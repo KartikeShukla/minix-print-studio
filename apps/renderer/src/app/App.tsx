@@ -11,12 +11,15 @@ import {
   Printer,
   QrCode,
   Redo2,
+  RotateCcw,
   ScanSearch,
   ShieldCheck,
   Square,
   Type,
   Undo2,
-  Wifi
+  Wifi,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import {
   appendElement,
@@ -66,6 +69,8 @@ const tools = [
 ];
 
 const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
+const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const DEFAULT_CANVAS_ZOOM_INDEX = 2;
 
 type PreviewWorkflow =
   | { status: "idle" }
@@ -127,6 +132,7 @@ export function App({ daemonClient }: AppProps) {
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
+  const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
   const { document, past, future, selectedElementId } = editorState;
 
   useEffect(() => {
@@ -337,6 +343,20 @@ export function App({ daemonClient }: AppProps) {
     setEditingTextElementId(null);
   }, []);
 
+  const zoomCanvasOut = useCallback(() => {
+    setCanvasZoomIndex((currentIndex) => Math.max(0, currentIndex - 1));
+  }, []);
+
+  const zoomCanvasIn = useCallback(() => {
+    setCanvasZoomIndex((currentIndex) =>
+      Math.min(CANVAS_ZOOM_STEPS.length - 1, currentIndex + 1)
+    );
+  }, []);
+
+  const resetCanvasZoom = useCallback(() => {
+    setCanvasZoomIndex(DEFAULT_CANVAS_ZOOM_INDEX);
+  }, []);
+
   const undoDocumentChange = useCallback(() => {
     setEditingTextElementId(null);
     setEditorState((currentState) => {
@@ -460,6 +480,10 @@ export function App({ daemonClient }: AppProps) {
   const previewReady = previewWorkflow.status === "ready";
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
+  const canvasZoom =
+    CANVAS_ZOOM_STEPS[canvasZoomIndex] ?? CANVAS_ZOOM_STEPS[DEFAULT_CANVAS_ZOOM_INDEX];
+  const canZoomOut = canvasZoomIndex > 0;
+  const canZoomIn = canvasZoomIndex < CANVAS_ZOOM_STEPS.length - 1;
   const selectedElement = useMemo(
     () => document.elements.find((element) => element.id === selectedElementId) ?? null,
     [document.elements, selectedElementId]
@@ -599,6 +623,7 @@ export function App({ daemonClient }: AppProps) {
                 previewReady={previewReady}
                 totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
                 editingTextElementId={editingTextElementId}
+                zoom={canvasZoom}
                 onSelect={selectElement}
                 onMove={moveDocumentElement}
                 onStartTextEdit={startInlineTextEdit}
@@ -671,7 +696,42 @@ export function App({ daemonClient }: AppProps) {
         </main>
 
         <footer className="flex items-center justify-between border-t border-border bg-card px-4 text-xs text-muted-foreground">
-          <span>Zoom 100%</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Zoom out"
+              aria-label="Zoom out"
+              onClick={zoomCanvasOut}
+              disabled={!canZoomOut}
+            >
+              <ZoomOut className="size-3.5" aria-hidden="true" />
+            </Button>
+            <span className="w-20 text-center tabular-nums">{formatZoom(canvasZoom)}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Zoom in"
+              aria-label="Zoom in"
+              onClick={zoomCanvasIn}
+              disabled={!canZoomIn}
+            >
+              <ZoomIn className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Reset zoom"
+              aria-label="Reset zoom"
+              onClick={resetCanvasZoom}
+              disabled={canvasZoomIndex === DEFAULT_CANVAS_ZOOM_INDEX}
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
           <span>{health ? `Daemon ${health.version}` : "No daemon health yet"}</span>
           <span>{formatQueueStatus(previewReady, printWorkflow)}</span>
         </footer>
@@ -1134,6 +1194,7 @@ function DocumentCanvas({
   previewReady,
   totalBands,
   editingTextElementId,
+  zoom,
   onSelect,
   onMove,
   onStartTextEdit,
@@ -1145,6 +1206,7 @@ function DocumentCanvas({
   previewReady: boolean;
   totalBands: number | null;
   editingTextElementId: string | null;
+  zoom: number;
   onSelect: (elementId: string | null) => void;
   onMove: (elementId: string, x: number, y: number) => void;
   onStartTextEdit: (elementId: string) => void;
@@ -1182,14 +1244,20 @@ function DocumentCanvas({
     (item) => item.kind === "text" && item.element.id === editingTextElementId
   );
   const editingTextElement = editingTextItem?.kind === "text" ? editingTextItem.element : null;
+  const stageWidth = Math.round(document.target.widthDots * zoom);
+  const stageHeight = Math.round(document.target.heightDots * zoom);
 
   return (
-    <div className="receipt-artboard" aria-label="384 dot receipt artboard">
+    <div
+      className="receipt-artboard"
+      aria-label="384 dot receipt artboard"
+      style={{ width: stageWidth }}
+    >
       <div className="border-b border-dashed border-safety/60 pb-3 text-center text-xs text-muted-foreground">
         {document.target.widthDots} dots
       </div>
       <div className="thermal-stage">
-        <Stage width={document.target.widthDots} height={document.target.heightDots}>
+        <Stage width={stageWidth} height={stageHeight} scaleX={zoom} scaleY={zoom}>
           <Layer>
             <Rect
               x={0}
@@ -1239,6 +1307,7 @@ function DocumentCanvas({
         {editingTextElement ? (
           <InlineTextEditor
             element={editingTextElement}
+            zoom={zoom}
             onCommit={(text) => onCommitTextEdit(editingTextElement.id, text)}
             onCancel={onCancelTextEdit}
           />
@@ -1264,10 +1333,12 @@ function DocumentCanvas({
 
 function InlineTextEditor({
   element,
+  zoom,
   onCommit,
   onCancel
 }: {
   element: TextElement;
+  zoom: number;
   onCommit: (text: string) => void;
   onCancel: () => void;
 }) {
@@ -1298,14 +1369,14 @@ function InlineTextEditor({
       className="absolute z-10 resize-none rounded-sm border border-primary bg-background/95 p-1 text-sm text-foreground shadow-sm outline-none ring-2 ring-primary/20"
       value={draft}
       style={{
-        left: element.x,
-        top: element.y,
-        width: element.width,
-        minHeight: element.height,
+        left: element.x * zoom,
+        top: element.y * zoom,
+        width: element.width * zoom,
+        minHeight: element.height * zoom,
         transform: `rotate(${element.rotation}deg)`,
         transformOrigin: "top left",
         fontFamily: element.style.fontFamily,
-        fontSize: element.style.fontSize,
+        fontSize: element.style.fontSize * zoom,
         fontWeight: element.style.fontWeight,
         lineHeight: element.style.lineHeight,
         color: element.style.fill,
@@ -1843,6 +1914,10 @@ function formatElementType(type: string): string {
     group: "Group"
   };
   return labels[type] ?? type;
+}
+
+function formatZoom(zoom: number): string {
+  return `Zoom ${Math.round(zoom * 100)}%`;
 }
 
 function formatPaperMode(mode: string): string {

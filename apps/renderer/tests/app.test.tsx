@@ -384,6 +384,57 @@ describe("MiniX Print Studio shell", () => {
     });
   });
 
+  it("zooms the canvas from footer controls without changing the print document", async () => {
+    const { container } = render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    await screen.findAllByText("Double-click to edit");
+
+    const initialStored = localStorage.getItem("minix.printStudio.currentDocument.v1");
+    expect(initialStored).toBeTruthy();
+    expect(screen.getByText("Zoom 100%")).toBeInTheDocument();
+
+    let stage = container.querySelector('[data-konva-node="Stage"]');
+    expect(stage).toHaveAttribute("data-scale-x", "1");
+    expect(stage).toHaveAttribute("data-scale-y", "1");
+    expect(stage).toHaveAttribute("data-width", "384");
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    expect(screen.getByText("Zoom 125%")).toBeInTheDocument();
+    stage = container.querySelector('[data-konva-node="Stage"]');
+    expect(stage).toHaveAttribute("data-scale-x", "1.25");
+    expect(stage).toHaveAttribute("data-scale-y", "1.25");
+    expect(stage).toHaveAttribute("data-width", "480");
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset zoom" }));
+    expect(screen.getByText("Zoom 100%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    expect(screen.getByText("Zoom 75%")).toBeInTheDocument();
+    stage = container.querySelector('[data-konva-node="Stage"]');
+    expect(stage).toHaveAttribute("data-scale-x", "0.75");
+    expect(stage).toHaveAttribute("data-width", "288");
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+  });
+
   it("edits the selected rectangle through the inspector and persists the document", async () => {
     render(
       <App
