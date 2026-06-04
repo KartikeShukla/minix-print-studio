@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
+import qrcode  # type: ignore[import-untyped]
 from PIL import Image, ImageDraw, ImageFont
 
 from minixd.raster.packing import calculate_black_coverage, pack_rows_msb
@@ -41,6 +42,8 @@ def render_document(document: dict[str, Any]) -> RenderedDocument:
             _draw_rect(draw, element)
         elif element_type == "text":
             _draw_text(draw, element)
+        elif element_type == "qr":
+            _draw_qr(draw, element)
 
     packed = _pack_thresholded_image(image)
     preview = _png_bytes(image)
@@ -86,6 +89,44 @@ def _draw_text(draw: ImageDraw.ImageDraw, element: dict[str, Any]) -> None:
     fill = 0 if _color_value(fill_source) < 128 else 255
     font = ImageFont.load_default()
     draw.text((_intish(element, "x"), _intish(element, "y")), text, fill=fill, font=font)
+
+
+def _draw_qr(draw: ImageDraw.ImageDraw, element: dict[str, Any]) -> None:
+    payload = str(element.get("payload", "")).strip()
+    if not payload:
+        return
+
+    x = _intish(element, "x")
+    y = _intish(element, "y")
+    width = _intish(element, "width")
+    height = _intish(element, "height")
+    available_size = min(width, height)
+    if available_size <= 0:
+        return
+
+    draw.rectangle((x, y, x + width - 1, y + height - 1), fill=255)
+    error_correction = _qr_error_correction(element.get("errorCorrectionLevel", "M"))
+    qr = qrcode.QRCode(error_correction=error_correction, box_size=1, border=1)
+    qr.add_data(payload)
+    qr.make(fit=True)
+    matrix = cast(list[list[bool]], qr.get_matrix())
+    if not matrix:
+        return
+
+    module_size = max(1, available_size // len(matrix))
+    rendered_size = module_size * len(matrix)
+    offset_x = x + max(0, (width - rendered_size) // 2)
+    offset_y = y + max(0, (height - rendered_size) // 2)
+    for row_index, row in enumerate(matrix):
+        for column_index, active in enumerate(row):
+            if not active:
+                continue
+            left = offset_x + column_index * module_size
+            top = offset_y + row_index * module_size
+            draw.rectangle(
+                (left, top, left + module_size - 1, top + module_size - 1),
+                fill=0,
+            )
 
 
 def _pack_thresholded_image(image: Image.Image) -> bytes:
@@ -139,6 +180,16 @@ def _color_value(value: object) -> int:
         blue = int(value[5:7], 16)
         return round((red + green + blue) / 3)
     return 0
+
+
+def _qr_error_correction(value: object) -> int:
+    levels = {
+        "L": qrcode.constants.ERROR_CORRECT_L,
+        "M": qrcode.constants.ERROR_CORRECT_M,
+        "Q": qrcode.constants.ERROR_CORRECT_Q,
+        "H": qrcode.constants.ERROR_CORRECT_H,
+    }
+    return int(levels.get(str(value), qrcode.constants.ERROR_CORRECT_M))
 
 
 def _stable(value: object) -> object:

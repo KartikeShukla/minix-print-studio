@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   createDefaultDocument,
+  createQrElement,
   createRectElement,
   createTextElement,
   moveElement,
   printDocumentSchema,
+  qrElementSchema,
   rectElementSchema,
   textElementSchema,
   updateElement
@@ -62,6 +64,25 @@ describe("default print document", () => {
     expect(element.fill).toBe("#000000");
     expect(element.width).toBe(336);
     expect(element.height).toBe(64);
+  });
+
+  it("creates a typed thermal QR element with stable defaults", () => {
+    const element = qrElementSchema.parse(
+      createQrElement({
+        id: "el_qr",
+        name: "Support URL",
+        payload: "https://example.com/support",
+        x: 120,
+        y: 220,
+        size: 128
+      })
+    );
+
+    expect(element.type).toBe("qr");
+    expect(element.payload).toBe("https://example.com/support");
+    expect(element.width).toBe(128);
+    expect(element.height).toBe(128);
+    expect(element.errorCorrectionLevel).toBe("M");
   });
 
   it("moves an element immutably and bumps updatedAt", () => {

@@ -21,17 +21,21 @@ import {
 import {
   appendElement,
   createDefaultDocument,
+  createQrElement,
   createRectElement,
   createTextElement,
   moveElement,
+  qrElementSchema,
   rectElementSchema,
   textElementSchema,
   updateElement,
   type PrintDocument,
+  type QrElement,
   type RectElement,
   type TextElement
 } from "@minix/design-model";
-import { Layer, Rect, Stage, Text as KonvaText } from "react-konva";
+import * as QRCode from "qrcode";
+import { Group, Layer, Rect, Stage, Text as KonvaText } from "react-konva";
 import type {
   DocumentPreviewResponse,
   HealthResponse,
@@ -98,7 +102,8 @@ type NumericElementField = "x" | "y" | "width" | "height";
 
 type CanvasElement =
   | { kind: "text"; element: TextElement }
-  | { kind: "rect"; element: RectElement };
+  | { kind: "rect"; element: RectElement }
+  | { kind: "qr"; element: QrElement };
 
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
@@ -201,6 +206,24 @@ export function App({ daemonClient }: AppProps) {
         y: 144 + rectCount * 32,
         width: currentDocument.target.widthDots - 64,
         height: 72
+      });
+      return {
+        document: appendElement(currentDocument, element),
+        selectedElementId: element.id
+      };
+    });
+  }, [commitDocument]);
+
+  const addQrLayer = useCallback(() => {
+    commitDocument((currentDocument) => {
+      const qrCount = currentDocument.elements.filter((element) => element.type === "qr").length;
+      const size = 128;
+      const element = createQrElement({
+        name: `QR ${qrCount + 1}`,
+        payload: "https://example.com",
+        x: Math.round((currentDocument.target.widthDots - size) / 2),
+        y: 240 + qrCount * 32,
+        size
       });
       return {
         document: appendElement(currentDocument, element),
@@ -444,6 +467,8 @@ export function App({ daemonClient }: AppProps) {
                           ? addTextLayer
                           : tool.label === "Rectangle"
                             ? addRectangleLayer
+                            : tool.label === "QR"
+                              ? addQrLayer
                             : undefined
                       }
                     >
@@ -563,6 +588,7 @@ function ElementInspector({
 }) {
   const textElement = element ? textElementSchema.safeParse(element) : null;
   const rectElement = element ? rectElementSchema.safeParse(element) : null;
+  const qrElement = element ? qrElementSchema.safeParse(element) : null;
 
   const updateTextField = (value: string) => {
     if (!element) {
@@ -690,10 +716,11 @@ function ElementInspector({
                   className="mt-1 min-h-20 w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
                   value={textElement.data.text}
                   onChange={(event) => {
+                    const text = event.currentTarget.value;
                     onUpdate(element.id, (currentElement) => {
                       const currentText = textElementSchema.safeParse(currentElement);
                       return currentText.success
-                        ? { ...currentText.data, text: event.currentTarget.value }
+                        ? { ...currentText.data, text }
                         : currentElement;
                     });
                   }}
@@ -718,6 +745,57 @@ function ElementInspector({
                   }}
                 />
               </div>
+            </div>
+          ) : null}
+
+          {qrElement?.success ? (
+            <div className="space-y-3">
+              <label
+                className="block text-xs font-medium text-muted-foreground"
+                htmlFor="inspector-qr-payload"
+              >
+                QR Payload
+                <textarea
+                  id="inspector-qr-payload"
+                  className="mt-1 min-h-20 w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={qrElement.data.payload}
+                  onChange={(event) => {
+                    const payload = event.currentTarget.value;
+                    onUpdate(element.id, (currentElement) => {
+                      const currentQr = qrElementSchema.safeParse(currentElement);
+                      return currentQr.success
+                        ? { ...currentQr.data, payload }
+                        : currentElement;
+                    });
+                  }}
+                />
+              </label>
+              <label
+                className="block text-xs font-medium text-muted-foreground"
+                htmlFor="inspector-qr-error-correction"
+              >
+                Error correction
+                <select
+                  id="inspector-qr-error-correction"
+                  className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                  value={qrElement.data.errorCorrectionLevel}
+                  onChange={(event) => {
+                    const errorCorrectionLevel = event.currentTarget
+                      .value as QrElement["errorCorrectionLevel"];
+                    onUpdate(element.id, (currentElement) => {
+                      const currentQr = qrElementSchema.safeParse(currentElement);
+                      return currentQr.success
+                        ? { ...currentQr.data, errorCorrectionLevel }
+                        : currentElement;
+                    });
+                  }}
+                >
+                  <option value="L">Low</option>
+                  <option value="M">Medium</option>
+                  <option value="Q">Quartile</option>
+                  <option value="H">High</option>
+                </select>
+              </label>
             </div>
           ) : null}
         </div>
@@ -850,6 +928,8 @@ function LayerList({
               <Type className="size-4 text-primary" aria-hidden="true" />
             ) : element.type === "rect" ? (
               <Square className="size-4 text-primary" aria-hidden="true" />
+            ) : element.type === "qr" ? (
+              <QrCode className="size-4 text-primary" aria-hidden="true" />
             ) : (
               <Layers3 className="size-4 text-primary" aria-hidden="true" />
             )}
@@ -860,6 +940,8 @@ function LayerList({
               ? element.text
               : element.type === "rect"
                 ? `${Math.round(element.width)} x ${Math.round(element.height)}`
+              : element.type === "qr" && typeof element.payload === "string"
+                ? element.payload
               : `${Math.round(element.x)}, ${Math.round(element.y)}`}
           </div>
         </button>
@@ -896,6 +978,12 @@ function DocumentCanvas({
       return items;
     }
 
+    const qrElement = qrElementSchema.safeParse(element);
+    if (qrElement.success) {
+      items.push({ kind: "qr", element: qrElement.data });
+      return items;
+    }
+
     return items;
   }, []);
 
@@ -923,8 +1011,16 @@ function DocumentCanvas({
                   onSelect={onSelect}
                   onMove={onMove}
                 />
-              ) : (
+              ) : item.kind === "rect" ? (
                 <CanvasRectElement
+                  key={item.element.id}
+                  element={item.element}
+                  selected={selectedElementId === item.element.id}
+                  onSelect={onSelect}
+                  onMove={onMove}
+                />
+              ) : (
+                <CanvasQrElement
                   key={item.element.id}
                   element={item.element}
                   selected={selectedElementId === item.element.id}
@@ -1025,6 +1121,74 @@ function CanvasRectElement({
         onMove(element.id, event.target.x(), event.target.y());
       }}
     />
+  );
+}
+
+function CanvasQrElement({
+  element,
+  selected,
+  onSelect,
+  onMove
+}: {
+  element: QrElement;
+  selected: boolean;
+  onSelect: (elementId: string) => void;
+  onMove: (elementId: string, x: number, y: number) => void;
+}) {
+  const matrix = useMemo(
+    () => createQrMatrix(element.payload, element.errorCorrectionLevel),
+    [element.errorCorrectionLevel, element.payload]
+  );
+  const availableSize = Math.max(1, Math.min(element.width, element.height));
+  const moduleSize = Math.max(1, Math.floor(availableSize / matrix.size));
+  const renderedSize = moduleSize * matrix.size;
+  const offsetX = Math.max(0, Math.round((element.width - renderedSize) / 2));
+  const offsetY = Math.max(0, Math.round((element.height - renderedSize) / 2));
+
+  return (
+    <Group
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      rotation={element.rotation}
+      draggable={!element.locked}
+      visible={element.visible}
+      onClick={() => onSelect(element.id)}
+      onTap={() => onSelect(element.id)}
+      onDragEnd={(event) => {
+        onMove(element.id, event.target.x(), event.target.y());
+      }}
+    >
+      <Rect width={element.width} height={element.height} fill="#ffffff" />
+      {Array.from(matrix.data).map((active, index) => {
+        if (!active) {
+          return null;
+        }
+        const row = Math.floor(index / matrix.size);
+        const column = index % matrix.size;
+        return (
+          <Rect
+            key={`${row}-${column}`}
+            x={offsetX + column * moduleSize}
+            y={offsetY + row * moduleSize}
+            width={moduleSize}
+            height={moduleSize}
+            fill="#000000"
+            listening={false}
+          />
+        );
+      })}
+      {selected ? (
+        <Rect
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+          stroke="#0f766e"
+          strokeWidth={2}
+          listening={false}
+        />
+      ) : null}
+    </Group>
   );
 }
 
@@ -1203,6 +1367,26 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
 
 function formatBandCount(totalBands: number): string {
   return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function createQrMatrix(
+  payload: string,
+  errorCorrectionLevel: QrElement["errorCorrectionLevel"]
+): { size: number; data: Uint8Array } {
+  const safePayload = payload.trim().length > 0 ? payload : " ";
+  try {
+    const qr = QRCode.create(safePayload, { errorCorrectionLevel });
+    return {
+      size: qr.modules.size,
+      data: qr.modules.data
+    };
+  } catch {
+    const fallbackQr = QRCode.create(" ", { errorCorrectionLevel: "M" });
+    return {
+      size: fallbackQr.modules.size,
+      data: fallbackQr.modules.data
+    };
+  }
 }
 
 function normalizeDotValue(value: number, minimum: number): number {

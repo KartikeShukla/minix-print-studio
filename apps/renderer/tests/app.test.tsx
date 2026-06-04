@@ -371,6 +371,52 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
   });
 
+  it("adds a QR layer from the canvas tool and edits payload through the inspector", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "QR" }));
+
+    expect(await screen.findByText("QR 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(screen.getByText("QR")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "QR Payload" }), {
+      target: { value: "https://minix.local/setup" }
+    });
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "qr",
+          name: "QR 1",
+          payload: "https://minix.local/setup",
+          width: 128,
+          height: 128,
+          errorCorrectionLevel: "M"
+        })
+      ]);
+    });
+  });
+
   it("adds a rectangle layer and keeps undo redo history persisted", async () => {
     render(
       <App

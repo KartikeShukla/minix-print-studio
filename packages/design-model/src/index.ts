@@ -33,6 +33,14 @@ export const rectElementSchema = elementBaseSchema.extend({
   fill: z.string()
 });
 
+export const qrErrorCorrectionLevelSchema = z.enum(["L", "M", "Q", "H"]);
+
+export const qrElementSchema = elementBaseSchema.extend({
+  type: z.literal("qr"),
+  payload: z.string(),
+  errorCorrectionLevel: qrErrorCorrectionLevelSchema
+});
+
 export const printDocumentSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string(),
@@ -58,6 +66,7 @@ export const printDocumentSchema = z.object({
 export type PrintDocument = z.infer<typeof printDocumentSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;
 export type RectElement = z.infer<typeof rectElementSchema>;
+export type QrElement = z.infer<typeof qrElementSchema>;
 
 export type DefaultDocumentOptions = {
   title?: string;
@@ -83,6 +92,16 @@ export type CreateRectElementOptions = {
   width: number;
   height: number;
   fill?: string;
+};
+
+export type CreateQrElementOptions = {
+  id?: string;
+  name: string;
+  payload: string;
+  x: number;
+  y: number;
+  size: number;
+  errorCorrectionLevel?: QrElement["errorCorrectionLevel"];
 };
 
 export function createDefaultDocument(options: DefaultDocumentOptions = {}): PrintDocument {
@@ -148,6 +167,23 @@ export function createRectElement(options: CreateRectElementOptions): RectElemen
     locked: false,
     visible: true,
     fill: options.fill ?? "#000000"
+  };
+}
+
+export function createQrElement(options: CreateQrElementOptions): QrElement {
+  return {
+    id: options.id ?? `el_${crypto.randomUUID()}`,
+    type: "qr",
+    name: options.name,
+    x: options.x,
+    y: options.y,
+    width: options.size,
+    height: options.size,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    payload: options.payload,
+    errorCorrectionLevel: options.errorCorrectionLevel ?? "M"
   };
 }
 

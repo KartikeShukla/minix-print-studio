@@ -86,3 +86,56 @@ def test_text_document_renders_deterministically_without_system_fonts() -> None:
 
     assert first.raster_hash == second.raster_hash
     assert first.safety["metrics"]["totalBlackPixels"] > 0
+
+
+def test_qr_document_renders_deterministically_from_payload() -> None:
+    document = {
+        "schemaVersion": 1,
+        "id": "doc_qr",
+        "title": "QR fixture",
+        "target": {
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": 180,
+            "dpi": 203,
+            "paperMode": "continuous",
+            "density": "medium",
+        },
+        "background": {"color": "#ffffff"},
+        "elements": [
+            {
+                "id": "qr_1",
+                "type": "qr",
+                "name": "Setup QR",
+                "x": 128,
+                "y": 24,
+                "width": 128,
+                "height": 128,
+                "rotation": 0,
+                "locked": False,
+                "visible": True,
+                "payload": "https://minix.local/setup",
+                "errorCorrectionLevel": "M",
+            }
+        ],
+        "assets": [],
+        "metadata": {},
+    }
+    changed_payload = {
+        **document,
+        "elements": [
+            {
+                **document["elements"][0],
+                "payload": "https://minix.local/diagnostics",
+            }
+        ],
+    }
+
+    first = render_document(document)
+    second = render_document(document)
+    changed = render_document(changed_payload)
+
+    assert first.raster_hash == second.raster_hash
+    assert first.raster_hash != changed.raster_hash
+    assert first.safety["metrics"]["totalBlackPixels"] > 0
+    assert first.preview_png.startswith(b"\x89PNG")

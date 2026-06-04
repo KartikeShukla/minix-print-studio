@@ -29,6 +29,7 @@ vi.mock("react-konva", async () => {
   return {
     Stage: node("Stage"),
     Layer: node("Layer"),
+    Group: node("Group"),
     Rect: node("Rect"),
     Text: node("Text")
   };
