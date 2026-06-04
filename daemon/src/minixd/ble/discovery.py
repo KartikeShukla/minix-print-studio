@@ -75,6 +75,10 @@ class PrinterDiscoveryError(Exception):
     """Base class for discovery failures that should be reported to callers."""
 
 
+class PrinterBluetoothUnavailableError(PrinterDiscoveryError):
+    """Raised when the host cannot access Bluetooth scanning or connections."""
+
+
 class PrinterNotFoundError(PrinterDiscoveryError):
     """Raised when a requested BLE device is not in the adapter scan."""
 

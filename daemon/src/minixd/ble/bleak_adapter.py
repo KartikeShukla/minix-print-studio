@@ -5,9 +5,12 @@ from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, cast
 
+from bleak.exc import BleakBluetoothNotAvailableError
+
 from minixd.ble.discovery import (
     BleAdvertisement,
     BleTimingEvent,
+    PrinterBluetoothUnavailableError,
     PrinterNotFoundError,
     ReadOnlyDeviceInfo,
 )
@@ -91,11 +94,16 @@ class BleakBleAdapter:
         self._devices_by_id: dict[str, object] = {}
 
     async def scan(self) -> list[BleAdvertisement]:
-        discovered = await self._scanner_discover(
-            self._scan_timeout_s,
-            return_adv=True,
-            service_uuids=list(self._service_uuids),
-        )
+        try:
+            discovered = await self._scanner_discover(
+                self._scan_timeout_s,
+                return_adv=True,
+                service_uuids=list(self._service_uuids),
+            )
+        except BleakBluetoothNotAvailableError as exc:
+            raise PrinterBluetoothUnavailableError(
+                f"Bluetooth unavailable: {_exception_message(exc)}"
+            ) from exc
         advertisements: list[BleAdvertisement] = []
         self._devices_by_id = {}
         for device_id, (device, advertisement_data) in discovered.items():
@@ -221,6 +229,12 @@ def _default_client_factory(device: object, services: list[str]) -> BleakClientL
 
 def _elapsed_ms(start: float) -> float:
     return max((time.perf_counter() - start) * 1000, 0)
+
+
+def _exception_message(exc: Exception) -> str:
+    if exc.args and isinstance(exc.args[0], str):
+        return exc.args[0]
+    return str(exc)
 
 
 async def _no_read_only_probe(session: ReadOnlyBleSession) -> ReadOnlyProbeResult:

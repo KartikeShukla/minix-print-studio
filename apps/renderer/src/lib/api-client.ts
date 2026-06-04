@@ -179,7 +179,7 @@ async function requestDaemon<T>(
   const response = await fetch(`${runtime.baseUrl}${path}`, init);
 
   if (!response.ok) {
-    throw new Error(`${label} failed with ${response.status}`);
+    throw new Error(await formatDaemonError(response, label));
   }
 
   return parse(await response.json());
@@ -207,10 +207,32 @@ async function requestDaemonBlob(
   const response = await fetch(`${runtime.baseUrl}${path}`, init);
 
   if (!response.ok) {
-    throw new Error(`${label} failed with ${response.status}`);
+    throw new Error(await formatDaemonError(response, label));
   }
 
   return response.blob();
+}
+
+async function formatDaemonError(response: Response, label: string): Promise<string> {
+  const detail = await readDaemonErrorDetail(response);
+  return `${label} failed with ${response.status}${detail ? `: ${detail}` : ""}`;
+}
+
+async function readDaemonErrorDetail(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json();
+    if (
+      body &&
+      typeof body === "object" &&
+      "detail" in body &&
+      typeof body.detail === "string"
+    ) {
+      return body.detail;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 async function getRuntime(): Promise<DaemonRuntime> {

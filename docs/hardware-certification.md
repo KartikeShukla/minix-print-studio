@@ -16,6 +16,18 @@ Stage A checks identity and BLE shape only:
 
 Stage A must not move paper, send raster bytes, or unlock printing.
 
+If the host cannot access Bluetooth, the scan/export flow returns a structured
+hardware error such as:
+
+```json
+{
+  "detail": "Bluetooth unavailable: Bluetooth is unsupported"
+}
+```
+
+Resolve Bluetooth availability, OS permission, or host adapter setup before treating
+Stage A as attempted.
+
 ## Exporting The Stage A Artifact
 
 After read-only verification, use `Export read-only artifact` in the Printer panel.

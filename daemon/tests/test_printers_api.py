@@ -1,6 +1,15 @@
+from typing import NoReturn
+
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from minixd.api.printers import create_printers_router
 from minixd.app import create_app
+from minixd.ble.discovery import (
+    PrinterDiscoveryError,
+    PrinterDiscoveryService,
+    ReadOnlyDeviceInfo,
+)
 
 
 def test_printer_scan_endpoint_returns_mock_candidates_without_print_permission() -> None:
@@ -34,6 +43,24 @@ def test_printer_scan_endpoint_supports_documented_post_method() -> None:
     assert response.json()["printers"][0]["deviceId"] == "mock-minix-0194"
 
 
+def test_printer_scan_endpoint_reports_bluetooth_unavailable() -> None:
+    app = FastAPI()
+    app.include_router(
+        create_printers_router(
+            discovery_service=PrinterDiscoveryService(
+                profiles=[],
+                adapter=UnavailableBleAdapter(),
+            )
+        )
+    )
+    client = TestClient(app)
+
+    response = client.post("/v1/printers/scan")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Bluetooth unavailable: Bluetooth is unsupported"}
+
+
 def test_read_only_verify_endpoint_keeps_matching_mock_printer_untrusted() -> None:
     client = TestClient(create_app(mock=True))
 
@@ -52,3 +79,11 @@ def test_read_only_verify_endpoint_keeps_matching_mock_printer_untrusted() -> No
     assert body["firmware"] == "V1.9.11"
     assert body["printable"] is False
     assert body["nextRequiredStage"] == "protocol_sanity_test"
+
+
+class UnavailableBleAdapter:
+    async def scan(self) -> NoReturn:
+        raise PrinterDiscoveryError("Bluetooth unavailable: Bluetooth is unsupported")
+
+    async def read_only_info(self, device_id: str) -> ReadOnlyDeviceInfo:
+        raise AssertionError("read_only_info should not be called during scan")

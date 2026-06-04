@@ -24,10 +24,14 @@ def create_printers_router(*, discovery_service: PrinterDiscoveryService) -> API
     @router.get("/scan")
     @router.post("/scan")
     async def scan_printers() -> dict[str, list[dict[str, object]]]:
+        try:
+            candidates = await discovery_service.scan()
+        except PrinterDiscoveryError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         return {
             "printers": [
                 _serialize_candidate(candidate)
-                for candidate in await discovery_service.scan()
+                for candidate in candidates
             ]
         }
 

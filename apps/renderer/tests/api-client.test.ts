@@ -320,4 +320,26 @@ describe("daemon API client", () => {
       }
     );
   });
+
+  it("includes daemon error details when printer scan fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({ detail: "Bluetooth unavailable: Bluetooth is unsupported" })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    await expect(client.scanPrinters()).rejects.toThrow(
+      "Daemon printer scan failed with 503: Bluetooth unavailable: Bluetooth is unsupported"
+    );
+  });
 });

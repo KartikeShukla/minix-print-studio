@@ -3,7 +3,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+from bleak.exc import BleakBluetoothNotAvailableError, BleakBluetoothNotAvailableReason
+
 from minixd.ble.bleak_adapter import BleakBleAdapter, ReadOnlyProbeResult
+from minixd.ble.discovery import PrinterDiscoveryError
 
 FF00 = "0000ff00-0000-1000-8000-00805f9b34fb"
 FF01 = "0000ff01-0000-1000-8000-00805f9b34fb"
@@ -118,6 +122,29 @@ def test_bleak_scan_maps_advertisement_data_to_daemon_advertisements() -> None:
     assert advertisements[0].name == "Seznik MiniX_0194_LE"
     assert advertisements[0].service_uuids == [FF00]
     assert advertisements[0].rssi == -47
+
+
+def test_bleak_scan_reports_bluetooth_unavailable() -> None:
+    async def discover(
+        timeout: float,
+        *,
+        return_adv: bool,
+        service_uuids: list[str],
+    ) -> dict[str, tuple[FakeDevice, FakeAdvertisementData]]:
+        raise BleakBluetoothNotAvailableError(
+            "Bluetooth is unsupported",
+            BleakBluetoothNotAvailableReason.NO_BLUETOOTH,
+        )
+
+    adapter = BleakBleAdapter(
+        scanner_discover=discover,
+        client_factory=_unused_client_factory,
+        scan_timeout_s=0.1,
+        service_uuids=[FF00],
+    )
+
+    with pytest.raises(PrinterDiscoveryError, match="Bluetooth unavailable"):
+        asyncio.run(adapter.scan())
 
 
 def test_bleak_read_only_info_connects_subscribes_probes_and_disconnects() -> None:
