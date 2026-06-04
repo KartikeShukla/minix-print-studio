@@ -13,6 +13,21 @@ export const elementBaseSchema = z.object({
   visible: z.boolean()
 });
 
+export const textStyleSchema = z.object({
+  fontFamily: z.string(),
+  fontSize: z.number().positive(),
+  fontWeight: z.number().int().positive(),
+  align: z.enum(["left", "center", "right"]),
+  lineHeight: z.number().positive(),
+  fill: z.string()
+});
+
+export const textElementSchema = elementBaseSchema.extend({
+  type: z.literal("text"),
+  text: z.string(),
+  style: textStyleSchema
+});
+
 export const printDocumentSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string(),
@@ -36,11 +51,22 @@ export const printDocumentSchema = z.object({
 });
 
 export type PrintDocument = z.infer<typeof printDocumentSchema>;
+export type TextElement = z.infer<typeof textElementSchema>;
 
 export type DefaultDocumentOptions = {
   title?: string;
   heightDots?: number;
   now?: Date;
+};
+
+export type CreateTextElementOptions = {
+  id?: string;
+  name: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 
 export function createDefaultDocument(options: DefaultDocumentOptions = {}): PrintDocument {
@@ -66,5 +92,55 @@ export function createDefaultDocument(options: DefaultDocumentOptions = {}): Pri
     elements: [],
     assets: [],
     metadata: {}
+  };
+}
+
+export function createTextElement(options: CreateTextElementOptions): TextElement {
+  return {
+    id: options.id ?? `el_${crypto.randomUUID()}`,
+    type: "text",
+    name: options.name,
+    x: options.x,
+    y: options.y,
+    width: options.width,
+    height: options.height,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    text: options.text,
+    style: {
+      fontFamily: "Inter",
+      fontSize: 28,
+      fontWeight: 700,
+      align: "center",
+      lineHeight: 1.1,
+      fill: "#000000"
+    }
+  };
+}
+
+export function appendElement(
+  document: PrintDocument,
+  element: PrintDocument["elements"][number],
+  options: { now?: Date } = {}
+): PrintDocument {
+  return {
+    ...document,
+    updatedAt: (options.now ?? new Date()).toISOString(),
+    elements: [...document.elements, element]
+  };
+}
+
+export function moveElement(
+  document: PrintDocument,
+  elementId: string,
+  options: { x: number; y: number; now?: Date }
+): PrintDocument {
+  return {
+    ...document,
+    updatedAt: (options.now ?? new Date()).toISOString(),
+    elements: document.elements.map((element) =>
+      element.id === elementId ? { ...element, x: options.x, y: options.y } : element
+    )
   };
 }

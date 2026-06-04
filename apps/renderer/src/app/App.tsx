@@ -16,7 +16,16 @@ import {
   Type,
   Wifi
 } from "lucide-react";
-import { createDefaultDocument } from "@minix/design-model";
+import {
+  appendElement,
+  createDefaultDocument,
+  createTextElement,
+  moveElement,
+  textElementSchema,
+  type PrintDocument,
+  type TextElement
+} from "@minix/design-model";
+import { Layer, Rect, Stage, Text as KonvaText } from "react-konva";
 import type {
   DocumentPreviewResponse,
   HealthResponse,
@@ -27,6 +36,7 @@ import type {
   RenderSettings
 } from "@minix/shared-api";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
+import { loadStoredDocument, saveStoredDocument } from "@/lib/document-storage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -40,11 +50,6 @@ const tools = [
   { label: "Rectangle", icon: Square },
   { label: "Image", icon: Image },
   { label: "QR", icon: QrCode }
-];
-
-const layers = [
-  { name: "Receipt artboard", detail: "384 x 900 dots", icon: FileText },
-  { name: "Protected tail margin", detail: "160 blank rows", icon: ShieldCheck }
 ];
 
 const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
@@ -71,12 +76,15 @@ type PrinterWorkflow =
 
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
-  const [document] = useState(() => createDefaultDocument({ heightDots: 900 }));
+  const [document, setDocument] = useState(() => {
+    return loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
+  });
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +108,43 @@ export function App({ daemonClient }: AppProps) {
       cancelled = true;
     };
   }, [client]);
+
+  useEffect(() => {
+    saveStoredDocument(document);
+  }, [document]);
+
+  const invalidatePreview = useCallback(() => {
+    setPreviewWorkflow({ status: "idle" });
+    setPrintWorkflow({ status: "idle" });
+  }, []);
+
+  const addTextLayer = useCallback(() => {
+    setDocument((currentDocument) => {
+      const textCount = currentDocument.elements.filter(
+        (element) => element.type === "text"
+      ).length;
+      const element = createTextElement({
+        name: `Text ${textCount + 1}`,
+        text: "Double-click to edit",
+        x: 24,
+        y: 56 + textCount * 24,
+        width: currentDocument.target.widthDots - 48,
+        height: 80
+      });
+      setSelectedElementId(element.id);
+      return appendElement(currentDocument, element);
+    });
+    invalidatePreview();
+  }, [invalidatePreview]);
+
+  const moveDocumentElement = useCallback(
+    (elementId: string, x: number, y: number) => {
+      setDocument((currentDocument) => moveElement(currentDocument, elementId, { x, y }));
+      setSelectedElementId(elementId);
+      invalidatePreview();
+    },
+    [invalidatePreview]
+  );
 
   const runPreview = useCallback(async () => {
     setPreviewWorkflow({ status: "running" });
@@ -200,7 +245,7 @@ export function App({ daemonClient }: AppProps) {
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold">MiniX Print Studio</h1>
               <p className="truncate text-xs text-muted-foreground">
-                Untitled print - continuous paper
+                {document.title} - {formatPaperMode(document.target.paperMode)}
               </p>
             </div>
           </div>
@@ -253,6 +298,7 @@ export function App({ daemonClient }: AppProps) {
                       size="icon"
                       title={tool.label}
                       aria-label={tool.label}
+                      onClick={tool.label === "Text" ? addTextLayer : undefined}
                     >
                       <Icon className="size-4" aria-hidden="true" />
                     </Button>
@@ -267,49 +313,21 @@ export function App({ daemonClient }: AppProps) {
                 <Layers3 className="size-4 text-muted-foreground" aria-hidden="true" />
               </div>
               <div className="space-y-2">
-                {layers.map((layer) => {
-                  const Icon = layer.icon;
-                  return (
-                    <div
-                      key={layer.name}
-                      className="rounded-md border border-border bg-card p-2 text-sm"
-                    >
-                      <div className="flex items-center gap-2 font-medium">
-                        <Icon className="size-4 text-primary" aria-hidden="true" />
-                        {layer.name}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">{layer.detail}</div>
-                    </div>
-                  );
-                })}
+                <LayerList document={document} selectedElementId={selectedElementId} />
               </div>
             </section>
           </aside>
 
           <section className="min-h-0 overflow-auto bg-workspace p-6">
             <div className="mx-auto flex min-h-full w-full max-w-4xl items-start justify-center">
-              <div className="receipt-artboard" aria-label="384 dot receipt artboard">
-                <div className="border-b border-dashed border-safety/60 pb-3 text-center text-xs text-muted-foreground">
-                  384 dots
-                </div>
-                <div className="flex flex-1 items-center justify-center text-center">
-                  <div>
-                    <Boxes
-                      className="mx-auto mb-3 size-9 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <div className="text-sm font-medium">Canvas editor bootstrap</div>
-                    <div className="mt-1 max-w-56 text-xs text-muted-foreground">
-                      {previewReady
-                        ? `${previewWorkflow.plan.totalBands} print bands planned from approved preview.`
-                        : "Document model and canonical preview contracts are ready for the editor slice."}
-                    </div>
-                  </div>
-                </div>
-                <div className="border-t border-dashed border-safety/60 pt-3 text-center text-xs text-safety">
-                  Protected tail margin
-                </div>
-              </div>
+              <DocumentCanvas
+                document={document}
+                selectedElementId={selectedElementId}
+                previewReady={previewReady}
+                totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
+                onSelect={setSelectedElementId}
+                onMove={moveDocumentElement}
+              />
             </div>
           </section>
 
@@ -381,6 +399,169 @@ export function App({ daemonClient }: AppProps) {
         </footer>
       </div>
     </div>
+  );
+}
+
+function LayerList({
+  document,
+  selectedElementId
+}: {
+  document: PrintDocument;
+  selectedElementId: string | null;
+}) {
+  const baseLayers = [
+    {
+      name: "Receipt artboard",
+      detail: `${document.target.widthDots} x ${document.target.heightDots} dots`,
+      icon: FileText
+    },
+    { name: "Protected tail margin", detail: "160 blank rows", icon: ShieldCheck }
+  ];
+
+  return (
+    <>
+      {baseLayers.map((layer) => {
+        const Icon = layer.icon;
+        return (
+          <div key={layer.name} className="rounded-md border border-border bg-card p-2 text-sm">
+            <div className="flex items-center gap-2 font-medium">
+              <Icon className="size-4 text-primary" aria-hidden="true" />
+              {layer.name}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">{layer.detail}</div>
+          </div>
+        );
+      })}
+      {document.elements.map((element) => (
+        <div
+          key={element.id}
+          className={`rounded-md border p-2 text-sm ${
+            selectedElementId === element.id
+              ? "border-primary bg-primary/5"
+              : "border-border bg-card"
+          }`}
+        >
+          <div className="flex items-center gap-2 font-medium">
+            {element.type === "text" ? (
+              <Type className="size-4 text-primary" aria-hidden="true" />
+            ) : (
+              <Layers3 className="size-4 text-primary" aria-hidden="true" />
+            )}
+            {element.name}
+          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {element.type === "text" && typeof element.text === "string"
+              ? element.text
+              : `${Math.round(element.x)}, ${Math.round(element.y)}`}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function DocumentCanvas({
+  document,
+  selectedElementId,
+  previewReady,
+  totalBands,
+  onSelect,
+  onMove
+}: {
+  document: PrintDocument;
+  selectedElementId: string | null;
+  previewReady: boolean;
+  totalBands: number | null;
+  onSelect: (elementId: string | null) => void;
+  onMove: (elementId: string, x: number, y: number) => void;
+}) {
+  const textElements = document.elements
+    .map((element) => textElementSchema.safeParse(element))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+
+  return (
+    <div className="receipt-artboard" aria-label="384 dot receipt artboard">
+      <div className="border-b border-dashed border-safety/60 pb-3 text-center text-xs text-muted-foreground">
+        {document.target.widthDots} dots
+      </div>
+      <div className="thermal-stage">
+        <Stage width={document.target.widthDots} height={document.target.heightDots}>
+          <Layer>
+            <Rect
+              x={0}
+              y={0}
+              width={document.target.widthDots}
+              height={document.target.heightDots}
+              fill={document.background.color}
+            />
+            {textElements.map((element) => (
+              <CanvasTextElement
+                key={element.id}
+                element={element}
+                selected={selectedElementId === element.id}
+                onSelect={onSelect}
+                onMove={onMove}
+              />
+            ))}
+          </Layer>
+        </Stage>
+        {document.elements.length === 0 ? (
+          <div className="thermal-stage-empty">
+            <Boxes className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden="true" />
+            <div className="text-sm font-medium">Canvas editor bootstrap</div>
+            <div className="mt-1 max-w-56 text-xs text-muted-foreground">
+              {previewReady
+                ? `${totalBands} print bands planned from approved preview.`
+                : "Document model and canonical preview contracts are ready for the editor slice."}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="border-t border-dashed border-safety/60 pt-3 text-center text-xs text-safety">
+        Protected tail margin
+      </div>
+    </div>
+  );
+}
+
+function CanvasTextElement({
+  element,
+  selected,
+  onSelect,
+  onMove
+}: {
+  element: TextElement;
+  selected: boolean;
+  onSelect: (elementId: string) => void;
+  onMove: (elementId: string, x: number, y: number) => void;
+}) {
+  const selectionProps = selected ? { stroke: "#0f766e", strokeWidth: 1 } : {};
+
+  return (
+    <KonvaText
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      width={element.width}
+      height={element.height}
+      rotation={element.rotation}
+      text={element.text}
+      fontFamily={element.style.fontFamily}
+      fontSize={element.style.fontSize}
+      fontStyle={String(element.style.fontWeight)}
+      align={element.style.align}
+      lineHeight={element.style.lineHeight}
+      fill={element.style.fill}
+      draggable={!element.locked}
+      visible={element.visible}
+      {...selectionProps}
+      onClick={() => onSelect(element.id)}
+      onTap={() => onSelect(element.id)}
+      onDragEnd={(event) => {
+        onMove(element.id, event.target.x(), event.target.y());
+      }}
+    />
   );
 }
 
@@ -559,6 +740,15 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
 
 function formatBandCount(totalBands: number): string {
   return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function formatPaperMode(mode: string): string {
+  const labels: Record<string, string> = {
+    continuous: "continuous paper",
+    gap_label: "gap label",
+    black_mark: "black mark"
+  };
+  return labels[mode] ?? mode;
 }
 
 function formatSupportLevel(level: string): string {

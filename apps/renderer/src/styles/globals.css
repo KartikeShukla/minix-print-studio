@@ -56,3 +56,21 @@ body {
   background-size: 24px 24px;
   box-shadow: 0 18px 42px hsl(220 20% 20% / 0.16);
 }
+
+.thermal-stage {
+  position: relative;
+  min-height: 620px;
+  overflow: hidden;
+  background: hsl(0 0% 100%);
+}
+
+.thermal-stage-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+}

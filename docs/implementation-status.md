@@ -49,6 +49,10 @@
 - Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
 - Bleak read-only connection lifecycle with async connect/disconnect, GATT service/characteristic discovery, notify subscription, and raw notification capture.
 - Read-only identity probing is injectable and intentionally does not mark real hardware verified until profile-specific model/firmware query behavior is implemented and tested.
+- Versioned document model now includes typed text elements with stable thermal defaults and immutable movement updates.
+- Renderer document persistence hydrates and saves the current document through localStorage with schema validation.
+- Initial React Konva artboard renders the document model, supports adding text layers from the toolbar, selects/moves text elements, and keeps the daemon preview/print state invalidated after edits.
+- Renderer test harness includes a React Konva mock so canvas behavior can stay covered without depending on browser canvas support in unit tests.
 
 ## Current Verification
 
@@ -63,6 +67,6 @@
 ## Next Implementation Slices
 
 1. Profile-backed read-only model/firmware probe plus physical hardware validation.
-2. Project/document persistence and editor canvas interactions.
+2. Canvas editor MVP depth: transformer handles, inline text editing, rectangle/image/QR layers, undo/redo, and inspector controls.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

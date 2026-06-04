@@ -5,6 +5,7 @@ import { App } from "../src/app/App";
 describe("MiniX Print Studio shell", () => {
   afterEach(() => {
     cleanup();
+    localStorage.clear();
   });
 
   it("shows the workspace and daemon health from the local API", async () => {
@@ -281,5 +282,43 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Protocol sanity test required")).toBeInTheDocument();
     expect(screen.getByText("Printing still locked")).toBeInTheDocument();
     expect(readOnlyVerify).toHaveBeenCalledWith("mock-minix-0194");
+  });
+
+  it("adds a text layer from the canvas tool and persists the document", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+
+    expect(await screen.findAllByText("Double-click to edit")).toHaveLength(2);
+    expect(screen.getByText("Text 1")).toBeInTheDocument();
+
+    const stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+    );
+    expect(stored.elements).toEqual([
+      expect.objectContaining({
+        type: "text",
+        name: "Text 1",
+        text: "Double-click to edit",
+        x: 24,
+        y: 56
+      })
+    ]);
   });
 });
