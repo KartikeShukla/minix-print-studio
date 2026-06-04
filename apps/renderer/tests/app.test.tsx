@@ -417,6 +417,66 @@ describe("MiniX Print Studio shell", () => {
     });
   });
 
+  it("imports an image file as an embedded image layer and persists preprocessing defaults", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+    const imageFile = new File(
+      [Uint8Array.from(atob(pngBase64), (character) => character.charCodeAt(0))],
+      "logo.png",
+      { type: "image/png" }
+    );
+
+    fireEvent.change(screen.getByLabelText("Import image"), {
+      target: { files: [imageFile] }
+    });
+
+    expect(await screen.findByText("Image 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(screen.getAllByText("Image")).not.toHaveLength(0);
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "image",
+          name: "Image 1",
+          width: 256,
+          height: 160,
+          fit: "contain",
+          processing: {
+            threshold: 128,
+            invert: false
+          },
+          source: expect.objectContaining({
+            kind: "embedded_data_url",
+            mimeType: "image/png",
+            dataUrl: expect.stringMatching(new RegExp("^data:image/png;base64,"))
+          })
+        })
+      ]);
+    });
+  });
+
   it("adds a rectangle layer and keeps undo redo history persisted", async () => {
     render(
       <App

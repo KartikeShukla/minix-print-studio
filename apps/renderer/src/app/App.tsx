@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Bluetooth,
   Boxes,
   CircleAlert,
   FileSearch,
   FileText,
-  Image,
+  Image as ImageIcon,
   Layers3,
   MousePointer2,
   Printer,
@@ -21,21 +21,24 @@ import {
 import {
   appendElement,
   createDefaultDocument,
+  createImageElement,
   createQrElement,
   createRectElement,
   createTextElement,
+  imageElementSchema,
   moveElement,
   qrElementSchema,
   rectElementSchema,
   textElementSchema,
   updateElement,
+  type ImageElement,
   type PrintDocument,
   type QrElement,
   type RectElement,
   type TextElement
 } from "@minix/design-model";
 import * as QRCode from "qrcode";
-import { Group, Layer, Rect, Stage, Text as KonvaText } from "react-konva";
+import { Group, Image as KonvaImage, Layer, Rect, Stage, Text as KonvaText } from "react-konva";
 import type {
   DocumentPreviewResponse,
   HealthResponse,
@@ -58,7 +61,7 @@ const tools = [
   { label: "Select", icon: MousePointer2 },
   { label: "Text", icon: Type },
   { label: "Rectangle", icon: Square },
-  { label: "Image", icon: Image },
+  { label: "Image", icon: ImageIcon },
   { label: "QR", icon: QrCode }
 ];
 
@@ -103,10 +106,12 @@ type NumericElementField = "x" | "y" | "width" | "height";
 type CanvasElement =
   | { kind: "text"; element: TextElement }
   | { kind: "rect"; element: RectElement }
+  | { kind: "image"; element: ImageElement }
   | { kind: "qr"; element: QrElement };
 
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
     const document = loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
     return {
@@ -231,6 +236,51 @@ export function App({ daemonClient }: AppProps) {
       };
     });
   }, [commitDocument]);
+
+  const importImageFile = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        if (typeof reader.result !== "string") {
+          return;
+        }
+        commitDocument((currentDocument) => {
+          const imageCount = currentDocument.elements.filter(
+            (element) => element.type === "image"
+          ).length;
+          const element = createImageElement({
+            name: `Image ${imageCount + 1}`,
+            dataUrl: reader.result as string,
+            mimeType: file.type,
+            x: 32,
+            y: 280 + imageCount * 32,
+            width: Math.min(256, currentDocument.target.widthDots - 64),
+            height: 160
+          });
+          return {
+            document: appendElement(currentDocument, element),
+            selectedElementId: element.id
+          };
+        });
+      });
+      reader.readAsDataURL(file);
+    },
+    [commitDocument]
+  );
+
+  const handleImageFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
+      if (file) {
+        importImageFile(file);
+      }
+      event.currentTarget.value = "";
+    },
+    [importImageFile]
+  );
 
   const moveDocumentElement = useCallback(
     (elementId: string, x: number, y: number) => {
@@ -467,6 +517,8 @@ export function App({ daemonClient }: AppProps) {
                           ? addTextLayer
                           : tool.label === "Rectangle"
                             ? addRectangleLayer
+                            : tool.label === "Image"
+                              ? () => imageInputRef.current?.click()
                             : tool.label === "QR"
                               ? addQrLayer
                             : undefined
@@ -477,6 +529,14 @@ export function App({ daemonClient }: AppProps) {
                   );
                 })}
               </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                aria-label="Import image"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={handleImageFileChange}
+              />
             </section>
 
             <section className="p-3">
@@ -588,6 +648,7 @@ function ElementInspector({
 }) {
   const textElement = element ? textElementSchema.safeParse(element) : null;
   const rectElement = element ? rectElementSchema.safeParse(element) : null;
+  const imageElement = element ? imageElementSchema.safeParse(element) : null;
   const qrElement = element ? qrElementSchema.safeParse(element) : null;
 
   const updateTextField = (value: string) => {
@@ -748,6 +809,83 @@ function ElementInspector({
             </div>
           ) : null}
 
+          {imageElement?.success ? (
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
+                  Source
+                </div>
+                <div className="truncate text-sm">{imageElement.data.source.mimeType}</div>
+              </div>
+              <label
+                className="block text-xs font-medium text-muted-foreground"
+                htmlFor="inspector-image-fit"
+              >
+                Fit
+                <select
+                  id="inspector-image-fit"
+                  className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                  value={imageElement.data.fit}
+                  onChange={(event) => {
+                    const fit = event.currentTarget.value as ImageElement["fit"];
+                    onUpdate(element.id, (currentElement) => {
+                      const currentImage = imageElementSchema.safeParse(currentElement);
+                      return currentImage.success ? { ...currentImage.data, fit } : currentElement;
+                    });
+                  }}
+                >
+                  <option value="contain">Contain</option>
+                  <option value="cover">Cover</option>
+                  <option value="stretch">Stretch</option>
+                </select>
+              </label>
+              <InspectorNumberField
+                id="inspector-image-threshold"
+                label="Threshold"
+                value={imageElement.data.processing.threshold}
+                min={0}
+                max={255}
+                onChange={(value) => {
+                  onUpdate(element.id, (currentElement) => {
+                    const currentImage = imageElementSchema.safeParse(currentElement);
+                    return currentImage.success
+                      ? {
+                          ...currentImage.data,
+                          processing: {
+                            ...currentImage.data.processing,
+                            threshold: Math.min(255, normalizeDotValue(value, 0))
+                          }
+                        }
+                      : currentElement;
+                  });
+                }}
+              />
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={imageElement.data.processing.invert}
+                  onChange={(event) => {
+                    const invert = event.currentTarget.checked;
+                    onUpdate(element.id, (currentElement) => {
+                      const currentImage = imageElementSchema.safeParse(currentElement);
+                      return currentImage.success
+                        ? {
+                            ...currentImage.data,
+                            processing: {
+                              ...currentImage.data.processing,
+                              invert
+                            }
+                          }
+                        : currentElement;
+                    });
+                  }}
+                />
+                Invert image
+              </label>
+            </div>
+          ) : null}
+
           {qrElement?.success ? (
             <div className="space-y-3">
               <label
@@ -811,12 +949,14 @@ function InspectorNumberField({
   label,
   value,
   min,
+  max,
   onChange
 }: {
   id: string;
   label: string;
   value: number;
   min: number;
+  max?: number;
   onChange: (value: number) => void;
 }) {
   return (
@@ -826,6 +966,7 @@ function InspectorNumberField({
         id={id}
         type="number"
         min={min}
+        max={max}
         step={1}
         className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
         value={value}
@@ -928,6 +1069,8 @@ function LayerList({
               <Type className="size-4 text-primary" aria-hidden="true" />
             ) : element.type === "rect" ? (
               <Square className="size-4 text-primary" aria-hidden="true" />
+            ) : element.type === "image" ? (
+              <ImageIcon className="size-4 text-primary" aria-hidden="true" />
             ) : element.type === "qr" ? (
               <QrCode className="size-4 text-primary" aria-hidden="true" />
             ) : (
@@ -936,13 +1079,7 @@ function LayerList({
             {element.name}
           </div>
           <div className="mt-1 truncate text-xs text-muted-foreground">
-            {element.type === "text" && typeof element.text === "string"
-              ? element.text
-              : element.type === "rect"
-                ? `${Math.round(element.width)} x ${Math.round(element.height)}`
-              : element.type === "qr" && typeof element.payload === "string"
-                ? element.payload
-              : `${Math.round(element.x)}, ${Math.round(element.y)}`}
+            {formatElementLayerDetail(element)}
           </div>
         </button>
       ))}
@@ -975,6 +1112,12 @@ function DocumentCanvas({
     const rectElement = rectElementSchema.safeParse(element);
     if (rectElement.success) {
       items.push({ kind: "rect", element: rectElement.data });
+      return items;
+    }
+
+    const imageElement = imageElementSchema.safeParse(element);
+    if (imageElement.success) {
+      items.push({ kind: "image", element: imageElement.data });
       return items;
     }
 
@@ -1013,6 +1156,14 @@ function DocumentCanvas({
                 />
               ) : item.kind === "rect" ? (
                 <CanvasRectElement
+                  key={item.element.id}
+                  element={item.element}
+                  selected={selectedElementId === item.element.id}
+                  onSelect={onSelect}
+                  onMove={onMove}
+                />
+              ) : item.kind === "image" ? (
+                <CanvasImageElement
                   key={item.element.id}
                   element={item.element}
                   selected={selectedElementId === item.element.id}
@@ -1121,6 +1272,82 @@ function CanvasRectElement({
         onMove(element.id, event.target.x(), event.target.y());
       }}
     />
+  );
+}
+
+function CanvasImageElement({
+  element,
+  selected,
+  onSelect,
+  onMove
+}: {
+  element: ImageElement;
+  selected: boolean;
+  onSelect: (elementId: string) => void;
+  onMove: (elementId: string, x: number, y: number) => void;
+}) {
+  const image = useLoadedCanvasImage(element.source.dataUrl);
+  const placement = image
+    ? calculateImagePlacement({
+        imageWidth: image.naturalWidth || image.width,
+        imageHeight: image.naturalHeight || image.height,
+        boxWidth: element.width,
+        boxHeight: element.height,
+        fit: element.fit
+      })
+    : null;
+
+  return (
+    <Group
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      rotation={element.rotation}
+      clipX={0}
+      clipY={0}
+      clipWidth={element.width}
+      clipHeight={element.height}
+      draggable={!element.locked}
+      visible={element.visible}
+      onClick={() => onSelect(element.id)}
+      onTap={() => onSelect(element.id)}
+      onDragEnd={(event) => {
+        onMove(element.id, event.target.x(), event.target.y());
+      }}
+    >
+      <Rect width={element.width} height={element.height} fill="#ffffff" />
+      {image && placement ? (
+        <KonvaImage
+          image={image}
+          x={placement.x}
+          y={placement.y}
+          width={placement.width}
+          height={placement.height}
+          listening={false}
+        />
+      ) : (
+        <KonvaText
+          width={element.width}
+          height={element.height}
+          align="center"
+          verticalAlign="middle"
+          text="Image"
+          fill="#6b7280"
+          fontSize={16}
+          listening={false}
+        />
+      )}
+      {selected ? (
+        <Rect
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+          stroke="#0f766e"
+          strokeWidth={2}
+          listening={false}
+        />
+      ) : null}
+    </Group>
   );
 }
 
@@ -1363,6 +1590,85 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
       </div>
     </div>
   );
+}
+
+function useLoadedCanvasImage(dataUrl: string): HTMLImageElement | null {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    let cancelled = false;
+    const nextImage = new window.Image();
+    nextImage.onload = () => {
+      if (!cancelled) {
+        setImage(nextImage);
+      }
+    };
+    nextImage.onerror = () => {
+      if (!cancelled) {
+        setImage(null);
+      }
+    };
+    nextImage.src = dataUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataUrl]);
+
+  return image;
+}
+
+function calculateImagePlacement({
+  imageWidth,
+  imageHeight,
+  boxWidth,
+  boxHeight,
+  fit
+}: {
+  imageWidth: number;
+  imageHeight: number;
+  boxWidth: number;
+  boxHeight: number;
+  fit: ImageElement["fit"];
+}): { x: number; y: number; width: number; height: number } {
+  if (fit === "stretch") {
+    return { x: 0, y: 0, width: boxWidth, height: boxHeight };
+  }
+
+  const scale =
+    fit === "cover"
+      ? Math.max(boxWidth / imageWidth, boxHeight / imageHeight)
+      : Math.min(boxWidth / imageWidth, boxHeight / imageHeight);
+  const width = Math.max(1, Math.round(imageWidth * scale));
+  const height = Math.max(1, Math.round(imageHeight * scale));
+  return {
+    x: Math.round((boxWidth - width) / 2),
+    y: Math.round((boxHeight - height) / 2),
+    width,
+    height
+  };
+}
+
+function formatElementLayerDetail(element: DocumentElement): string {
+  if (element.type === "text" && typeof element.text === "string") {
+    return element.text;
+  }
+  if (element.type === "rect") {
+    return `${Math.round(element.width)} x ${Math.round(element.height)}`;
+  }
+  if (element.type === "image") {
+    const imageElement = imageElementSchema.safeParse(element);
+    return imageElement.success
+      ? `${imageElement.data.source.mimeType} - ${imageElement.data.fit}`
+      : "Embedded image";
+  }
+  if (element.type === "qr" && typeof element.payload === "string") {
+    return element.payload;
+  }
+  return `${Math.round(element.x)}, ${Math.round(element.y)}`;
 }
 
 function formatBandCount(totalBands: number): string {

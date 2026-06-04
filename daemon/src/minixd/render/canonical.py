@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Any, cast
 
 import qrcode  # type: ignore[import-untyped]
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from minixd.raster.packing import calculate_black_coverage, pack_rows_msb
 
@@ -42,6 +44,8 @@ def render_document(document: dict[str, Any]) -> RenderedDocument:
             _draw_rect(draw, element)
         elif element_type == "text":
             _draw_text(draw, element)
+        elif element_type == "image":
+            _draw_image(image, element)
         elif element_type == "qr":
             _draw_qr(draw, element)
 
@@ -89,6 +93,39 @@ def _draw_text(draw: ImageDraw.ImageDraw, element: dict[str, Any]) -> None:
     fill = 0 if _color_value(fill_source) < 128 else 255
     font = ImageFont.load_default()
     draw.text((_intish(element, "x"), _intish(element, "y")), text, fill=fill, font=font)
+
+
+def _draw_image(image: Image.Image, element: dict[str, Any]) -> None:
+    x = _intish(element, "x")
+    y = _intish(element, "y")
+    width = _intish(element, "width")
+    height = _intish(element, "height")
+    if width <= 0 or height <= 0:
+        return
+
+    source = _dict_value(element, "source")
+    data_url = source.get("dataUrl")
+    if not isinstance(data_url, str):
+        raise ValueError("image source dataUrl must be a string")
+
+    payload = _decode_image_data_url(data_url)
+    with Image.open(BytesIO(payload)) as source_image:
+        grayscale = source_image.convert("L")
+
+    fitted = _fit_image(
+        grayscale,
+        width=width,
+        height=height,
+        fit=str(element.get("fit", "contain")),
+    )
+    processing = element.get("processing", {})
+    threshold_source = processing.get("threshold", 128) if isinstance(processing, dict) else 128
+    invert = bool(processing.get("invert", False)) if isinstance(processing, dict) else False
+    threshold = _bounded_int(threshold_source, minimum=0, maximum=255, field="image threshold")
+    if invert:
+        fitted = ImageOps.invert(fitted)
+    thresholded = fitted.point(lambda value: 0 if value < threshold else 255)
+    image.paste(thresholded, (x, y))
 
 
 def _draw_qr(draw: ImageDraw.ImageDraw, element: dict[str, Any]) -> None:
@@ -180,6 +217,45 @@ def _color_value(value: object) -> int:
         blue = int(value[5:7], 16)
         return round((red + green + blue) / 3)
     return 0
+
+
+def _decode_image_data_url(data_url: str) -> bytes:
+    prefix, separator, payload = data_url.partition(",")
+    if separator != "," or ";base64" not in prefix or not prefix.startswith("data:image/"):
+        raise ValueError("image source must be an embedded base64 image data URL")
+    try:
+        return base64.b64decode(payload, validate=True)
+    except binascii.Error as error:
+        raise ValueError("image source data URL is not valid base64") from error
+
+
+def _fit_image(source: Image.Image, *, width: int, height: int, fit: str) -> Image.Image:
+    if fit == "stretch":
+        return source.resize((width, height), Image.Resampling.LANCZOS)
+
+    scale = (
+        max(width / source.width, height / source.height)
+        if fit == "cover"
+        else min(width / source.width, height / source.height)
+    )
+    resized_width = max(1, round(source.width * scale))
+    resized_height = max(1, round(source.height * scale))
+    resized = source.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
+
+    if fit == "cover":
+        left = max(0, (resized_width - width) // 2)
+        top = max(0, (resized_height - height) // 2)
+        return resized.crop((left, top, left + width, top + height))
+
+    canvas = Image.new("L", (width, height), color=255)
+    canvas.paste(resized, ((width - resized_width) // 2, (height - resized_height) // 2))
+    return canvas
+
+
+def _bounded_int(value: object, *, minimum: int, maximum: int, field: str) -> int:
+    if not isinstance(value, int | float):
+        raise ValueError(f"{field} must be numeric")
+    return min(maximum, max(minimum, int(round(value))))
 
 
 def _qr_error_correction(value: object) -> int:

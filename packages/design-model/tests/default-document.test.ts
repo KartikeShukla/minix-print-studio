@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   createDefaultDocument,
+  createImageElement,
   createQrElement,
   createRectElement,
   createTextElement,
+  imageElementSchema,
   moveElement,
   printDocumentSchema,
   qrElementSchema,
@@ -83,6 +85,28 @@ describe("default print document", () => {
     expect(element.width).toBe(128);
     expect(element.height).toBe(128);
     expect(element.errorCorrectionLevel).toBe("M");
+  });
+
+  it("creates a typed embedded image element with stable preprocessing defaults", () => {
+    const element = imageElementSchema.parse(
+      createImageElement({
+        id: "el_image",
+        name: "Logo",
+        dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        mimeType: "image/png",
+        x: 32,
+        y: 260,
+        width: 256,
+        height: 160
+      })
+    );
+
+    expect(element.type).toBe("image");
+    expect(element.source.kind).toBe("embedded_data_url");
+    expect(element.source.mimeType).toBe("image/png");
+    expect(element.fit).toBe("contain");
+    expect(element.processing.threshold).toBe(128);
+    expect(element.processing.invert).toBe(false);
   });
 
   it("moves an element immutably and bumps updatedAt", () => {

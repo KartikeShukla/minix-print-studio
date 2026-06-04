@@ -33,6 +33,26 @@ export const rectElementSchema = elementBaseSchema.extend({
   fill: z.string()
 });
 
+export const imageFitSchema = z.enum(["contain", "cover", "stretch"]);
+
+export const embeddedImageSourceSchema = z.object({
+  kind: z.literal("embedded_data_url"),
+  dataUrl: z.string().startsWith("data:image/"),
+  mimeType: z.string().startsWith("image/")
+});
+
+export const imageProcessingSchema = z.object({
+  threshold: z.number().int().min(0).max(255),
+  invert: z.boolean()
+});
+
+export const imageElementSchema = elementBaseSchema.extend({
+  type: z.literal("image"),
+  source: embeddedImageSourceSchema,
+  fit: imageFitSchema,
+  processing: imageProcessingSchema
+});
+
 export const qrErrorCorrectionLevelSchema = z.enum(["L", "M", "Q", "H"]);
 
 export const qrElementSchema = elementBaseSchema.extend({
@@ -66,6 +86,7 @@ export const printDocumentSchema = z.object({
 export type PrintDocument = z.infer<typeof printDocumentSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;
 export type RectElement = z.infer<typeof rectElementSchema>;
+export type ImageElement = z.infer<typeof imageElementSchema>;
 export type QrElement = z.infer<typeof qrElementSchema>;
 
 export type DefaultDocumentOptions = {
@@ -92,6 +113,20 @@ export type CreateRectElementOptions = {
   width: number;
   height: number;
   fill?: string;
+};
+
+export type CreateImageElementOptions = {
+  id?: string;
+  name: string;
+  dataUrl: string;
+  mimeType: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fit?: ImageElement["fit"];
+  threshold?: number;
+  invert?: boolean;
 };
 
 export type CreateQrElementOptions = {
@@ -167,6 +202,31 @@ export function createRectElement(options: CreateRectElementOptions): RectElemen
     locked: false,
     visible: true,
     fill: options.fill ?? "#000000"
+  };
+}
+
+export function createImageElement(options: CreateImageElementOptions): ImageElement {
+  return {
+    id: options.id ?? `el_${crypto.randomUUID()}`,
+    type: "image",
+    name: options.name,
+    x: options.x,
+    y: options.y,
+    width: options.width,
+    height: options.height,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    source: {
+      kind: "embedded_data_url",
+      dataUrl: options.dataUrl,
+      mimeType: options.mimeType
+    },
+    fit: options.fit ?? "contain",
+    processing: {
+      threshold: options.threshold ?? 128,
+      invert: options.invert ?? false
+    }
   };
 }
 

@@ -1,3 +1,8 @@
+import base64
+from io import BytesIO
+
+from PIL import Image
+
 from minixd.render.canonical import render_document
 
 
@@ -139,3 +144,77 @@ def test_qr_document_renders_deterministically_from_payload() -> None:
     assert first.raster_hash != changed.raster_hash
     assert first.safety["metrics"]["totalBlackPixels"] > 0
     assert first.preview_png.startswith(b"\x89PNG")
+
+
+def test_embedded_image_document_renders_thresholded_data_url() -> None:
+    document = {
+        "schemaVersion": 1,
+        "id": "doc_image",
+        "title": "Image fixture",
+        "target": {
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": 96,
+            "dpi": 203,
+            "paperMode": "continuous",
+            "density": "medium",
+        },
+        "background": {"color": "#ffffff"},
+        "elements": [
+            {
+                "id": "image_1",
+                "type": "image",
+                "name": "Logo",
+                "x": 16,
+                "y": 16,
+                "width": 64,
+                "height": 48,
+                "rotation": 0,
+                "locked": False,
+                "visible": True,
+                "fit": "contain",
+                "source": {
+                    "kind": "embedded_data_url",
+                    "mimeType": "image/png",
+                    "dataUrl": _png_data_url(),
+                },
+                "processing": {
+                    "threshold": 128,
+                    "invert": False,
+                },
+            }
+        ],
+        "assets": [],
+        "metadata": {},
+    }
+    inverted = {
+        **document,
+        "elements": [
+            {
+                **document["elements"][0],
+                "processing": {
+                    "threshold": 128,
+                    "invert": True,
+                },
+            }
+        ],
+    }
+
+    first = render_document(document)
+    second = render_document(document)
+    changed = render_document(inverted)
+
+    assert first.raster_hash == second.raster_hash
+    assert first.raster_hash != changed.raster_hash
+    assert first.safety["metrics"]["totalBlackPixels"] > 0
+    assert first.preview_png.startswith(b"\x89PNG")
+
+
+def _png_data_url() -> str:
+    image = Image.new("L", (2, 2), color=255)
+    image.putpixel((0, 0), 0)
+    image.putpixel((1, 1), 0)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"

@@ -62,6 +62,9 @@
 - Design model now includes typed QR elements with payload and error-correction metadata.
 - Daemon canonical renderer renders QR payloads into one-bit raster output and preview PNGs.
 - Renderer canvas can add QR layers, display them as real QR module matrices, edit payload/error correction from the inspector, and persist them with the current document.
+- Design model now includes typed embedded image elements with fit and preprocessing metadata.
+- Daemon canonical renderer decodes embedded image data URLs, applies fit/threshold/invert preprocessing, and includes the result in one-bit raster output.
+- Renderer image import embeds local PNG/JPEG/WebP files into the document, displays imported images on the canvas, exposes fit/threshold/invert inspector controls, and persists them with undoable document edits.
 
 ## Current Verification
 
@@ -74,10 +77,11 @@
 - `.venv/bin/python -m pytest daemon/tests mcp/tests`
 - Playwright smoke against `http://127.0.0.1:5173/`: add rectangle, edit inspector X/Width/fill, verify localStorage persistence.
 - Playwright smoke against `http://127.0.0.1:5174/`: add QR layer, edit payload/error correction, verify localStorage persistence.
+- Playwright smoke against `http://127.0.0.1:5174/`: import PNG file, verify embedded image layer and preprocessing defaults in localStorage.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Canvas editor MVP depth: transformer handles, inline text editing, image layers, and pan/zoom.
+2. Canvas editor MVP depth: transformer handles, inline text editing, and pan/zoom.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.
