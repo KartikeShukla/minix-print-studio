@@ -33,7 +33,7 @@ def load_profiles() -> list[dict[str, Any]]:
     return [json.loads(PROFILE_PATH.read_text(encoding="utf-8"))]
 
 
-def create_app(*, mock: bool = False) -> FastAPI:
+def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
     app = FastAPI(title="MiniX Print Studio daemon", version=__version__)
     app.add_middleware(
         CORSMiddleware,
@@ -44,7 +44,12 @@ def create_app(*, mock: bool = False) -> FastAPI:
     )
     profiles_data = load_profiles()
     preview_store = PreviewStore()
-    print_queue = PrintQueue(profiles=profiles_data, preview_store=preview_store, mock=mock)
+    print_queue = PrintQueue(
+        profiles=profiles_data,
+        preview_store=preview_store,
+        mock=mock,
+        job_store_path=(data_dir / "jobs.json") if data_dir is not None else None,
+    )
     discovery_service = PrinterDiscoveryService(
         profiles=profiles_data,
         adapter=_create_ble_adapter(profiles=profiles_data, mock=mock),

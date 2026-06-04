@@ -44,7 +44,8 @@ function startSidecar(): void {
     repoRoot,
     port: runtime.port,
     token: runtime.token,
-    mock: runtime.mock
+    mock: runtime.mock,
+    dataDir: path.join(app.getPath("userData"), "daemon")
   });
 
   const child = startDaemon(config);

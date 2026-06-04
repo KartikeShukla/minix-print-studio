@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import platform
 from datetime import UTC, datetime
+from io import BytesIO
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
 from minixd import __version__
@@ -28,28 +31,68 @@ def create_diagnostics_router(
 
     @router.post("/export")
     def export_diagnostics(request: DiagnosticsExportRequest) -> dict[str, object]:
-        return {
-            "schemaVersion": 1,
-            "createdAt": datetime.now(UTC).isoformat(),
-            "redaction": {
-                "projectContentIncluded": request.include_project_content,
-                "rawImagesIncluded": request.include_raw_images,
-                "tokensIncluded": False,
-            },
-            "daemon": {
-                "version": __version__,
-                "profileRegistryVersion": profile_registry_version,
-                "mock": mock,
-                "os": platform.system(),
-                "python": platform.python_version(),
-            },
-            "profiles": [_profile_snapshot(profile) for profile in profiles],
-            "jobs": [_job_diagnostics(job, print_queue) for job in print_queue.list_jobs()],
-            "recentErrors": [],
-            "recentMcpCalls": [],
-        }
+        return _build_diagnostics_bundle(
+            request=request,
+            profiles=profiles,
+            print_queue=print_queue,
+            mock=mock,
+            profile_registry_version=profile_registry_version,
+        )
+
+    @router.post("/export/archive")
+    def export_diagnostics_archive(request: DiagnosticsExportRequest) -> Response:
+        bundle = _build_diagnostics_bundle(
+            request=request,
+            profiles=profiles,
+            print_queue=print_queue,
+            mock=mock,
+            profile_registry_version=profile_registry_version,
+        )
+        archive = BytesIO()
+        with ZipFile(archive, "w", ZIP_DEFLATED) as diagnostics_zip:
+            diagnostics_zip.writestr("diagnostics.json", json.dumps(bundle, indent=2))
+            diagnostics_zip.writestr(
+                "README.md",
+                "MiniX Print Studio diagnostics export. Raw raster bytes, approval tokens, "
+                "and project content are excluded unless explicitly marked in diagnostics.json.\n",
+            )
+        return Response(
+            content=archive.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="minix-diagnostics.zip"'},
+        )
 
     return router
+
+
+def _build_diagnostics_bundle(
+    *,
+    request: DiagnosticsExportRequest,
+    profiles: list[dict[str, Any]],
+    print_queue: PrintQueue,
+    mock: bool,
+    profile_registry_version: str,
+) -> dict[str, object]:
+    return {
+        "schemaVersion": 1,
+        "createdAt": datetime.now(UTC).isoformat(),
+        "redaction": {
+            "projectContentIncluded": request.include_project_content,
+            "rawImagesIncluded": request.include_raw_images,
+            "tokensIncluded": False,
+        },
+        "daemon": {
+            "version": __version__,
+            "profileRegistryVersion": profile_registry_version,
+            "mock": mock,
+            "os": platform.system(),
+            "python": platform.python_version(),
+        },
+        "profiles": [_profile_snapshot(profile) for profile in profiles],
+        "jobs": [_job_diagnostics(job, print_queue) for job in print_queue.list_jobs()],
+        "recentErrors": [],
+        "recentMcpCalls": [],
+    }
 
 
 def _profile_snapshot(profile: dict[str, Any]) -> dict[str, object]:

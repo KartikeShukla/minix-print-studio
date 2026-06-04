@@ -86,6 +86,8 @@
 - Renderer Agent Integrations panel exposes a non-mutating Test action and surfaces the desktop connection-test result per target.
 - MCP stdio smoke helper launches the real Python MCP server against a mock daemon runtime handoff and validates daemon status without exposing daemon bearer tokens.
 - Claude Desktop Agent Integration can export a token-free `.mcpb` bundle containing a manifest, local shim bridge, and install README.
+- Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
+- Diagnostics export supports both JSON response and downloadable ZIP archive containing redacted `diagnostics.json` plus a README.
 
 ## Current Verification
 
@@ -111,9 +113,10 @@
 - TDD red/green checks for stable MCP shim materialization, Agent Integration connection-prerequisite checks, and renderer Test action.
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
+- TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.
+2. Diagnostics depth: BLE timing capture for real transport sessions.

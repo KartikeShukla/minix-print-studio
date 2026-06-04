@@ -10,7 +10,8 @@ describe("daemon launch config", () => {
       repoRoot,
       port: 39281,
       token: "token_123",
-      mock: true
+      mock: true,
+      dataDir: path.join("/", "user-data", "daemon")
     });
 
     expect(config.command).toBe(path.join(repoRoot, ".venv", "bin", "python"));
@@ -18,5 +19,6 @@ describe("daemon launch config", () => {
     expect(config.env.MINIX_DAEMON_PORT).toBe("39281");
     expect(config.env.MINIX_DAEMON_TOKEN).toBe("token_123");
     expect(config.env.MINIX_DAEMON_MOCK).toBe("true");
+    expect(config.env.MINIX_DAEMON_DATA_DIR).toBe(path.join("/", "user-data", "daemon"));
   });
 });

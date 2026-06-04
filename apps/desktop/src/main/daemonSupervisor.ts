@@ -14,6 +14,7 @@ export type DaemonLaunchOptions = {
   port: number;
   token: string;
   mock: boolean;
+  dataDir?: string;
 };
 
 export type DaemonLaunchConfig = {
@@ -43,7 +44,8 @@ export function createDaemonLaunchConfig(options: DaemonLaunchOptions): DaemonLa
       ...process.env,
       MINIX_DAEMON_PORT: String(options.port),
       MINIX_DAEMON_TOKEN: options.token,
-      MINIX_DAEMON_MOCK: options.mock ? "true" : "false"
+      MINIX_DAEMON_MOCK: options.mock ? "true" : "false",
+      ...(options.dataDir ? { MINIX_DAEMON_DATA_DIR: options.dataDir } : {})
     }
   };
 }

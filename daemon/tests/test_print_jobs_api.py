@@ -1,3 +1,8 @@
+import json
+from io import BytesIO
+from pathlib import Path
+from zipfile import ZipFile
+
 from fastapi.testclient import TestClient
 
 from minixd.app import create_app
@@ -125,6 +130,55 @@ def test_print_endpoint_rejects_bad_approval_token_without_creating_job() -> Non
     assert client.get("/v1/jobs").json() == {"jobs": []}
 
 
+def test_print_jobs_survive_daemon_app_restart_with_data_dir(tmp_path: Path) -> None:
+    client = TestClient(create_app(mock=True, data_dir=tmp_path))
+    document = {
+        "schemaVersion": 1,
+        "id": "doc_persisted_job",
+        "title": "Persisted job",
+        "target": {
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": 16,
+            "dpi": 203,
+            "paperMode": "continuous",
+            "density": "medium",
+        },
+        "background": {"color": "#ffffff"},
+        "elements": [],
+        "assets": [],
+        "metadata": {},
+    }
+    preview = client.post(
+        "/v1/render/document-preview",
+        json={"document": document, "renderSettings": {}},
+    ).json()
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": preview["documentHash"],
+            "renderSettingsHash": preview["renderSettingsHash"],
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+
+    restarted = TestClient(create_app(mock=True, data_dir=tmp_path))
+
+    listed = restarted.get("/v1/jobs").json()["jobs"]
+    assert listed[0]["jobId"] == printed["jobId"]
+    assert listed[0]["completionLevel"] == "unverified"
+    segments = restarted.get(f"/v1/jobs/{printed['jobId']}/segments").json()["segments"]
+    assert segments[0]["rasterByteLength"] == 8_448
+    diagnostics = restarted.post("/v1/diagnostics/export", json={}).json()
+    assert diagnostics["jobs"][0]["jobId"] == printed["jobId"]
+
+
 def test_diagnostics_export_includes_redacted_job_and_segment_metadata() -> None:
     client = TestClient(create_app(mock=True))
     document = {
@@ -179,3 +233,17 @@ def test_diagnostics_export_includes_redacted_job_and_segment_metadata() -> None
     assert "approvalToken" not in str(bundle)
     assert "super-secret-token" not in str(bundle)
     assert "/Users/alice" not in str(bundle)
+
+    archive_response = client.post(
+        "/v1/diagnostics/export/archive",
+        json={"includeProjectContent": False},
+    )
+
+    assert archive_response.status_code == 200
+    assert archive_response.headers["content-type"] == "application/zip"
+    with ZipFile(BytesIO(archive_response.content)) as archive:
+        names = archive.namelist()
+        assert names == ["diagnostics.json", "README.md"]
+        archived_bundle = json.loads(archive.read("diagnostics.json"))
+        assert archived_bundle["jobs"][0]["jobId"] == printed["jobId"]
+        assert "approvalToken" not in archive.read("diagnostics.json").decode("utf-8")
