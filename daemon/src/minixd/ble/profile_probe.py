@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from minixd.ble.bleak_adapter import ReadOnlyBleSession, ReadOnlyProbeResult
+from minixd.ble.discovery import BleTimingEvent
 from minixd.protocol.aiyin import build_info_command
 
 
@@ -59,10 +60,19 @@ class ProfileReadOnlyProbe:
         response: bool,
     ) -> str | None:
         start_index = len(session.raw_notifications)
+        start = time.perf_counter()
         await session.client.write_gatt_char(
             characteristic,
             command,
             response=response,
+        )
+        session.timing_events.append(
+            BleTimingEvent(
+                operation="write_gatt_char",
+                characteristic=characteristic,
+                elapsed_ms=max((time.perf_counter() - start) * 1000, 0),
+                payload_bytes=len(command),
+            )
         )
         notifications = await self._wait_for_notifications(session.raw_notifications, start_index)
         return _extract_expected_text(notifications, expected_values)

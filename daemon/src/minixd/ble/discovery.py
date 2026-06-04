@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 
@@ -27,6 +27,14 @@ class PrinterCandidate:
 
 
 @dataclass(frozen=True)
+class BleTimingEvent:
+    operation: str
+    characteristic: str | None
+    elapsed_ms: float
+    payload_bytes: int | None = None
+
+
+@dataclass(frozen=True)
 class ReadOnlyDeviceInfo:
     model_response: str | None
     firmware: str | None
@@ -34,6 +42,7 @@ class ReadOnlyDeviceInfo:
     write_characteristics: list[str]
     notify_characteristics: list[str]
     raw_notifications: list[str]
+    timing_events: list[BleTimingEvent] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -51,6 +60,7 @@ class ReadOnlyVerification:
     write_characteristics: list[str]
     notify_characteristics: list[str]
     raw_notifications: list[str]
+    timing_events: list[BleTimingEvent] = field(default_factory=list)
 
 
 class BleAdapter(Protocol):
@@ -126,6 +136,7 @@ class PrinterDiscoveryService:
                     write_characteristics=_normalise_uuids(read_only_info.write_characteristics),
                     notify_characteristics=_normalise_uuids(read_only_info.notify_characteristics),
                     raw_notifications=list(read_only_info.raw_notifications),
+                    timing_events=list(read_only_info.timing_events),
                 )
 
         mismatch_profile = candidate_profiles[0] if candidate_profiles else None
@@ -145,6 +156,7 @@ class PrinterDiscoveryService:
             write_characteristics=_normalise_uuids(read_only_info.write_characteristics),
             notify_characteristics=_normalise_uuids(read_only_info.notify_characteristics),
             raw_notifications=list(read_only_info.raw_notifications),
+            timing_events=list(read_only_info.timing_events),
         )
 
     async def _find_advertisement(self, device_id: str) -> BleAdvertisement:

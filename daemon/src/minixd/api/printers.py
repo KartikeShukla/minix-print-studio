@@ -73,4 +73,13 @@ def _serialize_verification(verification: ReadOnlyVerification) -> dict[str, obj
         "writeCharacteristics": verification.write_characteristics,
         "notifyCharacteristics": verification.notify_characteristics,
         "rawNotifications": verification.raw_notifications,
+        "timingEvents": [
+            {
+                "operation": event.operation,
+                "characteristic": event.characteristic,
+                "elapsedMs": event.elapsed_ms,
+                "payloadBytes": event.payload_bytes,
+            }
+            for event in verification.timing_events
+        ],
     }

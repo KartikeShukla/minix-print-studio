@@ -74,6 +74,14 @@ def test_profile_read_only_probe_queries_model_and_firmware_without_print_comman
         WriteCall(FF02, bytes.fromhex("aa 01"), True),
         WriteCall(FF02, bytes.fromhex("aa 02"), True),
     ]
+    assert [
+        (event.operation, event.characteristic, event.payload_bytes)
+        for event in session.timing_events
+    ] == [
+        ("write_gatt_char", FF02, 2),
+        ("write_gatt_char", FF02, 2),
+    ]
+    assert all(event.elapsed_ms >= 0 for event in session.timing_events)
     assert result.model_response == "S1_LYiN48D_GY"
     assert result.firmware == "V1.9.11"
     assert raw_notifications == [

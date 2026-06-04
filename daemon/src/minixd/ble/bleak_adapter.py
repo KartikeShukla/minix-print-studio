@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, cast
 
 from minixd.ble.discovery import (
     BleAdvertisement,
+    BleTimingEvent,
     PrinterNotFoundError,
     ReadOnlyDeviceInfo,
 )
@@ -57,6 +59,7 @@ class ReadOnlyBleSession:
     write_characteristics: list[str]
     notify_characteristics: list[str]
     raw_notifications: list[str] = field(default_factory=list)
+    timing_events: list[BleTimingEvent] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -124,13 +127,29 @@ class BleakBleAdapter:
                 accepted_properties={"notify", "indicate"},
             )
             raw_notifications: list[str] = []
+            timing_events: list[BleTimingEvent] = []
             started_notify: list[str] = []
 
             def capture_notification(sender: object, data: bytes | bytearray) -> None:
                 raw_notifications.append(bytes(data).hex())
+                timing_events.append(
+                    BleTimingEvent(
+                        operation="notification",
+                        characteristic=str(sender),
+                        elapsed_ms=0,
+                        payload_bytes=len(data),
+                    )
+                )
 
             try:
                 for characteristic in notify_characteristics:
+                    timing_events.append(
+                        BleTimingEvent(
+                            operation="start_notify",
+                            characteristic=characteristic,
+                            elapsed_ms=0,
+                        )
+                    )
                     await connected_client.start_notify(characteristic, capture_notification)
                     started_notify.append(characteristic)
 
@@ -141,11 +160,20 @@ class BleakBleAdapter:
                     write_characteristics=write_characteristics,
                     notify_characteristics=notify_characteristics,
                     raw_notifications=raw_notifications,
+                    timing_events=timing_events,
                 )
                 result = await self._read_only_probe(session)
             finally:
                 for characteristic in started_notify:
+                    start = time.perf_counter()
                     await connected_client.stop_notify(characteristic)
+                    timing_events.append(
+                        BleTimingEvent(
+                            operation="stop_notify",
+                            characteristic=characteristic,
+                            elapsed_ms=_elapsed_ms(start),
+                        )
+                    )
 
             return ReadOnlyDeviceInfo(
                 model_response=result.model_response,
@@ -154,6 +182,7 @@ class BleakBleAdapter:
                 write_characteristics=write_characteristics,
                 notify_characteristics=notify_characteristics,
                 raw_notifications=[*raw_notifications, *result.raw_notifications],
+                timing_events=timing_events,
             )
 
     async def _device_for(self, device_id: str) -> object:
@@ -188,6 +217,10 @@ def _default_client_factory(device: object, services: list[str]) -> BleakClientL
     from bleak import BleakClient
 
     return cast(BleakClientLike, BleakClient(cast(Any, device), services=services))
+
+
+def _elapsed_ms(start: float) -> float:
+    return max((time.perf_counter() - start) * 1000, 0)
 
 
 async def _no_read_only_probe(session: ReadOnlyBleSession) -> ReadOnlyProbeResult:

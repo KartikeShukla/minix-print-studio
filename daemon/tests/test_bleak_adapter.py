@@ -174,6 +174,18 @@ def test_bleak_read_only_info_connects_subscribes_probes_and_disconnects() -> No
     assert info.write_characteristics == [FF02]
     assert info.notify_characteristics == [FF01, FF03]
     assert info.raw_notifications == ["aa55", "aa55", "probe:ok"]
+    assert [
+        (event.operation, event.characteristic, event.payload_bytes)
+        for event in info.timing_events
+    ] == [
+        ("start_notify", FF01, None),
+        ("notification", FF01, 2),
+        ("start_notify", FF03, None),
+        ("notification", FF03, 2),
+        ("stop_notify", FF01, None),
+        ("stop_notify", FF03, None),
+    ]
+    assert all(event.elapsed_ms >= 0 for event in info.timing_events)
     assert events == [
         "connect",
         ("start_notify", FF01),

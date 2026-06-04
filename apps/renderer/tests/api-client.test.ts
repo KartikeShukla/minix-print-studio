@@ -200,7 +200,8 @@ describe("daemon API client", () => {
         "0000ff01-0000-1000-8000-00805f9b34fb",
         "0000ff03-0000-1000-8000-00805f9b34fb"
       ],
-      rawNotifications: []
+      rawNotifications: [],
+      timingEvents: []
     };
     const fetchMock = vi
       .fn()

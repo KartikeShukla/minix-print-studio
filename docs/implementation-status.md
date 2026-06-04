@@ -88,6 +88,7 @@
 - Claude Desktop Agent Integration can export a token-free `.mcpb` bundle containing a manifest, local shim bridge, and install README.
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
 - Diagnostics export supports both JSON response and downloadable ZIP archive containing redacted `diagnostics.json` plus a README.
+- BLE read-only verification captures timing metadata for notify setup, notifications, writes, and notify teardown without recording raw command payloads.
 
 ## Current Verification
 
@@ -114,9 +115,9 @@
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
+- TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Diagnostics depth: BLE timing capture for real transport sessions.

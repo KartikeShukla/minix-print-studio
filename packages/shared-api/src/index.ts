@@ -22,6 +22,13 @@ export const readOnlyVerificationStatusSchema = z.enum([
   "read_only_mismatch"
 ]);
 
+export const bleTimingEventSchema = z.object({
+  operation: z.string(),
+  characteristic: z.string().nullable(),
+  elapsedMs: z.number().nonnegative(),
+  payloadBytes: z.number().int().nonnegative().nullable()
+});
+
 export const healthResponseSchema = z.object({
   ok: z.boolean(),
   version: z.string(),
@@ -163,7 +170,8 @@ export const readOnlyVerificationSchema = z.object({
   services: z.array(z.string()),
   writeCharacteristics: z.array(z.string()),
   notifyCharacteristics: z.array(z.string()),
-  rawNotifications: z.array(z.string())
+  rawNotifications: z.array(z.string()),
+  timingEvents: z.array(bleTimingEventSchema).default([])
 });
 
 export const printerProfileSchema = z.object({
