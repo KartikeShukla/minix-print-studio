@@ -36,6 +36,14 @@ class BleakClientLike(Protocol):
 
     async def stop_notify(self, characteristic: str) -> None: ...
 
+    async def write_gatt_char(
+        self,
+        characteristic: str,
+        data: bytes,
+        *,
+        response: bool | None = None,
+    ) -> None: ...
+
 
 class ClientFactory(Protocol):
     def __call__(self, device: object, services: list[str]) -> BleakClientLike: ...

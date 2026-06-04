@@ -19,6 +19,7 @@ from minixd.ble.discovery import (
     PrinterDiscoveryService,
     ReadOnlyDeviceInfo,
 )
+from minixd.ble.profile_probe import ProfileReadOnlyProbe
 from minixd.printing.queue import PrintQueue
 from minixd.render.preview_store import PreviewStore
 
@@ -75,7 +76,10 @@ def create_app(*, mock: bool = False) -> FastAPI:
 
 def _create_ble_adapter(*, profiles: list[dict[str, Any]], mock: bool) -> BleAdapter:
     if not mock:
-        return BleakBleAdapter(service_uuids=_profile_service_uuids(profiles))
+        return BleakBleAdapter(
+            service_uuids=_profile_service_uuids(profiles),
+            read_only_probe=ProfileReadOnlyProbe(profiles=profiles),
+        )
 
     profile = profiles[0]
     ble = profile.get("ble")

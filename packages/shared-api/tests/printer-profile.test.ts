@@ -16,6 +16,8 @@ describe("printer profile contracts", () => {
     expect(parsed.print.widthDots).toBe(384);
     expect(parsed.print.rowBytes).toBe(48);
     expect(parsed.ble.writeWithResponse).toBe(true);
+    expect(parsed.readOnly.modelCommandHex).toBe("10 ff 20 f0");
+    expect(parsed.readOnly.firmwareCommandHex).toBe("10 ff 20 f1");
   });
 
   it("classifies a service/name match as detected but not trusted before model verification", () => {

@@ -48,7 +48,7 @@
 - Renderer Scan Printers flow that displays detected candidates, runs identity verification, and shows `Printing still locked` after read-only verification.
 - Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
 - Bleak read-only connection lifecycle with async connect/disconnect, GATT service/characteristic discovery, notify subscription, and raw notification capture.
-- Read-only identity probing is injectable and intentionally does not mark real hardware verified until profile-specific model/firmware query behavior is implemented and tested.
+- Profile-backed read-only model/firmware probing uses the profile's configured query commands and write characteristic while keeping printing locked until protocol sanity testing.
 - Versioned document model now includes typed text elements with stable thermal defaults and immutable movement updates.
 - Renderer document persistence hydrates and saves the current document through localStorage with schema validation.
 - Initial React Konva artboard renders the document model, supports adding text layers from the toolbar, selects/moves text elements, and keeps the daemon preview/print state invalidated after edits.
@@ -66,7 +66,7 @@
 
 ## Next Implementation Slices
 
-1. Profile-backed read-only model/firmware probe plus physical hardware validation.
+1. Physical hardware validation for read-only model/firmware probing on the printer.
 2. Canvas editor MVP depth: transformer handles, inline text editing, rectangle/image/QR layers, undo/redo, and inspector controls.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

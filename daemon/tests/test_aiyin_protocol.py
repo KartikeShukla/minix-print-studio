@@ -3,6 +3,7 @@ import pytest
 from minixd.protocol.aiyin import (
     build_enable_mode_command,
     build_feed_form_command,
+    build_info_command,
     build_raster_command,
     build_set_density_command,
     build_set_paper_mode_command,
@@ -28,6 +29,12 @@ def test_fixed_protocol_commands_match_spec_sequence() -> None:
     assert build_enable_mode_command() == bytes.fromhex("10 ff fe 01")
     assert build_feed_form_command() == bytes.fromhex("1d 0c")
     assert build_stop_mode_command() == bytes.fromhex("10 ff fe 45")
+
+
+def test_read_only_info_commands_match_aiyin_query_bytes() -> None:
+    assert build_info_command("model") == bytes.fromhex("10 ff 20 f0")
+    assert build_info_command("firmware") == bytes.fromhex("10 ff 20 f1")
+    assert build_info_command("version") == bytes.fromhex("10 ff 20 f1")
 
 
 def test_gs_v0_raster_command_encodes_row_bytes_and_height_little_endian() -> None:

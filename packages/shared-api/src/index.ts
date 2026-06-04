@@ -161,6 +161,11 @@ export const printerProfileSchema = z.object({
     defaultInterChunkDelayMs: z.number().int().nonnegative(),
     flowControlNotifyCharUuid: z.string()
   }),
+  readOnly: z.object({
+    modelCommandHex: z.string(),
+    firmwareCommandHex: z.string(),
+    responseEncoding: z.literal("ascii-substring")
+  }),
   print: z.object({
     protocol: z.literal("aiyin-gs-v0-wrapper"),
     widthDots: z.number().int().positive(),
@@ -252,6 +257,11 @@ export const seznikMiniXProfile = {
     writeWithResponse: true,
     defaultInterChunkDelayMs: 25,
     flowControlNotifyCharUuid: "0000ff03-0000-1000-8000-00805f9b34fb"
+  },
+  readOnly: {
+    modelCommandHex: "10 ff 20 f0",
+    firmwareCommandHex: "10 ff 20 f1",
+    responseEncoding: "ascii-substring"
   },
   print: {
     protocol: "aiyin-gs-v0-wrapper",

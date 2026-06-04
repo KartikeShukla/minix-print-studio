@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
-from minixd.app import create_app
+from minixd.app import _create_ble_adapter, create_app, load_profiles
+from minixd.ble.bleak_adapter import BleakBleAdapter
+from minixd.ble.profile_probe import ProfileReadOnlyProbe
 
 
 def test_health_endpoint_exposes_registry_and_mock_mode() -> None:
@@ -41,3 +43,10 @@ def test_local_renderer_origin_can_call_daemon_with_authorization_header() -> No
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+
+
+def test_non_mock_ble_adapter_uses_profile_read_only_probe() -> None:
+    adapter = _create_ble_adapter(profiles=load_profiles(), mock=False)
+
+    assert isinstance(adapter, BleakBleAdapter)
+    assert isinstance(adapter._read_only_probe, ProfileReadOnlyProbe)

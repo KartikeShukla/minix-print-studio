@@ -485,6 +485,11 @@ Create this profile as the first official supported profile:
     "defaultInterChunkDelayMs": 25,
     "flowControlNotifyCharUuid": "0000ff03-0000-1000-8000-00805f9b34fb"
   },
+  "readOnly": {
+    "modelCommandHex": "10 ff 20 f0",
+    "firmwareCommandHex": "10 ff 20 f1",
+    "responseEncoding": "ascii-substring"
+  },
   "print": {
     "protocol": "aiyin-gs-v0-wrapper",
     "widthDots": 384,

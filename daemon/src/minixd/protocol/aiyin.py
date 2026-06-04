@@ -15,6 +15,12 @@ _PAPER_MODE_BYTES: dict[PaperMode, int] = {
     "continuous": 0x02,
 }
 
+_INFO_COMMANDS: dict[str, bytes] = {
+    "model": bytes.fromhex("10 ff 20 f0"),
+    "firmware": bytes.fromhex("10 ff 20 f1"),
+    "version": bytes.fromhex("10 ff 20 f1"),
+}
+
 
 def build_set_density_command(density: Density) -> bytes:
     try:
@@ -48,6 +54,14 @@ def build_feed_form_command() -> bytes:
 
 def build_stop_mode_command() -> bytes:
     return bytes.fromhex("10 ff fe 45")
+
+
+def build_info_command(kind: str) -> bytes:
+    key = kind.lower().replace("-", "_")
+    try:
+        return _INFO_COMMANDS[key]
+    except KeyError as exc:
+        raise ValueError(f"unsupported info command: {kind}") from exc
 
 
 def build_raster_command(*, width_dots: int, height_dots: int, packed_raster: bytes) -> bytes:
