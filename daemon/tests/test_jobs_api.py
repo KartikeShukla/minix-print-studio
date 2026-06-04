@@ -10,18 +10,31 @@ def test_plan_job_endpoint_returns_segment_metadata_without_raw_raster() -> None
     row_bytes = 48
     content_height = 300
     content_raster = bytes([0x55]) * row_bytes * content_height
+    preview_response = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": content_height,
+            "rasterBase64": base64.b64encode(content_raster).decode("ascii"),
+            "safety": {"allowed": True, "warnings": [], "metrics": {}},
+        },
+    )
+    preview = preview_response.json()
 
     response = client.post(
         "/v1/jobs/plan",
         json={
             "jobId": "job_api",
-            "previewId": "prev_api",
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
             "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
             "profileId": "seznik-minix-s1-lyin48d-gy",
             "paperMode": "continuous",
             "density": "medium",
-            "contentHeightDots": content_height,
-            "contentRasterBase64": base64.b64encode(content_raster).decode("ascii"),
         },
     )
 

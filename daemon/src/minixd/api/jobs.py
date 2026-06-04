@@ -1,41 +1,53 @@
 from __future__ import annotations
 
-import base64
-import binascii
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from minixd.printing.planner import PrintPlanPackage, create_print_plan
+from minixd.render.preview_store import PreviewBindingError, PreviewStore
 
 
 class PlanJobRequest(BaseModel):
     job_id: Annotated[str, Field(alias="jobId", min_length=1)]
     preview_id: Annotated[str, Field(alias="previewId", min_length=1)]
+    approval_token: Annotated[str, Field(alias="approvalToken", min_length=1)]
     document_hash: Annotated[str, Field(alias="documentHash", min_length=1)]
+    render_settings_hash: Annotated[str, Field(alias="renderSettingsHash", min_length=1)]
     profile_id: Annotated[str, Field(alias="profileId", min_length=1)]
     paper_mode: Annotated[
         str, Field(alias="paperMode", pattern="^(continuous|gap_label|black_mark)$")
     ]
     density: Annotated[str, Field(pattern="^(light|medium|dark)$")]
-    content_height_dots: Annotated[int, Field(alias="contentHeightDots", gt=0)]
-    content_raster_base64: Annotated[str, Field(alias="contentRasterBase64", min_length=1)]
 
 
-def create_jobs_router(*, profiles: list[dict[str, Any]]) -> APIRouter:
+def create_jobs_router(
+    *,
+    profiles: list[dict[str, Any]],
+    preview_store: PreviewStore,
+) -> APIRouter:
     router = APIRouter(prefix="/v1/jobs", tags=["jobs"])
 
     @router.post("/plan")
     def plan_job(request: PlanJobRequest) -> dict[str, object]:
         profile = _find_profile(profiles, request.profile_id)
-        content_raster = _decode_base64(request.content_raster_base64)
+        try:
+            preview = preview_store.verify(
+                preview_id=request.preview_id,
+                approval_token=request.approval_token,
+                document_hash=request.document_hash,
+                render_settings_hash=request.render_settings_hash,
+            )
+        except PreviewBindingError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
         package = create_print_plan(
             job_id=request.job_id,
-            preview_id=request.preview_id,
+            preview_id=preview.preview_id,
             document_hash=request.document_hash,
-            content_raster=content_raster,
-            content_height_dots=request.content_height_dots,
+            content_raster=preview.raster,
+            content_height_dots=preview.height_dots,
             profile=profile,
             paper_mode=request.paper_mode,
             density=request.density,
@@ -50,13 +62,6 @@ def _find_profile(profiles: list[dict[str, Any]], profile_id: str) -> dict[str, 
         if profile.get("id") == profile_id:
             return profile
     raise HTTPException(status_code=404, detail=f"unknown profile: {profile_id}")
-
-
-def _decode_base64(value: str) -> bytes:
-    try:
-        return base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="contentRasterBase64 is invalid") from exc
 
 
 def _serialize_plan_package(package: PrintPlanPackage) -> dict[str, object]:

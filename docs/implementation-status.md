@@ -23,7 +23,9 @@
 - MSB-first raster packing/unpacking helpers with coverage calculation.
 - Print planner that appends continuous-paper tail rows and segments raster data into profile-sized bands.
 - Virtual reconstruction coverage for a 10,000-dot raster.
-- `/v1/jobs/plan` endpoint that returns print plan and band metadata without exposing raw raster bytes.
+- Preview store that binds document hash, render settings hash, raster hash, and approval token.
+- `/v1/render/preview` endpoint that creates preview-bound approval artifacts.
+- `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
 
 ## Current Verification
 

@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from minixd import __version__
 from minixd.api.jobs import create_jobs_router
+from minixd.api.render import create_render_router
+from minixd.render.preview_store import PreviewStore
 
 PROFILE_REGISTRY_VERSION = "2026.06.04"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -29,7 +31,9 @@ def create_app(*, mock: bool = False) -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
     profiles_data = load_profiles()
-    app.include_router(create_jobs_router(profiles=profiles_data))
+    preview_store = PreviewStore()
+    app.include_router(create_render_router(preview_store=preview_store))
+    app.include_router(create_jobs_router(profiles=profiles_data, preview_store=preview_store))
 
     @app.get("/v1/health")
     def health() -> dict[str, bool | str]:
