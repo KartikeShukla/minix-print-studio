@@ -34,6 +34,8 @@
 - `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
+- Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
+- Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
 
 ## Current Verification
 
@@ -47,7 +49,7 @@
 
 ## Next Implementation Slices
 
-1. Renderer print action wired to `/v1/jobs/print`, mock job status, and user-check completion state.
-2. MCP tools backed by daemon health, preview, and approval-required flows.
-3. Real BLE scanner/connection manager with mock-first transport tests.
-4. Project/document persistence and editor canvas interactions.
+1. MCP tools backed by daemon health, preview, and approval-required flows.
+2. Real BLE scanner/connection manager with mock-first transport tests.
+3. Project/document persistence and editor canvas interactions.
+4. Persisted job history and diagnostics export.

@@ -76,6 +76,27 @@ export const printPlanResponseSchema = z.object({
   bands: z.array(printPlanBandSchema)
 });
 
+export const printJobResponseSchema = z.object({
+  jobId: z.string(),
+  previewId: z.string(),
+  planId: z.string(),
+  state: z.string(),
+  phase: z.string(),
+  completionLevel: z.string(),
+  completionConfidence: z.string(),
+  requiresUserCheck: z.boolean(),
+  source: z.string(),
+  copies: z.number().int().positive(),
+  bandsSent: z.number().int().nonnegative(),
+  totalBands: z.number().int().nonnegative(),
+  rowsSent: z.number().int().nonnegative(),
+  totalRows: z.number().int().nonnegative(),
+  bytesSent: z.number().int().nonnegative(),
+  totalBytes: z.number().int().nonnegative(),
+  tailBlankRowsDots: z.number().int().nonnegative(),
+  safeActions: z.array(z.string())
+});
+
 export const printerProfileSchema = z.object({
   id: z.string(),
   displayName: z.string(),
@@ -132,6 +153,7 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type RenderSettings = z.infer<typeof renderSettingsSchema>;
 export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
+export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
 export type SupportLevel = z.infer<typeof supportLevelSchema>;
 
 export type PrintPlanRequest = {
@@ -143,6 +165,11 @@ export type PrintPlanRequest = {
   profileId: string;
   paperMode: "continuous" | "gap_label" | "black_mark";
   density: "light" | "medium" | "dark";
+};
+
+export type PrintPreviewRequest = Omit<PrintPlanRequest, "jobId"> & {
+  copies: number;
+  source: string;
 };
 
 export type DiscoveredPrinter = {

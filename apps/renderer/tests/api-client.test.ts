@@ -53,10 +53,31 @@ describe("daemon API client", () => {
         }
       ]
     };
+    const printResponse = {
+      jobId: "job_api",
+      previewId: "prev_api",
+      planId: "plan_job_api",
+      state: "completed_unverified",
+      phase: "waiting_for_final_status",
+      completionLevel: "unverified",
+      completionConfidence: "mock_data_sent_final_ack_missing",
+      requiresUserCheck: true,
+      source: "ui",
+      copies: 1,
+      bandsSent: 5,
+      totalBands: 5,
+      rowsSent: 1060,
+      totalRows: 1060,
+      bytesSent: 50880,
+      totalBytes: 50880,
+      tailBlankRowsDots: 160,
+      safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"]
+    };
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => previewResponse })
-      .mockResolvedValueOnce({ ok: true, json: async () => planResponse });
+      .mockResolvedValueOnce({ ok: true, json: async () => planResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => printResponse });
     vi.stubGlobal("fetch", fetchMock);
     window.minix = {
       getDaemonRuntime: async () => ({
@@ -88,6 +109,19 @@ describe("daemon API client", () => {
         density: "medium"
       })
     ).resolves.toEqual(planResponse);
+    await expect(
+      client.printApprovedPreview({
+        previewId: "prev_api",
+        approvalToken: "appr_api",
+        documentHash: "sha256:document",
+        renderSettingsHash: "sha256:settings",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        copies: 1,
+        source: "ui"
+      })
+    ).resolves.toEqual(printResponse);
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:39281/v1/render/document-preview", {
       method: "POST",
@@ -112,6 +146,24 @@ describe("daemon API client", () => {
         profileId: "seznik-minix-s1-lyin48d-gy",
         paperMode: "continuous",
         density: "medium"
+      })
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "http://127.0.0.1:39281/v1/jobs/print", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        previewId: "prev_api",
+        approvalToken: "appr_api",
+        documentHash: "sha256:document",
+        renderSettingsHash: "sha256:settings",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        copies: 1,
+        source: "ui"
       })
     });
   });

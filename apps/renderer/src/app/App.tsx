@@ -20,6 +20,7 @@ import { createDefaultDocument } from "@minix/design-model";
 import type {
   DocumentPreviewResponse,
   HealthResponse,
+  PrintJobResponse,
   PrintPlanResponse,
   RenderSettings
 } from "@minix/shared-api";
@@ -52,12 +53,19 @@ type PreviewWorkflow =
   | { status: "ready"; preview: DocumentPreviewResponse; plan: PrintPlanResponse }
   | { status: "error"; message: string };
 
+type PrintWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "completed"; job: PrintJobResponse }
+  | { status: "error"; message: string };
+
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const [document] = useState(() => createDefaultDocument({ heightDots: 900 }));
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
+  const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +92,7 @@ export function App({ daemonClient }: AppProps) {
 
   const runPreview = useCallback(async () => {
     setPreviewWorkflow({ status: "running" });
+    setPrintWorkflow({ status: "idle" });
     try {
       const preview = await client.createDocumentPreview(document, DEFAULT_RENDER_SETTINGS);
       const plan = await client.planApprovedPreview({
@@ -104,6 +113,32 @@ export function App({ daemonClient }: AppProps) {
       });
     }
   }, [client, document]);
+
+  const runPrint = useCallback(async () => {
+    if (previewWorkflow.status !== "ready") {
+      return;
+    }
+    setPrintWorkflow({ status: "running" });
+    try {
+      const job = await client.printApprovedPreview({
+        previewId: previewWorkflow.preview.previewId,
+        approvalToken: previewWorkflow.preview.approvalToken,
+        documentHash: previewWorkflow.preview.documentHash,
+        renderSettingsHash: previewWorkflow.preview.renderSettingsHash,
+        profileId: document.target.profileId,
+        paperMode: document.target.paperMode,
+        density: document.target.density,
+        copies: 1,
+        source: "ui"
+      });
+      setPrintWorkflow({ status: "completed", job });
+    } catch (error: unknown) {
+      setPrintWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Print failed"
+      });
+    }
+  }, [client, document, previewWorkflow]);
 
   const statusLabel = health
     ? health.mock
@@ -148,7 +183,11 @@ export function App({ daemonClient }: AppProps) {
               <FileSearch className="size-4" aria-hidden="true" />
               Preview
             </Button>
-            <Button size="sm" disabled={!previewReady}>
+            <Button
+              size="sm"
+              disabled={!previewReady || printWorkflow.status === "running"}
+              onClick={runPrint}
+            >
               <Printer className="size-4" aria-hidden="true" />
               Print
             </Button>
@@ -280,19 +319,22 @@ export function App({ daemonClient }: AppProps) {
                 <h2 className="text-sm font-semibold">Preview Binding</h2>
               </div>
               {previewWorkflow.status === "ready" ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <Badge variant="success">Preview ready</Badge>
+                <div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge variant="success">Preview ready</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Preview</span>
+                      <span>{previewWorkflow.preview.previewId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Plan</span>
+                      <span>{formatBandCount(previewWorkflow.plan.totalBands)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Preview</span>
-                    <span>{previewWorkflow.preview.previewId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan</span>
-                    <span>{formatBandCount(previewWorkflow.plan.totalBands)}</span>
-                  </div>
+                  <PrintStatus workflow={printWorkflow} />
                 </div>
               ) : previewWorkflow.status === "running" ? (
                 <p className="text-sm leading-6 text-muted-foreground">
@@ -312,8 +354,57 @@ export function App({ daemonClient }: AppProps) {
         <footer className="flex items-center justify-between border-t border-border bg-card px-4 text-xs text-muted-foreground">
           <span>Zoom 100%</span>
           <span>{health ? `Daemon ${health.version}` : "No daemon health yet"}</span>
-          <span>{previewReady ? "Preview approved for planning" : "Queue idle"}</span>
+          <span>{formatQueueStatus(previewReady, printWorkflow)}</span>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
+  if (workflow.status === "running") {
+    return (
+      <div className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+        Sending approved preview to mock queue.
+      </div>
+    );
+  }
+
+  if (workflow.status === "error") {
+    return (
+      <div className="mt-4 border-t border-border pt-4 text-sm text-destructive">
+        {workflow.message}
+      </div>
+    );
+  }
+
+  if (workflow.status !== "completed") {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">Job Status</span>
+        <Badge variant={workflow.job.requiresUserCheck ? "warning" : "success"}>
+          {workflow.job.state}
+        </Badge>
+      </div>
+      {workflow.job.requiresUserCheck ? (
+        <div className="text-warning">User check required</div>
+      ) : null}
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Progress</span>
+        <span>
+          {workflow.job.bandsSent}/{workflow.job.totalBands} bands
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2 pt-1">
+        {workflow.job.safeActions.map((action) => (
+          <Badge key={action} variant="muted">
+            {formatSafeAction(action)}
+          </Badge>
+        ))}
       </div>
     </div>
   );
@@ -326,4 +417,23 @@ function formatBandCount(totalBands: number): string {
 function formatCoverage(preview: DocumentPreviewResponse): string {
   const value = preview.safety.metrics?.totalBlackCoverage;
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "0%";
+}
+
+function formatQueueStatus(previewReady: boolean, workflow: PrintWorkflow): string {
+  if (workflow.status === "completed") {
+    return workflow.job.requiresUserCheck ? "Job completed, check paper" : "Job complete";
+  }
+  if (workflow.status === "running") {
+    return "Print in progress";
+  }
+  return previewReady ? "Preview approved for planning" : "Queue idle";
+}
+
+function formatSafeAction(action: string): string {
+  const labels: Record<string, string> = {
+    confirm_complete: "Confirm complete",
+    feed_paper: "Feed paper",
+    reprint_from_start: "Reprint from start"
+  };
+  return labels[action] ?? action;
 }

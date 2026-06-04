@@ -2,11 +2,14 @@ import type { PrintDocument } from "@minix/design-model";
 import {
   documentPreviewResponseSchema,
   healthResponseSchema,
+  printJobResponseSchema,
   printPlanResponseSchema,
   type DocumentPreviewResponse,
   type HealthResponse,
+  type PrintJobResponse,
   type PrintPlanRequest,
   type PrintPlanResponse,
+  type PrintPreviewRequest,
   type RenderSettings
 } from "@minix/shared-api";
 
@@ -22,6 +25,7 @@ export type DaemonClient = {
     renderSettings: RenderSettings
   ) => Promise<DocumentPreviewResponse>;
   planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
+  printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
 };
 
 declare global {
@@ -58,6 +62,17 @@ export function createDaemonClient(): DaemonClient {
         },
         printPlanResponseSchema.parse,
         "Daemon print plan"
+      );
+    },
+    async printApprovedPreview(request) {
+      return requestDaemon(
+        "/v1/jobs/print",
+        {
+          method: "POST",
+          body: request
+        },
+        printJobResponseSchema.parse,
+        "Daemon print job"
       );
     }
   };
