@@ -21,6 +21,7 @@ export type AgentIntegrationPreviewTarget = {
   name: string;
   configPath: string;
   format: "json" | "shell" | "toml";
+  installable: boolean;
   content: string;
 };
 
@@ -57,6 +58,7 @@ export function buildAgentIntegrationPreview({
         name: "Codex",
         configPath: "~/.codex/config.toml",
         format: "toml",
+        installable: true,
         content: buildCodexConfigToml(shimPath, options)
       },
       {
@@ -64,6 +66,7 @@ export function buildAgentIntegrationPreview({
         name: "Claude Desktop",
         configPath: getClaudeDesktopConfigPath(platform),
         format: "json",
+        installable: true,
         content: JSON.stringify(buildClaudeDesktopConfig(shimPath, options), null, 2)
       },
       {
@@ -71,6 +74,7 @@ export function buildAgentIntegrationPreview({
         name: "Claude Code",
         configPath: "claude mcp add-json",
         format: "shell",
+        installable: false,
         content: buildClaudeCodeAddJsonCommand(shimPath, options)
       },
       {
@@ -78,6 +82,7 @@ export function buildAgentIntegrationPreview({
         name: "OpenCode",
         configPath: "~/.config/opencode/opencode.jsonc",
         format: "json",
+        installable: true,
         content: JSON.stringify(buildOpenCodeConfig(shimPath, options), null, 2)
       },
       {
@@ -85,6 +90,7 @@ export function buildAgentIntegrationPreview({
         name: "Generic stdio MCP",
         configPath: "Generic stdio MCP",
         format: "json",
+        installable: false,
         content: JSON.stringify(buildGenericMcpConfig(shimPath, options), null, 2)
       }
     ]

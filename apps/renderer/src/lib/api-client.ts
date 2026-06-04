@@ -1,5 +1,9 @@
 import type { PrintDocument } from "@minix/design-model";
-import type { AgentIntegrationPreview } from "@/lib/agent-integrations";
+import type {
+  AgentIntegrationInstallResult,
+  AgentIntegrationPreview,
+  AgentIntegrationTargetId
+} from "@/lib/agent-integrations";
 import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
@@ -45,6 +49,12 @@ declare global {
       getDaemonRuntime: () => Promise<DaemonRuntime>;
       getAppVersion: () => Promise<string>;
       getAgentIntegrationPreview?: () => Promise<AgentIntegrationPreview>;
+      installAgentIntegrationConfig?: (
+        targetId: AgentIntegrationTargetId
+      ) => Promise<AgentIntegrationInstallResult>;
+      uninstallAgentIntegrationConfig?: (
+        targetId: AgentIntegrationTargetId
+      ) => Promise<AgentIntegrationInstallResult>;
     };
   }
 }

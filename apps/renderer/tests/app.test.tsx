@@ -6,6 +6,7 @@ describe("MiniX Print Studio shell", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it("shows the workspace and daemon health from the local API", async () => {
@@ -90,6 +91,69 @@ describe("MiniX Print Studio shell", () => {
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining("MINIX_DAEMON_RUNTIME_FILE"));
     });
     expect(await screen.findByText("Copied Codex config")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before installing an agent integration config", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const install = vi.fn().mockResolvedValue({
+      version: 1,
+      operation: "install",
+      targetId: "codex",
+      targetPath: "/Users/example/.codex/config.toml",
+      backupPath: "/Users/example/Library/Application Support/MiniX Print Studio/backups/codex.bak",
+      manifestPath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/backups/codex.json",
+      existed: true,
+      createdAt: "2026-06-05T00:00:00.000Z"
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        agentIntegrationProvider={async () => ({
+          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          runtimeFilePath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
+          targets: [
+            {
+              id: "codex",
+              name: "Codex",
+              configPath: "~/.codex/config.toml",
+              format: "toml",
+              installable: true,
+              content:
+                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n"
+            }
+          ]
+        })}
+        agentIntegrationInstaller={{
+          install,
+          uninstall: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Install Codex config" }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("~/.codex/config.toml"));
+    await waitFor(() => {
+      expect(install).toHaveBeenCalledWith("codex");
+    });
+    expect(await screen.findByText("Installed Codex config")).toBeInTheDocument();
+
+    confirm.mockRestore();
   });
 
   it("requests a daemon preview and print plan before enabling print", async () => {

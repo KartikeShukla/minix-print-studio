@@ -8,6 +8,7 @@ import {
   Boxes,
   CircleAlert,
   Copy,
+  Download,
   FileSearch,
   FileText,
   Image as ImageIcon,
@@ -20,6 +21,7 @@ import {
   ScanSearch,
   ShieldCheck,
   Square,
+  Trash2,
   Type,
   Undo2,
   Wifi,
@@ -67,7 +69,10 @@ import type {
   RenderSettings
 } from "@minix/shared-api";
 import {
+  desktopAgentIntegrationInstaller,
   loadAgentIntegrationPreview,
+  type AgentIntegrationInstallResult,
+  type AgentIntegrationInstaller,
   type AgentIntegrationPreview,
   type AgentIntegrationPreviewTarget,
   type AgentIntegrationProvider,
@@ -87,6 +92,7 @@ import { Button } from "@/components/ui/button";
 export type AppProps = {
   daemonClient?: DaemonClient;
   agentIntegrationProvider?: AgentIntegrationProvider;
+  agentIntegrationInstaller?: AgentIntegrationInstaller;
 };
 
 const tools = [
@@ -126,6 +132,22 @@ type AgentIntegrationWorkflow =
   | { status: "unavailable" }
   | { status: "error"; message: string };
 
+type AgentIntegrationMutationWorkflow =
+  | { status: "idle" }
+  | { status: "running"; action: "install" | "uninstall"; targetId: AgentIntegrationTargetId }
+  | {
+      status: "success";
+      action: "install" | "uninstall";
+      targetId: AgentIntegrationTargetId;
+      result: AgentIntegrationInstallResult;
+    }
+  | {
+      status: "error";
+      action: "install" | "uninstall";
+      targetId: AgentIntegrationTargetId;
+      message: string;
+    };
+
 type PrinterWorkflow =
   | { status: "idle" }
   | { status: "scanning" }
@@ -163,11 +185,19 @@ type CanvasElement =
   | { kind: "image"; element: ImageElement }
   | { kind: "qr"; element: QrElement };
 
-export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
+export function App({
+  daemonClient,
+  agentIntegrationProvider,
+  agentIntegrationInstaller
+}: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const integrationProvider = useMemo(
     () => agentIntegrationProvider ?? loadAgentIntegrationPreview,
     [agentIntegrationProvider]
+  );
+  const integrationInstaller = useMemo(
+    () => agentIntegrationInstaller ?? desktopAgentIntegrationInstaller,
+    [agentIntegrationInstaller]
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
@@ -194,6 +224,8 @@ export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
   const [copiedIntegrationId, setCopiedIntegrationId] =
     useState<AgentIntegrationTargetId | null>(null);
   const [agentIntegrationCopyError, setAgentIntegrationCopyError] = useState<string | null>(null);
+  const [agentIntegrationMutation, setAgentIntegrationMutation] =
+    useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
@@ -233,6 +265,7 @@ export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
     setAgentIntegrationWorkflow({ status: "loading" });
     setCopiedIntegrationId(null);
     setAgentIntegrationCopyError(null);
+    setAgentIntegrationMutation({ status: "idle" });
 
     integrationProvider()
       .then((preview) => {
@@ -630,6 +663,78 @@ export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
     }
   }, []);
 
+  const installAgentIntegrationTarget = useCallback(
+    async (target: AgentIntegrationPreviewTarget) => {
+      if (!target.installable) {
+        return;
+      }
+      const confirmed = window.confirm(
+        `Install ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`
+      );
+      if (!confirmed) {
+        return;
+      }
+      setAgentIntegrationMutation({
+        status: "running",
+        action: "install",
+        targetId: target.id
+      });
+      try {
+        const result = await integrationInstaller.install(target.id);
+        setAgentIntegrationMutation({
+          status: "success",
+          action: "install",
+          targetId: target.id,
+          result
+        });
+      } catch (error: unknown) {
+        setAgentIntegrationMutation({
+          status: "error",
+          action: "install",
+          targetId: target.id,
+          message: error instanceof Error ? error.message : "Install failed"
+        });
+      }
+    },
+    [integrationInstaller]
+  );
+
+  const uninstallAgentIntegrationTarget = useCallback(
+    async (target: AgentIntegrationPreviewTarget) => {
+      if (!target.installable) {
+        return;
+      }
+      const confirmed = window.confirm(
+        `Uninstall ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`
+      );
+      if (!confirmed) {
+        return;
+      }
+      setAgentIntegrationMutation({
+        status: "running",
+        action: "uninstall",
+        targetId: target.id
+      });
+      try {
+        const result = await integrationInstaller.uninstall(target.id);
+        setAgentIntegrationMutation({
+          status: "success",
+          action: "uninstall",
+          targetId: target.id,
+          result
+        });
+      } catch (error: unknown) {
+        setAgentIntegrationMutation({
+          status: "error",
+          action: "uninstall",
+          targetId: target.id,
+          message: error instanceof Error ? error.message : "Uninstall failed"
+        });
+      }
+    },
+    [integrationInstaller]
+  );
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -860,7 +965,10 @@ export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
               workflow={agentIntegrationWorkflow}
               copiedTargetId={copiedIntegrationId}
               copyError={agentIntegrationCopyError}
+              mutation={agentIntegrationMutation}
               onCopy={copyAgentIntegrationConfig}
+              onInstall={installAgentIntegrationTarget}
+              onUninstall={uninstallAgentIntegrationTarget}
             />
 
             <RecentJobsPanel
@@ -1033,12 +1141,18 @@ function AgentIntegrationsPanel({
   workflow,
   copiedTargetId,
   copyError,
-  onCopy
+  mutation,
+  onCopy,
+  onInstall,
+  onUninstall
 }: {
   workflow: AgentIntegrationWorkflow;
   copiedTargetId: AgentIntegrationTargetId | null;
   copyError: string | null;
+  mutation: AgentIntegrationMutationWorkflow;
   onCopy: (target: AgentIntegrationPreviewTarget) => void;
+  onInstall: (target: AgentIntegrationPreviewTarget) => void;
+  onUninstall: (target: AgentIntegrationPreviewTarget) => void;
 }) {
   return (
     <section className="border-t border-border p-4">
@@ -1081,20 +1195,61 @@ function AgentIntegrationsPanel({
                 <Badge variant="muted">{target.format}</Badge>
               </div>
               <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-4 text-muted-foreground">{target.content}</pre>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full"
-                aria-label={`Copy ${target.name} config`}
-                onClick={() => onCopy(target)}
-              >
-                <Copy className="size-4" aria-hidden="true" />
-                Copy
-              </Button>
+              <div className="mt-2 grid grid-cols-1 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  aria-label={`Copy ${target.name} config`}
+                  onClick={() => onCopy(target)}
+                >
+                  <Copy className="size-4" aria-hidden="true" />
+                  Copy
+                </Button>
+                {target.installable ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Install ${target.name} config`}
+                      onClick={() => onInstall(target)}
+                      disabled={
+                        mutation.status === "running" && mutation.targetId === target.id
+                      }
+                    >
+                      <Download className="size-4" aria-hidden="true" />
+                      Install
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Uninstall ${target.name} config`}
+                      onClick={() => onUninstall(target)}
+                      disabled={
+                        mutation.status === "running" && mutation.targetId === target.id
+                      }
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Uninstall
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
               {copiedTargetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-success">
                   Copied {target.name} config
+                </div>
+              ) : null}
+              {mutation.status === "success" && mutation.targetId === target.id ? (
+                <div className="mt-2 text-xs font-medium text-success">
+                  {mutation.action === "install" ? "Installed" : "Uninstalled"} {target.name} config
+                </div>
+              ) : mutation.status === "error" && mutation.targetId === target.id ? (
+                <div className="mt-2 text-xs font-medium text-destructive">
+                  {mutation.message}
                 </div>
               ) : null}
             </article>

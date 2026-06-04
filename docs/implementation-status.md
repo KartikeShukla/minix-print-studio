@@ -78,6 +78,9 @@
 - Desktop Agent Integration previews expose a stable user-data MCP shim path plus token-free config text for Codex, Claude Desktop/Code, OpenCode, and generic stdio MCP clients.
 - Electron preload exposes the Agent Integration preview through IPC without passing the daemon bearer token to config snippets.
 - Renderer Agent Integrations panel loads the desktop preview, shows copyable config snippets, and copies target-specific config text to the clipboard.
+- Desktop Agent Integration installer writes Codex, Claude Desktop, and OpenCode configs with backup manifests before mutation; Codex uses a managed TOML block, while JSON clients preserve unrelated MCP servers.
+- Desktop Agent Integration uninstall removes only the MiniX-managed config entry and can revert a mutation from its backup manifest.
+- Renderer Agent Integrations panel shows install/uninstall controls only for installable targets and requires explicit confirmation before invoking the desktop installer.
 
 ## Current Verification
 
@@ -98,9 +101,11 @@
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
 - TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
 - TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
+- TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.
+- Playwright MCP smoke against `http://127.0.0.1:5173/`: Agent Integrations browser fallback renders in the right rail; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Agent integration installers: write/remove supported config entries, run a daemon connection test from the selected MCP client shape, and package the stable MCP shim into app user data.
+2. Agent integration connection tests and stable MCP shim packaging into app user data.
 3. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.

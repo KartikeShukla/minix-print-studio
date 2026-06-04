@@ -1,8 +1,12 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import log from "electron-log";
-import { buildAgentIntegrationPreview } from "./agentIntegrations";
+import { buildAgentIntegrationPreview, type AgentIntegrationTargetId } from "./agentIntegrations";
 import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
+import {
+  installAgentIntegrationConfig,
+  uninstallAgentIntegrationConfig
+} from "./integrationInstaller";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -59,6 +63,34 @@ ipcMain.handle("daemon:runtime", () => ({
 ipcMain.handle("agent-integrations:preview", () =>
   buildAgentIntegrationPreview({ userDataPath: app.getPath("userData") })
 );
+ipcMain.handle("agent-integrations:install", (_event, targetId: AgentIntegrationTargetId) => {
+  const userDataPath = app.getPath("userData");
+  const target = getAgentIntegrationTarget(targetId, userDataPath);
+  return installAgentIntegrationConfig({
+    targetId,
+    configPath: target.configPath,
+    content: target.content,
+    userDataPath
+  });
+});
+ipcMain.handle("agent-integrations:uninstall", (_event, targetId: AgentIntegrationTargetId) => {
+  const userDataPath = app.getPath("userData");
+  const target = getAgentIntegrationTarget(targetId, userDataPath);
+  return uninstallAgentIntegrationConfig({
+    targetId,
+    configPath: target.configPath,
+    userDataPath
+  });
+});
+
+function getAgentIntegrationTarget(targetId: AgentIntegrationTargetId, userDataPath: string) {
+  const preview = buildAgentIntegrationPreview({ userDataPath });
+  const target = preview.targets.find((candidate) => candidate.id === targetId);
+  if (!target) {
+    throw new Error(`Unknown agent integration target: ${targetId}`);
+  }
+  return target;
+}
 
 app.whenReady().then(() => {
   startSidecar();

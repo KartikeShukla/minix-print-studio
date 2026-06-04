@@ -10,6 +10,7 @@ export type AgentIntegrationPreviewTarget = {
   name: string;
   configPath: string;
   format: "json" | "shell" | "toml";
+  installable?: boolean;
   content: string;
 };
 
@@ -21,6 +22,39 @@ export type AgentIntegrationPreview = {
 
 export type AgentIntegrationProvider = () => Promise<AgentIntegrationPreview | null>;
 
+export type AgentIntegrationInstallResult = {
+  version: 1;
+  operation: "install" | "uninstall";
+  targetId: AgentIntegrationTargetId;
+  targetPath: string;
+  backupPath: string;
+  manifestPath: string;
+  existed: boolean;
+  createdAt: string;
+};
+
+export type AgentIntegrationInstaller = {
+  install: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
+  uninstall: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
+};
+
 export async function loadAgentIntegrationPreview(): Promise<AgentIntegrationPreview | null> {
   return window.minix?.getAgentIntegrationPreview?.() ?? null;
 }
+
+export const desktopAgentIntegrationInstaller: AgentIntegrationInstaller = {
+  async install(targetId) {
+    const install = window.minix?.installAgentIntegrationConfig;
+    if (!install) {
+      throw new Error("Agent integration install is unavailable");
+    }
+    return install(targetId);
+  },
+  async uninstall(targetId) {
+    const uninstall = window.minix?.uninstallAgentIntegrationConfig;
+    if (!uninstall) {
+      throw new Error("Agent integration uninstall is unavailable");
+    }
+    return uninstall(targetId);
+  }
+};

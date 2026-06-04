@@ -19,6 +19,11 @@ describe("agent integration previews", () => {
       "opencode",
       "generic-stdio"
     ]);
+    expect(preview.targets.filter((target) => target.installable).map((target) => target.id)).toEqual([
+      "codex",
+      "claude-desktop",
+      "opencode"
+    ]);
     expect(preview.targets[0]).toEqual(
       expect.objectContaining({
         id: "codex",
