@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import log from "electron-log";
 import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
 import { getRepoRoot } from "./paths";
+import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
 
 let mainWindow: BrowserWindow | null = null;
@@ -35,6 +36,15 @@ function startSidecar(): void {
   });
 
   const child = startDaemon(config);
+  try {
+    writeDaemonRuntimeHandoff({
+      runtime,
+      userDataPath: app.getPath("userData"),
+      pid: child.pid ?? process.pid
+    });
+  } catch (error) {
+    log.warn("Unable to write daemon runtime handoff", error);
+  }
   child.once("error", (error) => {
     log.warn("Unable to start daemon sidecar", error);
   });

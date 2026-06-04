@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 
 from minix_mcp.daemon_client import DaemonHttpClient, JsonObject
+from minix_mcp.runtime import resolve_daemon_runtime
 from minix_mcp.tools import (
     DaemonClient,
     get_daemon_status_tool,
@@ -59,9 +59,10 @@ def build_mcp_server(
 
 
 def build_default_client() -> DaemonHttpClient:
+    runtime = resolve_daemon_runtime()
     return DaemonHttpClient(
-        base_url=os.environ.get("MINIX_DAEMON_BASE_URL", "http://127.0.0.1:39281"),
-        token=os.environ.get("MINIX_DAEMON_TOKEN", "dev-token"),
+        base_url=runtime.base_url,
+        token=runtime.token,
     )
 
 

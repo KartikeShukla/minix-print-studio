@@ -8,6 +8,8 @@ import {
 } from "../src/index";
 
 const shimPath = "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp";
+const runtimeFilePath =
+  "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json";
 
 describe("MCP integration config generators", () => {
   it("generates Codex TOML with a stable stdio shim command", () => {
@@ -50,5 +52,30 @@ describe("MCP integration config generators", () => {
       args: [],
       env: {}
     });
+  });
+
+  it("generates MCP configs that reference the runtime handoff file without embedding tokens", () => {
+    expect(buildGenericMcpConfig(shimPath, { runtimeFilePath })).toEqual({
+      type: "stdio",
+      command: shimPath,
+      args: [],
+      env: {
+        MINIX_DAEMON_RUNTIME_FILE: runtimeFilePath
+      }
+    });
+    expect(buildCodexConfigToml(shimPath, { runtimeFilePath })).toContain(
+      `MINIX_DAEMON_RUNTIME_FILE = "${runtimeFilePath}"`
+    );
+    expect(buildClaudeDesktopConfig(shimPath, { runtimeFilePath }).mcpServers["minix-print"].env)
+      .toEqual({
+        MINIX_DAEMON_RUNTIME_FILE: runtimeFilePath
+      });
+    expect(buildOpenCodeConfig(shimPath, { runtimeFilePath }).mcp["minix-print"].environment)
+      .toEqual({
+        MINIX_DAEMON_RUNTIME_FILE: runtimeFilePath
+      });
+    expect(JSON.stringify(buildGenericMcpConfig(shimPath, { runtimeFilePath }))).not.toContain(
+      "token"
+    );
   });
 });

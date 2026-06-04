@@ -24,6 +24,10 @@ export type OpenCodeConfig = {
   };
 };
 
+export type McpRuntimeHandoffOptions = {
+  runtimeFilePath?: string;
+};
+
 function escapeTomlString(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
@@ -32,40 +36,71 @@ function shellSingleQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
-export function buildGenericMcpConfig(shimPath: string): StdioMcpConfig {
+function buildMcpEnvironment(options: McpRuntimeHandoffOptions = {}): Record<string, string> {
+  return options.runtimeFilePath
+    ? {
+        MINIX_DAEMON_RUNTIME_FILE: options.runtimeFilePath
+      }
+    : {};
+}
+
+export function buildGenericMcpConfig(
+  shimPath: string,
+  options: McpRuntimeHandoffOptions = {}
+): StdioMcpConfig {
   return {
     type: "stdio",
     command: shimPath,
     args: [],
-    env: {}
+    env: buildMcpEnvironment(options)
   };
 }
 
-export function buildCodexConfigToml(shimPath: string): string {
-  return [
+export function buildCodexConfigToml(
+  shimPath: string,
+  options: McpRuntimeHandoffOptions = {}
+): string {
+  const lines = [
     "[mcp_servers.minix_print]",
     `command = "${escapeTomlString(shimPath)}"`,
     "args = []",
     "startup_timeout_sec = 15.0",
     "tool_timeout_sec = 120.0",
     ""
-  ].join("\n");
+  ];
+  if (options.runtimeFilePath) {
+    lines.push(
+      "[mcp_servers.minix_print.env]",
+      `MINIX_DAEMON_RUNTIME_FILE = "${escapeTomlString(options.runtimeFilePath)}"`,
+      ""
+    );
+  }
+  return lines.join("\n");
 }
 
-export function buildClaudeDesktopConfig(shimPath: string): ClaudeDesktopConfig {
+export function buildClaudeDesktopConfig(
+  shimPath: string,
+  options: McpRuntimeHandoffOptions = {}
+): ClaudeDesktopConfig {
   return {
     mcpServers: {
-      "minix-print": buildGenericMcpConfig(shimPath)
+      "minix-print": buildGenericMcpConfig(shimPath, options)
     }
   };
 }
 
-export function buildClaudeCodeAddJsonCommand(shimPath: string): string {
-  const config = JSON.stringify(buildGenericMcpConfig(shimPath));
+export function buildClaudeCodeAddJsonCommand(
+  shimPath: string,
+  options: McpRuntimeHandoffOptions = {}
+): string {
+  const config = JSON.stringify(buildGenericMcpConfig(shimPath, options));
   return `claude mcp add-json minix-print ${shellSingleQuote(config)}`;
 }
 
-export function buildOpenCodeConfig(shimPath: string): OpenCodeConfig {
+export function buildOpenCodeConfig(
+  shimPath: string,
+  options: McpRuntimeHandoffOptions = {}
+): OpenCodeConfig {
   return {
     $schema: "https://opencode.ai/config.json",
     mcp: {
@@ -74,7 +109,7 @@ export function buildOpenCodeConfig(shimPath: string): OpenCodeConfig {
         command: [shimPath],
         enabled: true,
         timeout: 15000,
-        environment: {}
+        environment: buildMcpEnvironment(options)
       }
     }
   };

@@ -72,6 +72,9 @@
 - Renderer completed print jobs persist to a localStorage-backed Recent Jobs list with job id, status, completion level, and band progress.
 - Daemon `/v1/diagnostics/export` returns a redacted diagnostics bundle with daemon/version context, profile snapshot, job metadata, segment metadata without raw raster bytes, mock timing summaries, and completion decision explanation.
 - Renderer daemon client and Recent Jobs panel can request the redacted diagnostics export and show the exported bundle job count.
+- Electron writes daemon runtime handoff files under user data: `runtime/runtime.json` contains base URL, PID, start time, mock flag, and token-file path while `runtime/token` stores the bearer token separately.
+- MCP integration config generators can include `MINIX_DAEMON_RUNTIME_FILE` for Codex, Claude Desktop/Code, OpenCode, and generic stdio configs without embedding bearer tokens.
+- MCP stdio shim resolves daemon base URL and token from the Electron runtime handoff file, rejects inline tokens in runtime JSON, and keeps the existing explicit environment fallback for development.
 
 ## Current Verification
 
@@ -90,9 +93,10 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: use footer pan controls to move 0,0 -> 48,0 -> 48,48 -> 0,0, verify reset disables and localStorage remains stable.
 - Playwright smoke against `http://127.0.0.1:5174/`: add rectangle, drag the selected layer's bottom-right transformer handle, verify localStorage geometry changes from `320 x 72` to `358 x 81`.
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
+- TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. MCP runtime config handoff from Electron user data.
+2. Agent integrations UI: copy/install config previews using the runtime handoff and stable MCP shim path.
 3. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.
