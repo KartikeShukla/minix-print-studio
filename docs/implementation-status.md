@@ -36,6 +36,8 @@
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
+- MCP daemon HTTP client for bearer-authenticated daemon health and document-preview requests.
+- MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
 
 ## Current Verification
 
@@ -49,7 +51,7 @@
 
 ## Next Implementation Slices
 
-1. MCP tools backed by daemon health, preview, and approval-required flows.
+1. Wrap MCP core tool handlers with an MCP SDK stdio server entrypoint.
 2. Real BLE scanner/connection manager with mock-first transport tests.
 3. Project/document persistence and editor canvas interactions.
 4. Persisted job history and diagnostics export.
