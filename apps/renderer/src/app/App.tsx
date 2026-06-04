@@ -126,6 +126,7 @@ export function App({ daemonClient }: AppProps) {
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
+  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const { document, past, future, selectedElementId } = editorState;
 
   useEffect(() => {
@@ -155,6 +156,17 @@ export function App({ daemonClient }: AppProps) {
     saveStoredDocument(document);
   }, [document]);
 
+  useEffect(() => {
+    if (
+      editingTextElementId &&
+      !document.elements.some(
+        (element) => element.id === editingTextElementId && element.type === "text"
+      )
+    ) {
+      setEditingTextElementId(null);
+    }
+  }, [document.elements, editingTextElementId]);
+
   const invalidatePreview = useCallback(() => {
     setPreviewWorkflow({ status: "idle" });
     setPrintWorkflow({ status: "idle" });
@@ -179,6 +191,14 @@ export function App({ daemonClient }: AppProps) {
   const selectElement = useCallback((elementId: string | null) => {
     setEditorState((currentState) => ({ ...currentState, selectedElementId: elementId }));
   }, []);
+
+  const startInlineTextEdit = useCallback(
+    (elementId: string) => {
+      selectElement(elementId);
+      setEditingTextElementId(elementId);
+    },
+    [selectElement]
+  );
 
   const addTextLayer = useCallback(() => {
     commitDocument((currentDocument) => {
@@ -302,7 +322,23 @@ export function App({ daemonClient }: AppProps) {
     [commitDocument]
   );
 
+  const commitInlineTextEdit = useCallback(
+    (elementId: string, text: string) => {
+      updateDocumentElement(elementId, (currentElement) => {
+        const currentText = textElementSchema.safeParse(currentElement);
+        return currentText.success ? { ...currentText.data, text } : currentElement;
+      });
+      setEditingTextElementId(null);
+    },
+    [updateDocumentElement]
+  );
+
+  const cancelInlineTextEdit = useCallback(() => {
+    setEditingTextElementId(null);
+  }, []);
+
   const undoDocumentChange = useCallback(() => {
+    setEditingTextElementId(null);
     setEditorState((currentState) => {
       const previousDocument = currentState.past.at(-1);
       if (!previousDocument) {
@@ -319,6 +355,7 @@ export function App({ daemonClient }: AppProps) {
   }, [invalidatePreview]);
 
   const redoDocumentChange = useCallback(() => {
+    setEditingTextElementId(null);
     setEditorState((currentState) => {
       const nextDocument = currentState.future[0];
       if (!nextDocument) {
@@ -561,8 +598,12 @@ export function App({ daemonClient }: AppProps) {
                 selectedElementId={selectedElementId}
                 previewReady={previewReady}
                 totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
+                editingTextElementId={editingTextElementId}
                 onSelect={selectElement}
                 onMove={moveDocumentElement}
+                onStartTextEdit={startInlineTextEdit}
+                onCommitTextEdit={commitInlineTextEdit}
+                onCancelTextEdit={cancelInlineTextEdit}
               />
             </div>
           </section>
@@ -1092,15 +1133,23 @@ function DocumentCanvas({
   selectedElementId,
   previewReady,
   totalBands,
+  editingTextElementId,
   onSelect,
-  onMove
+  onMove,
+  onStartTextEdit,
+  onCommitTextEdit,
+  onCancelTextEdit
 }: {
   document: PrintDocument;
   selectedElementId: string | null;
   previewReady: boolean;
   totalBands: number | null;
+  editingTextElementId: string | null;
   onSelect: (elementId: string | null) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onStartTextEdit: (elementId: string) => void;
+  onCommitTextEdit: (elementId: string, text: string) => void;
+  onCancelTextEdit: () => void;
 }) {
   const canvasElements = document.elements.reduce<CanvasElement[]>((items, element) => {
     const textElement = textElementSchema.safeParse(element);
@@ -1129,6 +1178,10 @@ function DocumentCanvas({
 
     return items;
   }, []);
+  const editingTextItem = canvasElements.find(
+    (item) => item.kind === "text" && item.element.id === editingTextElementId
+  );
+  const editingTextElement = editingTextItem?.kind === "text" ? editingTextItem.element : null;
 
   return (
     <div className="receipt-artboard" aria-label="384 dot receipt artboard">
@@ -1153,6 +1206,7 @@ function DocumentCanvas({
                   selected={selectedElementId === item.element.id}
                   onSelect={onSelect}
                   onMove={onMove}
+                  onEdit={onStartTextEdit}
                 />
               ) : item.kind === "rect" ? (
                 <CanvasRectElement
@@ -1182,6 +1236,13 @@ function DocumentCanvas({
             )}
           </Layer>
         </Stage>
+        {editingTextElement ? (
+          <InlineTextEditor
+            element={editingTextElement}
+            onCommit={(text) => onCommitTextEdit(editingTextElement.id, text)}
+            onCancel={onCancelTextEdit}
+          />
+        ) : null}
         {document.elements.length === 0 ? (
           <div className="thermal-stage-empty">
             <Boxes className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden="true" />
@@ -1201,16 +1262,85 @@ function DocumentCanvas({
   );
 }
 
+function InlineTextEditor({
+  element,
+  onCommit,
+  onCancel
+}: {
+  element: TextElement;
+  onCommit: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const [draft, setDraft] = useState(element.text);
+
+  useEffect(() => {
+    setDraft(element.text);
+  }, [element.id, element.text]);
+
+  useEffect(() => {
+    editorRef.current?.focus();
+    editorRef.current?.select();
+  }, [element.id]);
+
+  const finishEditing = useCallback(() => {
+    if (draft === element.text) {
+      onCancel();
+      return;
+    }
+    onCommit(draft);
+  }, [draft, element.text, onCancel, onCommit]);
+
+  return (
+    <textarea
+      ref={editorRef}
+      aria-label="Inline text"
+      className="absolute z-10 resize-none rounded-sm border border-primary bg-background/95 p-1 text-sm text-foreground shadow-sm outline-none ring-2 ring-primary/20"
+      value={draft}
+      style={{
+        left: element.x,
+        top: element.y,
+        width: element.width,
+        minHeight: element.height,
+        transform: `rotate(${element.rotation}deg)`,
+        transformOrigin: "top left",
+        fontFamily: element.style.fontFamily,
+        fontSize: element.style.fontSize,
+        fontWeight: element.style.fontWeight,
+        lineHeight: element.style.lineHeight,
+        color: element.style.fill,
+        textAlign: element.style.align
+      }}
+      onChange={(event) => setDraft(event.currentTarget.value)}
+      onBlur={finishEditing}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onCancel();
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          finishEditing();
+        }
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+    />
+  );
+}
+
 function CanvasTextElement({
   element,
   selected,
   onSelect,
-  onMove
+  onMove,
+  onEdit
 }: {
   element: TextElement;
   selected: boolean;
   onSelect: (elementId: string) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onEdit: (elementId: string) => void;
 }) {
   const selectionProps = selected ? { stroke: "#0f766e", strokeWidth: 1 } : {};
 
@@ -1234,6 +1364,8 @@ function CanvasTextElement({
       {...selectionProps}
       onClick={() => onSelect(element.id)}
       onTap={() => onSelect(element.id)}
+      onDblClick={() => onEdit(element.id)}
+      onDblTap={() => onEdit(element.id)}
       onDragEnd={(event) => {
         onMove(element.id, event.target.x(), event.target.y());
       }}

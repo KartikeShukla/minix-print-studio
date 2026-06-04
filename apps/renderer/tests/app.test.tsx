@@ -322,6 +322,68 @@ describe("MiniX Print Studio shell", () => {
     ]);
   });
 
+  it("edits text inline from the canvas overlay and keeps undo history", async () => {
+    const { container } = render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+
+    await screen.findAllByText("Double-click to edit");
+    const canvasText = container.querySelector('[data-konva-node="Text"][data-testid^="el_"]');
+    expect(canvasText).toBeInstanceOf(HTMLElement);
+
+    fireEvent.doubleClick(canvasText as HTMLElement);
+
+    const inlineEditor = await screen.findByRole("textbox", { name: "Inline text" });
+    fireEvent.change(inlineEditor, { target: { value: "Fresh thermal label" } });
+    fireEvent.blur(inlineEditor);
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "text",
+          name: "Text 1",
+          text: "Fresh thermal label"
+        })
+      ]);
+    });
+    expect(screen.queryByRole("textbox", { name: "Inline text" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "text",
+          name: "Text 1",
+          text: "Double-click to edit"
+        })
+      ]);
+    });
+  });
+
   it("edits the selected rectangle through the inspector and persists the document", async () => {
     render(
       <App

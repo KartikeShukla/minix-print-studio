@@ -65,6 +65,7 @@
 - Design model now includes typed embedded image elements with fit and preprocessing metadata.
 - Daemon canonical renderer decodes embedded image data URLs, applies fit/threshold/invert preprocessing, and includes the result in one-bit raster output.
 - Renderer image import embeds local PNG/JPEG/WebP files into the document, displays imported images on the canvas, exposes fit/threshold/invert inspector controls, and persists them with undoable document edits.
+- Renderer text layers support double-click inline editing through an HTML canvas overlay that commits one undoable document edit on blur or Enter, and cancels with Escape.
 
 ## Current Verification
 
@@ -78,10 +79,11 @@
 - Playwright smoke against `http://127.0.0.1:5173/`: add rectangle, edit inspector X/Width/fill, verify localStorage persistence.
 - Playwright smoke against `http://127.0.0.1:5174/`: add QR layer, edit payload/error correction, verify localStorage persistence.
 - Playwright smoke against `http://127.0.0.1:5174/`: import PNG file, verify embedded image layer and preprocessing defaults in localStorage.
+- Playwright smoke against `http://127.0.0.1:5174/`: add text layer, double-click canvas text, edit the inline overlay, verify localStorage persistence and Undo enablement.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Canvas editor MVP depth: transformer handles, inline text editing, and pan/zoom.
+2. Canvas editor MVP depth: transformer handles and pan/zoom.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.
