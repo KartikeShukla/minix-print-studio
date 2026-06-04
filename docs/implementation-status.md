@@ -56,6 +56,9 @@
 - Document model now includes typed rectangle elements aligned with the daemon's canonical rectangle renderer.
 - Renderer canvas can add rectangle layers, render them on the React Konva stage, show them in the layer list, and persist them with the current document.
 - Renderer editor state supports undo/redo for document edits without persisting history stacks to localStorage.
+- Design model exposes a generic immutable `updateElement` helper for history-aware editor mutations.
+- Renderer layer list can select document elements for right-panel editing.
+- Renderer inspector panel edits selected layer name, geometry, visibility, lock state, rectangle fill, and text content/fill through the persisted document history path.
 
 ## Current Verification
 
@@ -66,10 +69,11 @@
 - `.venv/bin/python -m ruff check daemon mcp`
 - `.venv/bin/python -m mypy daemon/src mcp/src`
 - `.venv/bin/python -m pytest daemon/tests mcp/tests`
+- Playwright smoke against `http://127.0.0.1:5173/`: add rectangle, edit inspector X/Width/fill, verify localStorage persistence.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Canvas editor MVP depth: transformer handles, inline text editing, image/QR layers, pan/zoom, and inspector controls.
+2. Canvas editor MVP depth: transformer handles, inline text editing, image/QR layers, and pan/zoom.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.
