@@ -67,6 +67,7 @@ def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
         create_diagnostics_router(
             profiles=profiles_data,
             print_queue=print_queue,
+            discovery_service=discovery_service,
             mock=mock,
             profile_registry_version=PROFILE_REGISTRY_VERSION,
         )

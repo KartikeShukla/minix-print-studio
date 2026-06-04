@@ -17,6 +17,7 @@ import {
   type DiagnosticsExportRequest,
   type DiagnosticsExportResponse,
   type DocumentPreviewResponse,
+  type HardwareTestExportRequest,
   type HealthResponse,
   type PrintJobResponse,
   type PrintPlanRequest,
@@ -41,6 +42,7 @@ export type DaemonClient = {
   planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
   printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
   exportDiagnostics?: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResponse>;
+  exportHardwareTest?: (deviceId: string) => Promise<Blob>;
   scanPrinters: () => Promise<PrinterScanResponse>;
   readOnlyVerify: (deviceId: string) => Promise<ReadOnlyVerification>;
 };
@@ -116,6 +118,20 @@ export function createDaemonClient(): DaemonClient {
         "Daemon diagnostics export"
       );
     },
+    async exportHardwareTest(deviceId) {
+      const request: HardwareTestExportRequest = {
+        deviceId,
+        stage: "read_only_verification"
+      };
+      return requestDaemonBlob(
+        "/v1/diagnostics/hardware-test",
+        {
+          method: "POST",
+          body: request
+        },
+        "Daemon hardware-test export"
+      );
+    },
     async scanPrinters() {
       return requestDaemon(
         "/v1/printers/scan",
@@ -167,6 +183,34 @@ async function requestDaemon<T>(
   }
 
   return parse(await response.json());
+}
+
+async function requestDaemonBlob(
+  path: string,
+  options: { method?: "GET" | "POST"; body?: object },
+  label: string
+): Promise<Blob> {
+  const runtime = await getRuntime();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${runtime.token}`
+  };
+  const init: RequestInit = {
+    method: options.method ?? "GET",
+    headers
+  };
+
+  if (options.body) {
+    headers["Content-Type"] = "application/json";
+    init.body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(`${runtime.baseUrl}${path}`, init);
+
+  if (!response.ok) {
+    throw new Error(`${label} failed with ${response.status}`);
+  }
+
+  return response.blob();
 }
 
 async function getRuntime(): Promise<DaemonRuntime> {

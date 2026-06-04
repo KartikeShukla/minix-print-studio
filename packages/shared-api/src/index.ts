@@ -263,6 +263,12 @@ export type DiagnosticsExportRequest = {
   includeRawImages: boolean;
 };
 
+export type HardwareTestExportRequest = {
+  deviceId: string;
+  stage: "read_only_verification";
+  userConfirmation?: Record<string, unknown>;
+};
+
 export type DiscoveredPrinter = {
   name: string | null;
   serviceUuids: string[];

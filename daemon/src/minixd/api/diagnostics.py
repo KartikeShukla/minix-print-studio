@@ -4,14 +4,20 @@ import json
 import platform
 from datetime import UTC, datetime
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from minixd import __version__
 from minixd.api.jobs import _serialize_print_job
+from minixd.ble.discovery import (
+    PrinterDiscoveryError,
+    PrinterDiscoveryService,
+    PrinterNotFoundError,
+    ReadOnlyVerification,
+)
 from minixd.printing.queue import PrintJob, PrintQueue
 
 
@@ -20,10 +26,17 @@ class DiagnosticsExportRequest(BaseModel):
     include_raw_images: bool = Field(default=False, alias="includeRawImages")
 
 
+class HardwareTestRequest(BaseModel):
+    device_id: str = Field(alias="deviceId", min_length=1)
+    stage: Literal["read_only_verification"] = "read_only_verification"
+    user_confirmation: dict[str, Any] = Field(default_factory=dict, alias="userConfirmation")
+
+
 def create_diagnostics_router(
     *,
     profiles: list[dict[str, Any]],
     print_queue: PrintQueue,
+    discovery_service: PrinterDiscoveryService,
     mock: bool,
     profile_registry_version: str,
 ) -> APIRouter:
@@ -60,6 +73,33 @@ def create_diagnostics_router(
             content=archive.getvalue(),
             media_type="application/zip",
             headers={"Content-Disposition": 'attachment; filename="minix-diagnostics.zip"'},
+        )
+
+    @router.post("/hardware-test")
+    async def export_hardware_test(request: HardwareTestRequest) -> Response:
+        try:
+            verification = await discovery_service.read_only_verify(request.device_id)
+        except PrinterNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except PrinterDiscoveryError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        archive = _build_read_only_hardware_test_archive(
+            request=request,
+            verification=verification,
+            profiles=profiles,
+            mock=mock,
+            profile_registry_version=profile_registry_version,
+        )
+        created_at = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        return Response(
+            content=archive,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="hardware-test-{created_at}.zip"'
+                )
+            },
         )
 
     return router
@@ -164,6 +204,178 @@ def _job_diagnostics(job: PrintJob, print_queue: PrintQueue) -> dict[str, object
         "notifications": {"summary": "not captured in mock transport"},
     }
     return serialized
+
+
+def _build_read_only_hardware_test_archive(
+    *,
+    request: HardwareTestRequest,
+    verification: ReadOnlyVerification,
+    profiles: list[dict[str, Any]],
+    mock: bool,
+    profile_registry_version: str,
+) -> bytes:
+    matching_profile = _find_profile(profiles, verification.profile_id)
+    transfer_manifest = {
+        "stage": request.stage,
+        "deviceId": verification.device_id,
+        "profileId": verification.profile_id,
+        "printCommandsSent": False,
+        "rasterBytesIncluded": False,
+        "printable": verification.printable,
+        "nextRequiredStage": verification.next_required_stage,
+        "reason": verification.reason,
+    }
+    archive = BytesIO()
+    with ZipFile(archive, "w", ZIP_DEFLATED) as hardware_zip:
+        hardware_zip.writestr(
+            "device.json",
+            _json_bytes(
+                {
+                    "deviceId": verification.device_id,
+                    "status": verification.status,
+                    "profileId": verification.profile_id,
+                    "profileSupportLevel": verification.profile_support_level,
+                    "modelResponse": verification.model_response,
+                    "firmware": verification.firmware,
+                    "printable": verification.printable,
+                    "nextRequiredStage": verification.next_required_stage,
+                    "reason": verification.reason,
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "profile.json",
+            _json_bytes(_profile_snapshot(matching_profile) if matching_profile else {}),
+        )
+        hardware_zip.writestr(
+            "ble-discovery.json",
+            _json_bytes(
+                {
+                    "services": verification.services,
+                    "writeCharacteristics": verification.write_characteristics,
+                    "notifyCharacteristics": verification.notify_characteristics,
+                    "rawNotificationCount": len(verification.raw_notifications),
+                    "timingEvents": [
+                        {
+                            "operation": event.operation,
+                            "characteristic": event.characteristic,
+                            "elapsedMs": event.elapsed_ms,
+                            "payloadBytes": event.payload_bytes,
+                        }
+                        for event in verification.timing_events
+                    ],
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "model-response.bin",
+            (verification.model_response or "").encode("utf-8"),
+        )
+        hardware_zip.writestr(
+            "firmware-response.bin",
+            (verification.firmware or "").encode("utf-8"),
+        )
+        hardware_zip.writestr(
+            "notifications.log",
+            "\n".join(verification.raw_notifications).encode("utf-8"),
+        )
+        hardware_zip.writestr("commands.log", _commands_log(verification))
+        hardware_zip.writestr("print-transfer-manifest.json", _json_bytes(transfer_manifest))
+        hardware_zip.writestr(
+            "band-manifest.json",
+            _json_bytes(
+                {
+                    "bands": [],
+                    "notApplicableReason": (
+                        "Read-only verification does not send raster bands."
+                    ),
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "finalizer-result.json",
+            _json_bytes(
+                {
+                    "status": "not_applicable",
+                    "reason": "Read-only verification does not run print finalizers.",
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "safety-report.json",
+            _json_bytes(
+                {
+                    "printingLocked": True,
+                    "certificationComplete": False,
+                    "certificationStage": request.stage,
+                    "nextRequiredStage": verification.next_required_stage,
+                    "reason": "Read-only verification alone never unlocks printing.",
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "user-confirmation.json",
+            _json_bytes(
+                {
+                    "stage": request.stage,
+                    "responses": request.user_confirmation,
+                    "requiredForCertification": True,
+                    "certificationComplete": False,
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "app-version.json",
+            _json_bytes(
+                {
+                    "daemonVersion": __version__,
+                    "profileRegistryVersion": profile_registry_version,
+                    "mock": mock,
+                    "os": platform.system(),
+                    "python": platform.python_version(),
+                }
+            ),
+        )
+        hardware_zip.writestr(
+            "README.md",
+            (
+                "MiniX Print Studio hardware-test artifact for Stage A read-only "
+                "verification. This archive does not certify the printer and does not "
+                "include raster bytes, approval tokens, or print commands.\n"
+            ),
+        )
+    return archive.getvalue()
+
+
+def _find_profile(profiles: list[dict[str, Any]], profile_id: str | None) -> dict[str, Any] | None:
+    if profile_id is None:
+        return None
+    for profile in profiles:
+        if profile.get("id") == profile_id:
+            return profile
+    return None
+
+
+def _commands_log(verification: ReadOnlyVerification) -> bytes:
+    lines = [
+        json.dumps(
+            {
+                "operation": event.operation,
+                "characteristic": event.characteristic,
+                "elapsedMs": event.elapsed_ms,
+                "payloadBytes": event.payload_bytes,
+                "rawPayloadIncluded": False,
+            },
+            sort_keys=True,
+        )
+        for event in verification.timing_events
+        if event.operation == "write_gatt_char"
+    ]
+    return ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8")
+
+
+def _json_bytes(value: object) -> bytes:
+    return json.dumps(value, indent=2, sort_keys=True).encode("utf-8")
 
 
 def _dict_value(value: dict[str, Any], key: str) -> dict[str, Any]:

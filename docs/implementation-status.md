@@ -89,6 +89,8 @@
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
 - Diagnostics export supports both JSON response and downloadable ZIP archive containing redacted `diagnostics.json` plus a README.
 - BLE read-only verification captures timing metadata for notify setup, notifications, writes, and notify teardown without recording raw command payloads.
+- `/v1/diagnostics/hardware-test` runs Stage A read-only verification and exports a hardware-test ZIP with device/profile snapshots, BLE discovery metadata, model/firmware response files, notification/command logs, safety report, and explicit evidence that no print commands or raster bytes were sent.
+- Renderer printer setup exposes `Export read-only artifact` after read-only verification so a hardware tester can capture the Stage A validation record without terminal steps.
 
 ## Current Verification
 
@@ -116,8 +118,10 @@
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
 - TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
+- TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
-1. Physical hardware validation for read-only model/firmware probing on the printer.
+1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer and inspect the exported hardware-test artifact.
+2. After Stage A is confirmed on hardware, implement the protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.

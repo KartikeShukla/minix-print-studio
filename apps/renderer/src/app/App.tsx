@@ -128,6 +128,12 @@ type DiagnosticsWorkflow =
   | { status: "exported"; bundle: DiagnosticsExportResponse }
   | { status: "error"; message: string };
 
+type HardwareArtifactWorkflow =
+  | { status: "idle" }
+  | { status: "running"; deviceId: string }
+  | { status: "exported"; deviceId: string; sizeBytes: number }
+  | { status: "error"; deviceId: string; message: string };
+
 type AgentIntegrationWorkflow =
   | { status: "loading" }
   | { status: "ready"; preview: AgentIntegrationPreview }
@@ -235,6 +241,10 @@ export function App({
   const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
     status: "idle"
   });
+  const [hardwareArtifactWorkflow, setHardwareArtifactWorkflow] =
+    useState<HardwareArtifactWorkflow>({
+      status: "idle"
+    });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
     useState<AgentIntegrationWorkflow>({
       status: "loading"
@@ -667,6 +677,36 @@ export function App({
     }
   }, [client]);
 
+  const runHardwareArtifactExport = useCallback(
+    async (deviceId: string) => {
+      if (!client.exportHardwareTest) {
+        setHardwareArtifactWorkflow({
+          status: "error",
+          deviceId,
+          message: "Hardware artifact export unavailable"
+        });
+        return;
+      }
+      setHardwareArtifactWorkflow({ status: "running", deviceId });
+      try {
+        const artifact = await client.exportHardwareTest(deviceId);
+        downloadBlob(artifact, "hardware-test-read-only.zip");
+        setHardwareArtifactWorkflow({
+          status: "exported",
+          deviceId,
+          sizeBytes: artifact.size
+        });
+      } catch (error: unknown) {
+        setHardwareArtifactWorkflow({
+          status: "error",
+          deviceId,
+          message: error instanceof Error ? error.message : "Hardware artifact export failed"
+        });
+      }
+    },
+    [client]
+  );
+
   const copyAgentIntegrationConfig = useCallback(async (target: AgentIntegrationPreviewTarget) => {
     try {
       if (!navigator.clipboard?.writeText) {
@@ -981,7 +1021,12 @@ export function App({
           </section>
 
           <aside className="min-h-0 overflow-auto border-l border-border bg-card">
-            <PrinterPanel workflow={printerWorkflow} onVerify={runReadOnlyVerify} />
+            <PrinterPanel
+              workflow={printerWorkflow}
+              hardwareArtifactWorkflow={hardwareArtifactWorkflow}
+              onVerify={runReadOnlyVerify}
+              onExportHardwareArtifact={runHardwareArtifactExport}
+            />
             <ElementInspector element={selectedElement} onUpdate={updateDocumentElement} />
 
             <section className="border-b border-border p-4">
@@ -2393,10 +2438,14 @@ function CanvasQrElement({
 
 function PrinterPanel({
   workflow,
-  onVerify
+  hardwareArtifactWorkflow,
+  onVerify,
+  onExportHardwareArtifact
 }: {
   workflow: PrinterWorkflow;
+  hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
+  onExportHardwareArtifact: (deviceId: string) => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
@@ -2430,9 +2479,15 @@ function PrinterPanel({
         workflow={workflow}
         candidate={primaryCandidate}
         verification={verification}
+        hardwareArtifactWorkflow={hardwareArtifactWorkflow}
         onVerify={() => {
           if (primaryCandidate) {
             onVerify(primaryCandidate.deviceId, candidates);
+          }
+        }}
+        onExportHardwareArtifact={() => {
+          if (verification) {
+            onExportHardwareArtifact(verification.deviceId);
           }
         }}
       />
@@ -2444,12 +2499,16 @@ function PrinterDiscoveryStatus({
   workflow,
   candidate,
   verification,
-  onVerify
+  hardwareArtifactWorkflow,
+  onVerify,
+  onExportHardwareArtifact
 }: {
   workflow: PrinterWorkflow;
   candidate: PrinterCandidate | undefined;
   verification: ReadOnlyVerification | null;
+  hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   onVerify: () => void;
+  onExportHardwareArtifact: () => void;
 }) {
   if (workflow.status === "scanning") {
     return <div className="mt-4 text-sm text-muted-foreground">Scanning</div>;
@@ -2498,6 +2557,34 @@ function PrinterDiscoveryStatus({
             </span>
           </div>
           <Badge variant="warning">Printing still locked</Badge>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onExportHardwareArtifact}
+            disabled={
+              hardwareArtifactWorkflow.status === "running" &&
+              hardwareArtifactWorkflow.deviceId === verification.deviceId
+            }
+          >
+            <Download className="size-4" aria-hidden="true" />
+            {hardwareArtifactWorkflow.status === "running" &&
+            hardwareArtifactWorkflow.deviceId === verification.deviceId
+              ? "Exporting artifact"
+              : "Export read-only artifact"}
+          </Button>
+          {hardwareArtifactWorkflow.status === "exported" &&
+          hardwareArtifactWorkflow.deviceId === verification.deviceId ? (
+            <div className="rounded-md border border-success/30 bg-success/10 p-2 text-success">
+              <div className="font-medium">Hardware artifact exported</div>
+              <div className="text-xs">Ready for physical validation record</div>
+            </div>
+          ) : hardwareArtifactWorkflow.status === "error" &&
+            hardwareArtifactWorkflow.deviceId === verification.deviceId ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+              {hardwareArtifactWorkflow.message}
+            </div>
+          ) : null}
         </div>
       ) : (
         <Button
@@ -2649,6 +2736,22 @@ function formatBandCount(totalBands: number): string {
 
 function formatDiagnosticsJobCount(totalJobs: number): string {
   return `${totalJobs} ${totalJobs === 1 ? "job" : "jobs"} in bundle`;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+    return;
+  }
+
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
 }
 
 function createQrMatrix(

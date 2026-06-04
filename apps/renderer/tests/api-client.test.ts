@@ -288,4 +288,36 @@ describe("daemon API client", () => {
       body: JSON.stringify({ includeProjectContent: false, includeRawImages: false })
     });
   });
+
+  it("exports a read-only hardware artifact through the daemon with auth", async () => {
+    const artifact = new Blob(["zip-bytes"], { type: "application/zip" });
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, blob: async () => artifact });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    await expect(client.exportHardwareTest?.("mock-minix-0194")).resolves.toBe(artifact);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:39281/v1/diagnostics/hardware-test",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret-token",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          deviceId: "mock-minix-0194",
+          stage: "read_only_verification"
+        })
+      }
+    );
+  });
 });

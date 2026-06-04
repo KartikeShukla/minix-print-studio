@@ -534,6 +534,15 @@ describe("MiniX Print Studio shell", () => {
       ],
       rawNotifications: []
     });
+    const exportHardwareTest = vi
+      .fn()
+      .mockResolvedValue(new Blob(["hardware-test"], { type: "application/zip" }));
+    const createObjectURL = vi.fn(() => "blob:hardware-test");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    const clickDownload = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
 
     render(
       <App
@@ -548,7 +557,8 @@ describe("MiniX Print Studio shell", () => {
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters,
-          readOnlyVerify
+          readOnlyVerify,
+          exportHardwareTest
         }}
       />
     );
@@ -566,6 +576,15 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Protocol sanity test required")).toBeInTheDocument();
     expect(screen.getByText("Printing still locked")).toBeInTheDocument();
     expect(readOnlyVerify).toHaveBeenCalledWith("mock-minix-0194");
+
+    fireEvent.click(screen.getByRole("button", { name: "Export read-only artifact" }));
+
+    expect(await screen.findByText("Hardware artifact exported")).toBeInTheDocument();
+    expect(screen.getByText("Ready for physical validation record")).toBeInTheDocument();
+    expect(exportHardwareTest).toHaveBeenCalledWith("mock-minix-0194");
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(clickDownload).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:hardware-test");
   });
 
   it("adds a text layer from the canvas tool and persists the document", async () => {
