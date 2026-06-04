@@ -1,4 +1,4 @@
-import path from "node:path";
+import { existsSync } from "node:fs";
 import {
   buildClaudeCodeAddJsonCommand,
   buildClaudeDesktopConfig,
@@ -7,6 +7,7 @@ import {
   buildOpenCodeConfig,
   type McpRuntimeHandoffOptions
 } from "@minix/integration-configs";
+import { ensureMcpShim, getMcpShimPath } from "./mcpShim";
 import { getRuntimeHandoffPaths } from "./runtimeHandoff";
 
 export type AgentIntegrationTargetId =
@@ -31,12 +32,15 @@ export type AgentIntegrationPreview = {
   targets: AgentIntegrationPreviewTarget[];
 };
 
-export function getMcpShimPath(
-  userDataPath: string,
-  platform: NodeJS.Platform = process.platform
-): string {
-  return path.join(userDataPath, "bin", platform === "win32" ? "minix-mcp.exe" : "minix-mcp");
-}
+export type AgentIntegrationConnectionTestResult = {
+  ok: boolean;
+  targetId: AgentIntegrationTargetId;
+  shimPath: string;
+  runtimeFilePath: string;
+  checkedAt: string;
+  message: string;
+  missing: string[];
+};
 
 export function buildAgentIntegrationPreview({
   userDataPath,
@@ -94,6 +98,44 @@ export function buildAgentIntegrationPreview({
         content: JSON.stringify(buildGenericMcpConfig(shimPath, options), null, 2)
       }
     ]
+  };
+}
+
+export function testAgentIntegrationConnection({
+  targetId,
+  userDataPath,
+  repoRoot,
+  now = new Date()
+}: {
+  targetId: AgentIntegrationTargetId;
+  userDataPath: string;
+  repoRoot: string;
+  now?: Date;
+}): AgentIntegrationConnectionTestResult {
+  const preview = buildAgentIntegrationPreview({ userDataPath });
+  const target = preview.targets.find((candidate) => candidate.id === targetId);
+  if (!target) {
+    throw new Error(`Unknown agent integration target: ${targetId}`);
+  }
+
+  const shim = ensureMcpShim({ userDataPath, repoRoot });
+  const runtimeFilePath = getRuntimeHandoffPaths(userDataPath).runtimeFile;
+  const missing = [
+    ...(existsSync(shim.shimPath) ? [] : ["MCP shim"]),
+    ...(existsSync(runtimeFilePath) ? [] : ["runtime handoff"])
+  ];
+
+  return {
+    ok: missing.length === 0,
+    targetId,
+    shimPath: shim.shimPath,
+    runtimeFilePath,
+    checkedAt: now.toISOString(),
+    message:
+      missing.length === 0
+        ? `${target.name} integration prerequisites are ready`
+        : `${target.name} integration is missing ${missing.join(" and ")}`,
+    missing
   };
 }
 

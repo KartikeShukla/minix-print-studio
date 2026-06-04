@@ -71,6 +71,7 @@ import type {
 import {
   desktopAgentIntegrationInstaller,
   loadAgentIntegrationPreview,
+  type AgentIntegrationConnectionTestResult,
   type AgentIntegrationInstallResult,
   type AgentIntegrationInstaller,
   type AgentIntegrationPreview,
@@ -134,7 +135,11 @@ type AgentIntegrationWorkflow =
 
 type AgentIntegrationMutationWorkflow =
   | { status: "idle" }
-  | { status: "running"; action: "install" | "uninstall"; targetId: AgentIntegrationTargetId }
+  | {
+      status: "running";
+      action: "install" | "uninstall" | "test";
+      targetId: AgentIntegrationTargetId;
+    }
   | {
       status: "success";
       action: "install" | "uninstall";
@@ -142,8 +147,14 @@ type AgentIntegrationMutationWorkflow =
       result: AgentIntegrationInstallResult;
     }
   | {
+      status: "success";
+      action: "test";
+      targetId: AgentIntegrationTargetId;
+      result: AgentIntegrationConnectionTestResult;
+    }
+  | {
       status: "error";
-      action: "install" | "uninstall";
+      action: "install" | "uninstall" | "test";
       targetId: AgentIntegrationTargetId;
       message: string;
     };
@@ -735,6 +746,33 @@ export function App({
     [integrationInstaller]
   );
 
+  const testAgentIntegrationTarget = useCallback(
+    async (target: AgentIntegrationPreviewTarget) => {
+      setAgentIntegrationMutation({
+        status: "running",
+        action: "test",
+        targetId: target.id
+      });
+      try {
+        const result = await integrationInstaller.testConnection(target.id);
+        setAgentIntegrationMutation({
+          status: "success",
+          action: "test",
+          targetId: target.id,
+          result
+        });
+      } catch (error: unknown) {
+        setAgentIntegrationMutation({
+          status: "error",
+          action: "test",
+          targetId: target.id,
+          message: error instanceof Error ? error.message : "Connection test failed"
+        });
+      }
+    },
+    [integrationInstaller]
+  );
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -969,6 +1007,7 @@ export function App({
               onCopy={copyAgentIntegrationConfig}
               onInstall={installAgentIntegrationTarget}
               onUninstall={uninstallAgentIntegrationTarget}
+              onTest={testAgentIntegrationTarget}
             />
 
             <RecentJobsPanel
@@ -1144,7 +1183,8 @@ function AgentIntegrationsPanel({
   mutation,
   onCopy,
   onInstall,
-  onUninstall
+  onUninstall,
+  onTest
 }: {
   workflow: AgentIntegrationWorkflow;
   copiedTargetId: AgentIntegrationTargetId | null;
@@ -1153,6 +1193,7 @@ function AgentIntegrationsPanel({
   onCopy: (target: AgentIntegrationPreviewTarget) => void;
   onInstall: (target: AgentIntegrationPreviewTarget) => void;
   onUninstall: (target: AgentIntegrationPreviewTarget) => void;
+  onTest: (target: AgentIntegrationPreviewTarget) => void;
 }) {
   return (
     <section className="border-t border-border p-4">
@@ -1207,6 +1248,18 @@ function AgentIntegrationsPanel({
                   <Copy className="size-4" aria-hidden="true" />
                   Copy
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  aria-label={`Test ${target.name} connection`}
+                  onClick={() => onTest(target)}
+                  disabled={mutation.status === "running" && mutation.targetId === target.id}
+                >
+                  <Wifi className="size-4" aria-hidden="true" />
+                  Test
+                </Button>
                 {target.installable ? (
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -1245,7 +1298,9 @@ function AgentIntegrationsPanel({
               ) : null}
               {mutation.status === "success" && mutation.targetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-success">
-                  {mutation.action === "install" ? "Installed" : "Uninstalled"} {target.name} config
+                  {mutation.action === "test"
+                    ? mutation.result.message
+                    : `${mutation.action === "install" ? "Installed" : "Uninstalled"} ${target.name} config`}
                 </div>
               ) : mutation.status === "error" && mutation.targetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-destructive">

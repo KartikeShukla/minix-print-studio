@@ -1,8 +1,11 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAgentIntegrationPreview } from "../src/main/agentIntegrations";
+import {
+  buildAgentIntegrationPreview,
+  testAgentIntegrationConnection
+} from "../src/main/agentIntegrations";
 
 describe("agent integration previews", () => {
   it("builds copyable MCP configs from the stable shim and runtime handoff paths", () => {
@@ -35,5 +38,41 @@ describe("agent integration previews", () => {
     );
     expect(JSON.stringify(preview)).not.toContain("token_");
     expect(JSON.stringify(preview)).not.toContain("MINIX_DAEMON_TOKEN");
+  });
+
+  it("checks connection prerequisites through the stable shim and runtime handoff", () => {
+    const userDataPath = mkdtempSync(path.join(os.tmpdir(), "minix-user-data-"));
+    const repoRoot = mkdtempSync(path.join(os.tmpdir(), "minix-repo-"));
+    const runtimeDir = path.join(userDataPath, "runtime");
+    mkdirSync(runtimeDir, { recursive: true });
+    writeFileSync(
+      path.join(runtimeDir, "runtime.json"),
+      JSON.stringify({
+        version: 1,
+        pid: 123,
+        baseUrl: "http://127.0.0.1:39281",
+        tokenFile: path.join(runtimeDir, "token"),
+        startedAt: "2026-06-05T00:00:00.000Z",
+        mock: true
+      }),
+      "utf-8"
+    );
+
+    const result = testAgentIntegrationConnection({
+      targetId: "codex",
+      userDataPath,
+      repoRoot,
+      now: new Date("2026-06-05T00:01:00.000Z")
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        targetId: "codex",
+        shimPath: path.join(userDataPath, "bin", "minix-mcp"),
+        runtimeFilePath: path.join(runtimeDir, "runtime.json"),
+        checkedAt: "2026-06-05T00:01:00.000Z"
+      })
+    );
   });
 });

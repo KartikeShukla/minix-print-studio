@@ -1,12 +1,17 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import log from "electron-log";
-import { buildAgentIntegrationPreview, type AgentIntegrationTargetId } from "./agentIntegrations";
+import {
+  buildAgentIntegrationPreview,
+  testAgentIntegrationConnection,
+  type AgentIntegrationTargetId
+} from "./agentIntegrations";
 import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
 import {
   installAgentIntegrationConfig,
   uninstallAgentIntegrationConfig
 } from "./integrationInstaller";
+import { ensureMcpShim } from "./mcpShim";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -33,8 +38,9 @@ function createWindow(): void {
 }
 
 function startSidecar(): void {
+  const repoRoot = getRepoRoot();
   const config = createDaemonLaunchConfig({
-    repoRoot: getRepoRoot(),
+    repoRoot,
     port: runtime.port,
     token: runtime.token,
     mock: runtime.mock
@@ -47,8 +53,12 @@ function startSidecar(): void {
       userDataPath: app.getPath("userData"),
       pid: child.pid ?? process.pid
     });
+    ensureMcpShim({
+      userDataPath: app.getPath("userData"),
+      repoRoot
+    });
   } catch (error) {
-    log.warn("Unable to write daemon runtime handoff", error);
+    log.warn("Unable to write daemon runtime handoff or MCP shim", error);
   }
   child.once("error", (error) => {
     log.warn("Unable to start daemon sidecar", error);
@@ -82,6 +92,13 @@ ipcMain.handle("agent-integrations:uninstall", (_event, targetId: AgentIntegrati
     userDataPath
   });
 });
+ipcMain.handle("agent-integrations:test", (_event, targetId: AgentIntegrationTargetId) =>
+  testAgentIntegrationConnection({
+    targetId,
+    userDataPath: app.getPath("userData"),
+    repoRoot: getRepoRoot()
+  })
+);
 
 function getAgentIntegrationTarget(targetId: AgentIntegrationTargetId, userDataPath: string) {
   const preview = buildAgentIntegrationPreview({ userDataPath });

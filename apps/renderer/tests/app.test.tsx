@@ -140,7 +140,8 @@ describe("MiniX Print Studio shell", () => {
         })}
         agentIntegrationInstaller={{
           install,
-          uninstall: vi.fn()
+          uninstall: vi.fn(),
+          testConnection: vi.fn()
         }}
       />
     );
@@ -154,6 +155,65 @@ describe("MiniX Print Studio shell", () => {
     expect(await screen.findByText("Installed Codex config")).toBeInTheDocument();
 
     confirm.mockRestore();
+  });
+
+  it("runs an agent integration connection test from the target card", async () => {
+    const testConnection = vi.fn().mockResolvedValue({
+      ok: true,
+      targetId: "codex",
+      shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+      runtimeFilePath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
+      checkedAt: "2026-06-05T00:00:00.000Z",
+      message: "Codex integration prerequisites are ready",
+      missing: []
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        agentIntegrationProvider={async () => ({
+          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          runtimeFilePath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
+          targets: [
+            {
+              id: "codex",
+              name: "Codex",
+              configPath: "~/.codex/config.toml",
+              format: "toml",
+              installable: true,
+              content:
+                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n"
+            }
+          ]
+        })}
+        agentIntegrationInstaller={{
+          install: vi.fn(),
+          uninstall: vi.fn(),
+          testConnection
+        }}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Test Codex connection" }));
+
+    await waitFor(() => {
+      expect(testConnection).toHaveBeenCalledWith("codex");
+    });
+    expect(await screen.findByText("Codex integration prerequisites are ready")).toBeInTheDocument();
   });
 
   it("requests a daemon preview and print plan before enabling print", async () => {

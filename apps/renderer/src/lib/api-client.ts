@@ -1,5 +1,6 @@
 import type { PrintDocument } from "@minix/design-model";
 import type {
+  AgentIntegrationConnectionTestResult,
   AgentIntegrationInstallResult,
   AgentIntegrationPreview,
   AgentIntegrationTargetId
@@ -55,6 +56,9 @@ declare global {
       uninstallAgentIntegrationConfig?: (
         targetId: AgentIntegrationTargetId
       ) => Promise<AgentIntegrationInstallResult>;
+      testAgentIntegrationConnection?: (
+        targetId: AgentIntegrationTargetId
+      ) => Promise<AgentIntegrationConnectionTestResult>;
     };
   }
 }

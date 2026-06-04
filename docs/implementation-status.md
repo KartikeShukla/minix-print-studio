@@ -81,6 +81,9 @@
 - Desktop Agent Integration installer writes Codex, Claude Desktop, and OpenCode configs with backup manifests before mutation; Codex uses a managed TOML block, while JSON clients preserve unrelated MCP servers.
 - Desktop Agent Integration uninstall removes only the MiniX-managed config entry and can revert a mutation from its backup manifest.
 - Renderer Agent Integrations panel shows install/uninstall controls only for installable targets and requires explicit confirmation before invoking the desktop installer.
+- Electron materializes a stable executable `minix-mcp` shim under app user data that launches the existing Python MCP server via the repo-local MCP source path without embedding daemon tokens.
+- Desktop Agent Integration connection tests verify the stable shim and runtime handoff prerequisites for a selected target.
+- Renderer Agent Integrations panel exposes a non-mutating Test action and surfaces the desktop connection-test result per target.
 
 ## Current Verification
 
@@ -103,9 +106,11 @@
 - TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
 - TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Agent Integrations browser fallback renders in the right rail; daemon health fetch errors are expected in non-Electron browser mode.
+- TDD red/green checks for stable MCP shim materialization, Agent Integration connection-prerequisite checks, and renderer Test action.
+- Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Agent integration connection tests and stable MCP shim packaging into app user data.
+2. Agent integration live MCP stdio smoke and Claude Desktop `.mcpb` extension export.
 3. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.

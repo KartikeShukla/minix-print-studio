@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld("minix", {
   installAgentIntegrationConfig: (targetId: string) =>
     ipcRenderer.invoke("agent-integrations:install", targetId),
   uninstallAgentIntegrationConfig: (targetId: string) =>
-    ipcRenderer.invoke("agent-integrations:uninstall", targetId)
+    ipcRenderer.invoke("agent-integrations:uninstall", targetId),
+  testAgentIntegrationConnection: (targetId: string) =>
+    ipcRenderer.invoke("agent-integrations:test", targetId)
 });

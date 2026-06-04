@@ -33,9 +33,22 @@ export type AgentIntegrationInstallResult = {
   createdAt: string;
 };
 
+export type AgentIntegrationConnectionTestResult = {
+  ok: boolean;
+  targetId: AgentIntegrationTargetId;
+  shimPath: string;
+  runtimeFilePath: string;
+  checkedAt: string;
+  message: string;
+  missing: string[];
+};
+
 export type AgentIntegrationInstaller = {
   install: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
   uninstall: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
+  testConnection: (
+    targetId: AgentIntegrationTargetId
+  ) => Promise<AgentIntegrationConnectionTestResult>;
 };
 
 export async function loadAgentIntegrationPreview(): Promise<AgentIntegrationPreview | null> {
@@ -56,5 +69,12 @@ export const desktopAgentIntegrationInstaller: AgentIntegrationInstaller = {
       throw new Error("Agent integration uninstall is unavailable");
     }
     return uninstall(targetId);
+  },
+  async testConnection(targetId) {
+    const testConnection = window.minix?.testAgentIntegrationConnection;
+    if (!testConnection) {
+      throw new Error("Agent integration connection test is unavailable");
+    }
+    return testConnection(targetId);
   }
 };
