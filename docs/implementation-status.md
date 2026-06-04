@@ -32,6 +32,8 @@
 - `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
 - In-memory mock print queue that consumes preview-bound jobs and reports `completed_unverified` with user-check actions.
 - `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
+- Renderer daemon client methods for authenticated document preview and approved print planning.
+- Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 
 ## Current Verification
 
@@ -45,8 +47,7 @@
 
 ## Next Implementation Slices
 
-1. Preview-to-print binding data model and hash store.
-2. Canonical renderer prototype with golden raster fixtures.
-3. Mock print queue that consumes a planned job and reports completion states.
-4. Renderer integration for `/v1/jobs/plan` and preview status.
-5. MCP tools backed by daemon health, preview, and approval-required flows.
+1. Renderer print action wired to `/v1/jobs/print`, mock job status, and user-check completion state.
+2. MCP tools backed by daemon health, preview, and approval-required flows.
+3. Real BLE scanner/connection manager with mock-first transport tests.
+4. Project/document persistence and editor canvas interactions.

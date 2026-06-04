@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bluetooth,
   Boxes,
   CircleAlert,
+  FileSearch,
   FileText,
   Image,
   Layers3,
@@ -15,7 +16,13 @@ import {
   Type,
   Wifi
 } from "lucide-react";
-import type { HealthResponse } from "@minix/shared-api";
+import { createDefaultDocument } from "@minix/design-model";
+import type {
+  DocumentPreviewResponse,
+  HealthResponse,
+  PrintPlanResponse,
+  RenderSettings
+} from "@minix/shared-api";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,10 +44,20 @@ const layers = [
   { name: "Protected tail margin", detail: "160 blank rows", icon: ShieldCheck }
 ];
 
+const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
+
+type PreviewWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; preview: DocumentPreviewResponse; plan: PrintPlanResponse }
+  | { status: "error"; message: string };
+
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
+  const [document] = useState(() => createDefaultDocument({ heightDots: 900 }));
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +82,29 @@ export function App({ daemonClient }: AppProps) {
     };
   }, [client]);
 
+  const runPreview = useCallback(async () => {
+    setPreviewWorkflow({ status: "running" });
+    try {
+      const preview = await client.createDocumentPreview(document, DEFAULT_RENDER_SETTINGS);
+      const plan = await client.planApprovedPreview({
+        jobId: "job_preview",
+        previewId: preview.previewId,
+        approvalToken: preview.approvalToken,
+        documentHash: preview.documentHash,
+        renderSettingsHash: preview.renderSettingsHash,
+        profileId: document.target.profileId,
+        paperMode: document.target.paperMode,
+        density: document.target.density
+      });
+      setPreviewWorkflow({ status: "ready", preview, plan });
+    } catch (error: unknown) {
+      setPreviewWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Preview failed"
+      });
+    }
+  }, [client, document]);
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -72,6 +112,7 @@ export function App({ daemonClient }: AppProps) {
     : healthError
       ? "Daemon offline"
       : "Checking daemon";
+  const previewReady = previewWorkflow.status === "ready";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -98,10 +139,16 @@ export function App({ daemonClient }: AppProps) {
               <ScanSearch className="size-4" aria-hidden="true" />
               Scan printers
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runPreview}
+              disabled={previewWorkflow.status === "running"}
+            >
+              <FileSearch className="size-4" aria-hidden="true" />
               Preview
             </Button>
-            <Button size="sm" disabled>
+            <Button size="sm" disabled={!previewReady}>
               <Printer className="size-4" aria-hidden="true" />
               Print
             </Button>
@@ -163,10 +210,15 @@ export function App({ daemonClient }: AppProps) {
                 </div>
                 <div className="flex flex-1 items-center justify-center text-center">
                   <div>
-                    <Boxes className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden="true" />
+                    <Boxes
+                      className="mx-auto mb-3 size-9 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                     <div className="text-sm font-medium">Canvas editor bootstrap</div>
                     <div className="mt-1 max-w-56 text-xs text-muted-foreground">
-                      Document model and canonical preview contracts are ready for the editor slice.
+                      {previewReady
+                        ? `${previewWorkflow.plan.totalBands} print bands planned from approved preview.`
+                        : "Document model and canonical preview contracts are ready for the editor slice."}
                     </div>
                   </div>
                 </div>
@@ -210,7 +262,7 @@ export function App({ daemonClient }: AppProps) {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Coverage</span>
-                  <span>0%</span>
+                  <span>{previewReady ? formatCoverage(previewWorkflow.preview) : "0%"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Agent direct print</span>
@@ -221,12 +273,38 @@ export function App({ daemonClient }: AppProps) {
 
             <section className="p-4">
               <div className="mb-3 flex items-center gap-2">
-                <CircleAlert className="size-4 text-warning" aria-hidden="true" />
+                <CircleAlert
+                  className={`size-4 ${previewReady ? "text-success" : "text-warning"}`}
+                  aria-hidden="true"
+                />
                 <h2 className="text-sm font-semibold">Preview Binding</h2>
               </div>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Printing will require a daemon-generated preview hash before physical output.
-              </p>
+              {previewWorkflow.status === "ready" ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant="success">Preview ready</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Preview</span>
+                    <span>{previewWorkflow.preview.previewId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plan</span>
+                    <span>{formatBandCount(previewWorkflow.plan.totalBands)}</span>
+                  </div>
+                </div>
+              ) : previewWorkflow.status === "running" ? (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Requesting daemon preview and print plan.
+                </p>
+              ) : previewWorkflow.status === "error" ? (
+                <p className="text-sm leading-6 text-destructive">{previewWorkflow.message}</p>
+              ) : (
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Printing will require a daemon-generated preview hash before physical output.
+                </p>
+              )}
             </section>
           </aside>
         </main>
@@ -234,9 +312,18 @@ export function App({ daemonClient }: AppProps) {
         <footer className="flex items-center justify-between border-t border-border bg-card px-4 text-xs text-muted-foreground">
           <span>Zoom 100%</span>
           <span>{health ? `Daemon ${health.version}` : "No daemon health yet"}</span>
-          <span>Queue idle</span>
+          <span>{previewReady ? "Preview approved for planning" : "Queue idle"}</span>
         </footer>
       </div>
     </div>
   );
+}
+
+function formatBandCount(totalBands: number): string {
+  return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function formatCoverage(preview: DocumentPreviewResponse): string {
+  const value = preview.safety.metrics?.totalBlackCoverage;
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "0%";
 }

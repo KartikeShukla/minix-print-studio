@@ -17,6 +17,65 @@ export const healthResponseSchema = z.object({
   mock: z.boolean()
 });
 
+export const renderSettingsSchema = z.record(z.unknown());
+
+export const previewSafetySchema = z
+  .object({
+    allowed: z.boolean().optional(),
+    warnings: z.array(z.unknown()).optional(),
+    errors: z.array(z.unknown()).optional(),
+    metrics: z.record(z.unknown()).optional()
+  })
+  .passthrough();
+
+export const documentPreviewResponseSchema = z.object({
+  previewId: z.string(),
+  approvalToken: z.string(),
+  documentHash: z.string(),
+  renderSettingsHash: z.string(),
+  rasterHash: z.string(),
+  profileId: z.string(),
+  widthDots: z.number().int().positive(),
+  heightDots: z.number().int().positive(),
+  safety: previewSafetySchema,
+  createdAt: z.string(),
+  expiresAt: z.string()
+});
+
+export const printPlanBandSchema = z.object({
+  index: z.number().int().nonnegative(),
+  startRow: z.number().int().nonnegative(),
+  heightDots: z.number().int().positive(),
+  rasterByteOffset: z.number().int().nonnegative(),
+  rasterByteLength: z.number().int().nonnegative(),
+  payloadBytes: z.number().int().nonnegative(),
+  sha256: z.string()
+});
+
+export const printPlanSchema = z.object({
+  planId: z.string(),
+  jobId: z.string(),
+  previewId: z.string(),
+  documentHash: z.string(),
+  rasterHash: z.string(),
+  profileId: z.string(),
+  paperMode: z.enum(["continuous", "gap_label", "black_mark"]),
+  density: z.enum(["light", "medium", "dark"]),
+  widthDots: z.number().int().positive(),
+  contentHeightDots: z.number().int().positive(),
+  tailBlankRowsDots: z.number().int().nonnegative(),
+  transferHeightDots: z.number().int().positive(),
+  rowBytes: z.number().int().positive(),
+  totalRasterBytes: z.number().int().nonnegative(),
+  requiresLongPrintMode: z.boolean()
+});
+
+export const printPlanResponseSchema = z.object({
+  plan: printPlanSchema,
+  totalBands: z.number().int().nonnegative(),
+  bands: z.array(printPlanBandSchema)
+});
+
 export const printerProfileSchema = z.object({
   id: z.string(),
   displayName: z.string(),
@@ -70,7 +129,21 @@ export const printerProfileSchema = z.object({
 
 export type PrinterProfile = z.infer<typeof printerProfileSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+export type RenderSettings = z.infer<typeof renderSettingsSchema>;
+export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
+export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type SupportLevel = z.infer<typeof supportLevelSchema>;
+
+export type PrintPlanRequest = {
+  jobId: string;
+  previewId: string;
+  approvalToken: string;
+  documentHash: string;
+  renderSettingsHash: string;
+  profileId: string;
+  paperMode: "continuous" | "gap_label" | "black_mark";
+  density: "light" | "medium" | "dark";
+};
 
 export type DiscoveredPrinter = {
   name: string | null;
