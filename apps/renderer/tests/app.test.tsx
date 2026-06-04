@@ -475,6 +475,88 @@ describe("MiniX Print Studio shell", () => {
     expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
   });
 
+  it("shows transformer handles for a selected layer and persists resize rotate edits", async () => {
+    const { container } = render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+
+    const transformer = container.querySelector('[data-konva-node="Transformer"]');
+    expect(transformer).toBeInstanceOf(HTMLElement);
+    expect(transformer).toHaveAttribute("data-rotate-enabled", "true");
+    expect(transformer?.getAttribute("data-enabled-anchors")).toContain("bottom-right");
+
+    const rectNode = container.querySelector('[data-konva-node="Rect"][data-testid^="el_"]');
+    expect(rectNode).toBeInstanceOf(HTMLElement);
+    rectNode?.dispatchEvent(
+      new CustomEvent("konva-transform-end", {
+        bubbles: true,
+        detail: {
+          x: 48,
+          y: 176,
+          width: 280,
+          height: 96,
+          rotation: 15,
+          scaleX: 1,
+          scaleY: 1
+        }
+      })
+    );
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "rect",
+          name: "Rectangle 1",
+          x: 48,
+          y: 176,
+          width: 280,
+          height: 96,
+          rotation: 15
+        })
+      ]);
+    });
+    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "rect",
+          name: "Rectangle 1",
+          x: 32,
+          y: 144,
+          width: 320,
+          height: 72,
+          rotation: 0
+        })
+      ]);
+    });
+  });
+
   it("edits the selected rectangle through the inspector and persists the document", async () => {
     render(
       <App

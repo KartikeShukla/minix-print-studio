@@ -44,8 +44,17 @@ import {
   type RectElement,
   type TextElement
 } from "@minix/design-model";
+import type Konva from "konva";
 import * as QRCode from "qrcode";
-import { Group, Image as KonvaImage, Layer, Rect, Stage, Text as KonvaText } from "react-konva";
+import {
+  Group,
+  Image as KonvaImage,
+  Layer,
+  Rect,
+  Stage,
+  Text as KonvaText,
+  Transformer
+} from "react-konva";
 import type {
   DocumentPreviewResponse,
   HealthResponse,
@@ -112,6 +121,13 @@ type DocumentCommit = (document: PrintDocument) => {
 type DocumentElement = PrintDocument["elements"][number];
 type ElementUpdater = (element: DocumentElement) => DocumentElement;
 type NumericElementField = "x" | "y" | "width" | "height";
+type ElementTransform = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+};
 
 type CanvasElement =
   | { kind: "text"; element: TextElement }
@@ -332,6 +348,20 @@ export function App({ daemonClient }: AppProps) {
       }));
     },
     [commitDocument]
+  );
+
+  const transformDocumentElement = useCallback(
+    (elementId: string, transform: ElementTransform) => {
+      updateDocumentElement(elementId, (currentElement) => ({
+        ...currentElement,
+        x: normalizeDotValue(transform.x, 0),
+        y: normalizeDotValue(transform.y, 0),
+        width: normalizeDotValue(transform.width, 1),
+        height: normalizeDotValue(transform.height, 1),
+        rotation: Math.round(transform.rotation)
+      }));
+    },
+    [updateDocumentElement]
   );
 
   const commitInlineTextEdit = useCallback(
@@ -645,6 +675,7 @@ export function App({ daemonClient }: AppProps) {
                 pan={canvasPan}
                 onSelect={selectElement}
                 onMove={moveDocumentElement}
+                onTransform={transformDocumentElement}
                 onStartTextEdit={startInlineTextEdit}
                 onCommitTextEdit={commitInlineTextEdit}
                 onCancelTextEdit={cancelInlineTextEdit}
@@ -1270,6 +1301,7 @@ function DocumentCanvas({
   pan,
   onSelect,
   onMove,
+  onTransform,
   onStartTextEdit,
   onCommitTextEdit,
   onCancelTextEdit
@@ -1283,10 +1315,13 @@ function DocumentCanvas({
   pan: { x: number; y: number };
   onSelect: (elementId: string | null) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onTransform: (elementId: string, transform: ElementTransform) => void;
   onStartTextEdit: (elementId: string) => void;
   onCommitTextEdit: (elementId: string, text: string) => void;
   onCancelTextEdit: () => void;
 }) {
+  const selectedNodeRef = useRef<Konva.Node | null>(null);
+  const transformerRef = useRef<Konva.Transformer | null>(null);
   const canvasElements = document.elements.reduce<CanvasElement[]>((items, element) => {
     const textElement = textElementSchema.safeParse(element);
     if (textElement.success) {
@@ -1318,8 +1353,51 @@ function DocumentCanvas({
     (item) => item.kind === "text" && item.element.id === editingTextElementId
   );
   const editingTextElement = editingTextItem?.kind === "text" ? editingTextItem.element : null;
+  const selectedCanvasElement = canvasElements.find(
+    (item) => item.element.id === selectedElementId
+  );
+  const canTransformSelectedElement =
+    Boolean(selectedCanvasElement) &&
+    !selectedCanvasElement?.element.locked &&
+    editingTextElementId !== selectedElementId;
   const stageWidth = Math.round(document.target.widthDots * zoom);
   const stageHeight = Math.round(document.target.heightDots * zoom);
+
+  useEffect(() => {
+    if (!transformerRef.current) {
+      return;
+    }
+    transformerRef.current.nodes(
+      canTransformSelectedElement && selectedNodeRef.current ? [selectedNodeRef.current] : []
+    );
+    transformerRef.current.getLayer()?.batchDraw();
+  }, [canTransformSelectedElement, document.elements, selectedElementId]);
+
+  const attachSelectedNode = useCallback((node: Konva.Node | null) => {
+    selectedNodeRef.current = node;
+  }, []);
+
+  const transformSelectedElement = useCallback(
+    (elementId: string) => {
+      const node = selectedNodeRef.current;
+      if (!node) {
+        return;
+      }
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      const nextTransform = {
+        x: node.x(),
+        y: node.y(),
+        width: node.width() * scaleX,
+        height: node.height() * scaleY,
+        rotation: node.rotation()
+      };
+      node.scaleX(1);
+      node.scaleY(1);
+      onTransform(elementId, nextTransform);
+    },
+    [onTransform]
+  );
 
   return (
     <div
@@ -1357,6 +1435,12 @@ function DocumentCanvas({
                     onSelect={onSelect}
                     onMove={onMove}
                     onEdit={onStartTextEdit}
+                    onTransformEnd={transformSelectedElement}
+                    nodeRef={
+                      canTransformSelectedElement && selectedElementId === item.element.id
+                        ? attachSelectedNode
+                        : undefined
+                    }
                   />
                 ) : item.kind === "rect" ? (
                   <CanvasRectElement
@@ -1365,6 +1449,12 @@ function DocumentCanvas({
                     selected={selectedElementId === item.element.id}
                     onSelect={onSelect}
                     onMove={onMove}
+                    onTransformEnd={transformSelectedElement}
+                    nodeRef={
+                      canTransformSelectedElement && selectedElementId === item.element.id
+                        ? attachSelectedNode
+                        : undefined
+                    }
                   />
                 ) : item.kind === "image" ? (
                   <CanvasImageElement
@@ -1373,6 +1463,12 @@ function DocumentCanvas({
                     selected={selectedElementId === item.element.id}
                     onSelect={onSelect}
                     onMove={onMove}
+                    onTransformEnd={transformSelectedElement}
+                    nodeRef={
+                      canTransformSelectedElement && selectedElementId === item.element.id
+                        ? attachSelectedNode
+                        : undefined
+                    }
                   />
                 ) : (
                   <CanvasQrElement
@@ -1381,9 +1477,34 @@ function DocumentCanvas({
                     selected={selectedElementId === item.element.id}
                     onSelect={onSelect}
                     onMove={onMove}
+                    onTransformEnd={transformSelectedElement}
+                    nodeRef={
+                      canTransformSelectedElement && selectedElementId === item.element.id
+                        ? attachSelectedNode
+                        : undefined
+                    }
                   />
                 )
               )}
+              {canTransformSelectedElement ? (
+                <Transformer
+                  ref={transformerRef}
+                  rotateEnabled
+                  enabledAnchors={[
+                    "top-left",
+                    "top-center",
+                    "top-right",
+                    "middle-right",
+                    "bottom-right",
+                    "bottom-center",
+                    "bottom-left",
+                    "middle-left"
+                  ]}
+                  boundBoxFunc={(oldBox, newBox) =>
+                    newBox.width < 8 || newBox.height < 8 ? oldBox : newBox
+                  }
+                />
+              ) : null}
             </Layer>
           </Stage>
           {editingTextElement ? (
@@ -1488,18 +1609,23 @@ function CanvasTextElement({
   selected,
   onSelect,
   onMove,
-  onEdit
+  onEdit,
+  onTransformEnd,
+  nodeRef
 }: {
   element: TextElement;
   selected: boolean;
   onSelect: (elementId: string) => void;
   onMove: (elementId: string, x: number, y: number) => void;
   onEdit: (elementId: string) => void;
+  onTransformEnd: (elementId: string) => void;
+  nodeRef?: ((node: Konva.Node | null) => void) | undefined;
 }) {
   const selectionProps = selected ? { stroke: "#0f766e", strokeWidth: 1 } : {};
 
   return (
     <KonvaText
+      ref={(node) => nodeRef?.(node)}
       id={element.id}
       x={element.x}
       y={element.y}
@@ -1523,6 +1649,7 @@ function CanvasTextElement({
       onDragEnd={(event) => {
         onMove(element.id, event.target.x(), event.target.y());
       }}
+      onTransformEnd={() => onTransformEnd(element.id)}
     />
   );
 }
@@ -1531,17 +1658,22 @@ function CanvasRectElement({
   element,
   selected,
   onSelect,
-  onMove
+  onMove,
+  onTransformEnd,
+  nodeRef
 }: {
   element: RectElement;
   selected: boolean;
   onSelect: (elementId: string) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onTransformEnd: (elementId: string) => void;
+  nodeRef?: ((node: Konva.Node | null) => void) | undefined;
 }) {
   const selectionProps = selected ? { stroke: "#0f766e", strokeWidth: 2 } : {};
 
   return (
     <Rect
+      ref={(node) => nodeRef?.(node)}
       id={element.id}
       x={element.x}
       y={element.y}
@@ -1557,6 +1689,7 @@ function CanvasRectElement({
       onDragEnd={(event) => {
         onMove(element.id, event.target.x(), event.target.y());
       }}
+      onTransformEnd={() => onTransformEnd(element.id)}
     />
   );
 }
@@ -1565,12 +1698,16 @@ function CanvasImageElement({
   element,
   selected,
   onSelect,
-  onMove
+  onMove,
+  onTransformEnd,
+  nodeRef
 }: {
   element: ImageElement;
   selected: boolean;
   onSelect: (elementId: string) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onTransformEnd: (elementId: string) => void;
+  nodeRef?: ((node: Konva.Node | null) => void) | undefined;
 }) {
   const image = useLoadedCanvasImage(element.source.dataUrl);
   const placement = image
@@ -1585,9 +1722,12 @@ function CanvasImageElement({
 
   return (
     <Group
+      ref={(node) => nodeRef?.(node)}
       id={element.id}
       x={element.x}
       y={element.y}
+      width={element.width}
+      height={element.height}
       rotation={element.rotation}
       clipX={0}
       clipY={0}
@@ -1600,6 +1740,7 @@ function CanvasImageElement({
       onDragEnd={(event) => {
         onMove(element.id, event.target.x(), event.target.y());
       }}
+      onTransformEnd={() => onTransformEnd(element.id)}
     >
       <Rect width={element.width} height={element.height} fill="#ffffff" />
       {image && placement ? (
@@ -1641,12 +1782,16 @@ function CanvasQrElement({
   element,
   selected,
   onSelect,
-  onMove
+  onMove,
+  onTransformEnd,
+  nodeRef
 }: {
   element: QrElement;
   selected: boolean;
   onSelect: (elementId: string) => void;
   onMove: (elementId: string, x: number, y: number) => void;
+  onTransformEnd: (elementId: string) => void;
+  nodeRef?: ((node: Konva.Node | null) => void) | undefined;
 }) {
   const matrix = useMemo(
     () => createQrMatrix(element.payload, element.errorCorrectionLevel),
@@ -1660,9 +1805,12 @@ function CanvasQrElement({
 
   return (
     <Group
+      ref={(node) => nodeRef?.(node)}
       id={element.id}
       x={element.x}
       y={element.y}
+      width={element.width}
+      height={element.height}
       rotation={element.rotation}
       draggable={!element.locked}
       visible={element.visible}
@@ -1671,6 +1819,7 @@ function CanvasQrElement({
       onDragEnd={(event) => {
         onMove(element.id, event.target.x(), event.target.y());
       }}
+      onTransformEnd={() => onTransformEnd(element.id)}
     >
       <Rect width={element.width} height={element.height} fill="#ffffff" />
       {Array.from(matrix.data).map((active, index) => {
