@@ -1,6 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import log from "electron-log";
+import { buildAgentIntegrationPreview } from "./agentIntegrations";
 import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
@@ -55,6 +56,9 @@ ipcMain.handle("daemon:runtime", () => ({
   baseUrl: runtime.baseUrl,
   token: runtime.token
 }));
+ipcMain.handle("agent-integrations:preview", () =>
+  buildAgentIntegrationPreview({ userDataPath: app.getPath("userData") })
+);
 
 app.whenReady().then(() => {
   startSidecar();

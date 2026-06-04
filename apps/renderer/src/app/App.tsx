@@ -7,6 +7,7 @@ import {
   Bluetooth,
   Boxes,
   CircleAlert,
+  Copy,
   FileSearch,
   FileText,
   Image as ImageIcon,
@@ -65,6 +66,13 @@ import type {
   ReadOnlyVerification,
   RenderSettings
 } from "@minix/shared-api";
+import {
+  loadAgentIntegrationPreview,
+  type AgentIntegrationPreview,
+  type AgentIntegrationPreviewTarget,
+  type AgentIntegrationProvider,
+  type AgentIntegrationTargetId
+} from "@/lib/agent-integrations";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
 import { loadStoredDocument, saveStoredDocument } from "@/lib/document-storage";
 import {
@@ -78,6 +86,7 @@ import { Button } from "@/components/ui/button";
 
 export type AppProps = {
   daemonClient?: DaemonClient;
+  agentIntegrationProvider?: AgentIntegrationProvider;
 };
 
 const tools = [
@@ -109,6 +118,12 @@ type DiagnosticsWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "exported"; bundle: DiagnosticsExportResponse }
+  | { status: "error"; message: string };
+
+type AgentIntegrationWorkflow =
+  | { status: "loading" }
+  | { status: "ready"; preview: AgentIntegrationPreview }
+  | { status: "unavailable" }
   | { status: "error"; message: string };
 
 type PrinterWorkflow =
@@ -148,8 +163,12 @@ type CanvasElement =
   | { kind: "image"; element: ImageElement }
   | { kind: "qr"; element: QrElement };
 
-export function App({ daemonClient }: AppProps) {
+export function App({ daemonClient, agentIntegrationProvider }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
+  const integrationProvider = useMemo(
+    () => agentIntegrationProvider ?? loadAgentIntegrationPreview,
+    [agentIntegrationProvider]
+  );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
     const document = loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
@@ -168,6 +187,13 @@ export function App({ daemonClient }: AppProps) {
   const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
     status: "idle"
   });
+  const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
+    useState<AgentIntegrationWorkflow>({
+      status: "loading"
+    });
+  const [copiedIntegrationId, setCopiedIntegrationId] =
+    useState<AgentIntegrationTargetId | null>(null);
+  const [agentIntegrationCopyError, setAgentIntegrationCopyError] = useState<string | null>(null);
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
@@ -200,6 +226,34 @@ export function App({ daemonClient }: AppProps) {
   useEffect(() => {
     saveStoredDocument(document);
   }, [document]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setAgentIntegrationWorkflow({ status: "loading" });
+    setCopiedIntegrationId(null);
+    setAgentIntegrationCopyError(null);
+
+    integrationProvider()
+      .then((preview) => {
+        if (cancelled) {
+          return;
+        }
+        setAgentIntegrationWorkflow(preview ? { status: "ready", preview } : { status: "unavailable" });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setAgentIntegrationWorkflow({
+            status: "error",
+            message: error instanceof Error ? error.message : "Integration preview unavailable"
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [integrationProvider]);
 
   useEffect(() => {
     if (
@@ -562,6 +616,20 @@ export function App({ daemonClient }: AppProps) {
     }
   }, [client]);
 
+  const copyAgentIntegrationConfig = useCallback(async (target: AgentIntegrationPreviewTarget) => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(target.content);
+      setCopiedIntegrationId(target.id);
+      setAgentIntegrationCopyError(null);
+    } catch (error: unknown) {
+      setCopiedIntegrationId(null);
+      setAgentIntegrationCopyError(error instanceof Error ? error.message : "Copy failed");
+    }
+  }, []);
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -788,6 +856,13 @@ export function App({ daemonClient }: AppProps) {
               )}
             </section>
 
+            <AgentIntegrationsPanel
+              workflow={agentIntegrationWorkflow}
+              copiedTargetId={copiedIntegrationId}
+              copyError={agentIntegrationCopyError}
+              onCopy={copyAgentIntegrationConfig}
+            />
+
             <RecentJobsPanel
               jobs={jobHistory}
               workflow={diagnosticsWorkflow}
@@ -950,6 +1025,82 @@ function RecentJobsPanel({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function AgentIntegrationsPanel({
+  workflow,
+  copiedTargetId,
+  copyError,
+  onCopy
+}: {
+  workflow: AgentIntegrationWorkflow;
+  copiedTargetId: AgentIntegrationTargetId | null;
+  copyError: string | null;
+  onCopy: (target: AgentIntegrationPreviewTarget) => void;
+}) {
+  return (
+    <section className="border-t border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Copy className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Agent Integrations</h2>
+      </div>
+
+      {workflow.status === "loading" ? (
+        <p className="text-sm leading-6 text-muted-foreground">Loading local MCP config previews.</p>
+      ) : workflow.status === "unavailable" ? (
+        <p className="text-sm leading-6 text-muted-foreground">
+          Open the desktop app to generate local MCP config previews.
+        </p>
+      ) : workflow.status === "error" ? (
+        <p className="text-sm leading-6 text-destructive">{workflow.message}</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
+            <div className="font-medium text-foreground">Runtime handoff</div>
+            <div className="mt-1 break-all">{workflow.preview.runtimeFilePath}</div>
+          </div>
+          {copyError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
+              {copyError}
+            </div>
+          ) : null}
+          {workflow.preview.targets.map((target) => (
+            <article
+              key={target.id}
+              className="rounded-md border border-border bg-background p-3 text-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate font-medium">{target.name}</h3>
+                  <div className="mt-1 break-all text-xs text-muted-foreground">
+                    {target.configPath}
+                  </div>
+                </div>
+                <Badge variant="muted">{target.format}</Badge>
+              </div>
+              <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-4 text-muted-foreground">{target.content}</pre>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                aria-label={`Copy ${target.name} config`}
+                onClick={() => onCopy(target)}
+              >
+                <Copy className="size-4" aria-hidden="true" />
+                Copy
+              </Button>
+              {copiedTargetId === target.id ? (
+                <div className="mt-2 text-xs font-medium text-success">
+                  Copied {target.name} config
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

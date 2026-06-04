@@ -1,4 +1,5 @@
 import type { PrintDocument } from "@minix/design-model";
+import type { AgentIntegrationPreview } from "@/lib/agent-integrations";
 import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
@@ -43,6 +44,7 @@ declare global {
     minix?: {
       getDaemonRuntime: () => Promise<DaemonRuntime>;
       getAppVersion: () => Promise<string>;
+      getAgentIntegrationPreview?: () => Promise<AgentIntegrationPreview>;
     };
   }
 }

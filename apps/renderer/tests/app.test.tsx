@@ -37,6 +37,61 @@ describe("MiniX Print Studio shell", () => {
     });
   });
 
+  it("shows copyable agent integration config previews without exposing daemon tokens", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        agentIntegrationProvider={async () => ({
+          shimPath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          runtimeFilePath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
+          targets: [
+            {
+              id: "codex",
+              name: "Codex",
+              configPath: "~/.codex/config.toml",
+              format: "toml",
+              content:
+                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n[mcp_servers.minix_print.env]\nMINIX_DAEMON_RUNTIME_FILE = \"/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json\"\n"
+            }
+          ]
+        })}
+      />
+    );
+
+    expect(await screen.findByText("Agent Integrations")).toBeInTheDocument();
+    expect(screen.getByText("Codex")).toBeInTheDocument();
+    expect(screen.getByText("~/.codex/config.toml")).toBeInTheDocument();
+    expect(screen.getByText(/MINIX_DAEMON_RUNTIME_FILE/)).toBeInTheDocument();
+    expect(screen.queryByText(/secret-token|token_123/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy Codex config" }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("MINIX_DAEMON_RUNTIME_FILE"));
+    });
+    expect(await screen.findByText("Copied Codex config")).toBeInTheDocument();
+  });
+
   it("requests a daemon preview and print plan before enabling print", async () => {
     const createDocumentPreview = vi.fn().mockResolvedValue({
       previewId: "prev_ready",

@@ -75,6 +75,9 @@
 - Electron writes daemon runtime handoff files under user data: `runtime/runtime.json` contains base URL, PID, start time, mock flag, and token-file path while `runtime/token` stores the bearer token separately.
 - MCP integration config generators can include `MINIX_DAEMON_RUNTIME_FILE` for Codex, Claude Desktop/Code, OpenCode, and generic stdio configs without embedding bearer tokens.
 - MCP stdio shim resolves daemon base URL and token from the Electron runtime handoff file, rejects inline tokens in runtime JSON, and keeps the existing explicit environment fallback for development.
+- Desktop Agent Integration previews expose a stable user-data MCP shim path plus token-free config text for Codex, Claude Desktop/Code, OpenCode, and generic stdio MCP clients.
+- Electron preload exposes the Agent Integration preview through IPC without passing the daemon bearer token to config snippets.
+- Renderer Agent Integrations panel loads the desktop preview, shows copyable config snippets, and copies target-specific config text to the clipboard.
 
 ## Current Verification
 
@@ -94,9 +97,10 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: add rectangle, drag the selected layer's bottom-right transformer handle, verify localStorage geometry changes from `320 x 72` to `358 x 81`.
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
 - TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
+- TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Agent integrations UI: copy/install config previews using the runtime handoff and stable MCP shim path.
+2. Agent integration installers: write/remove supported config entries, run a daemon connection test from the selected MCP client shape, and package the stable MCP shim into app user data.
 3. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.
