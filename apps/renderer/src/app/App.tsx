@@ -26,6 +26,7 @@ import {
   moveElement,
   rectElementSchema,
   textElementSchema,
+  updateElement,
   type PrintDocument,
   type RectElement,
   type TextElement
@@ -90,6 +91,10 @@ type DocumentCommit = (document: PrintDocument) => {
   document: PrintDocument;
   selectedElementId?: string | null;
 };
+
+type DocumentElement = PrintDocument["elements"][number];
+type ElementUpdater = (element: DocumentElement) => DocumentElement;
+type NumericElementField = "x" | "y" | "width" | "height";
 
 type CanvasElement =
   | { kind: "text"; element: TextElement }
@@ -208,6 +213,16 @@ export function App({ daemonClient }: AppProps) {
     (elementId: string, x: number, y: number) => {
       commitDocument((currentDocument) => ({
         document: moveElement(currentDocument, elementId, { x, y }),
+        selectedElementId: elementId
+      }));
+    },
+    [commitDocument]
+  );
+
+  const updateDocumentElement = useCallback(
+    (elementId: string, updater: ElementUpdater) => {
+      commitDocument((currentDocument) => ({
+        document: updateElement(currentDocument, elementId, updater),
         selectedElementId: elementId
       }));
     },
@@ -335,6 +350,10 @@ export function App({ daemonClient }: AppProps) {
   const previewReady = previewWorkflow.status === "ready";
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
+  const selectedElement = useMemo(
+    () => document.elements.find((element) => element.id === selectedElementId) ?? null,
+    [document.elements, selectedElementId]
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -441,7 +460,11 @@ export function App({ daemonClient }: AppProps) {
                 <Layers3 className="size-4 text-muted-foreground" aria-hidden="true" />
               </div>
               <div className="space-y-2">
-                <LayerList document={document} selectedElementId={selectedElementId} />
+                <LayerList
+                  document={document}
+                  selectedElementId={selectedElementId}
+                  onSelect={selectElement}
+                />
               </div>
             </section>
           </aside>
@@ -459,8 +482,9 @@ export function App({ daemonClient }: AppProps) {
             </div>
           </section>
 
-          <aside className="min-h-0 border-l border-border bg-card">
+          <aside className="min-h-0 overflow-auto border-l border-border bg-card">
             <PrinterPanel workflow={printerWorkflow} onVerify={runReadOnlyVerify} />
+            <ElementInspector element={selectedElement} onUpdate={updateDocumentElement} />
 
             <section className="border-b border-border p-4">
               <div className="mb-3 flex items-center gap-2">
@@ -530,12 +554,262 @@ export function App({ daemonClient }: AppProps) {
   );
 }
 
+function ElementInspector({
+  element,
+  onUpdate
+}: {
+  element: DocumentElement | null;
+  onUpdate: (elementId: string, updater: ElementUpdater) => void;
+}) {
+  const textElement = element ? textElementSchema.safeParse(element) : null;
+  const rectElement = element ? rectElementSchema.safeParse(element) : null;
+
+  const updateTextField = (value: string) => {
+    if (!element) {
+      return;
+    }
+    onUpdate(element.id, (currentElement) => ({ ...currentElement, name: value }));
+  };
+
+  const updateBooleanField = (field: "locked" | "visible", value: boolean) => {
+    if (!element) {
+      return;
+    }
+    onUpdate(element.id, (currentElement) => ({ ...currentElement, [field]: value }));
+  };
+
+  const updateNumberField = (field: NumericElementField, value: number) => {
+    if (!element) {
+      return;
+    }
+    const minimum = field === "width" || field === "height" ? 1 : 0;
+    onUpdate(element.id, (currentElement) => ({
+      ...currentElement,
+      [field]: normalizeDotValue(value, minimum)
+    }));
+  };
+
+  return (
+    <section className="border-b border-border p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">Inspector</h2>
+        {element ? <Badge variant="muted">{formatElementType(element.type)}</Badge> : null}
+      </div>
+
+      {element ? (
+        <div className="space-y-4">
+          <label className="block text-xs font-medium text-muted-foreground" htmlFor="inspector-name">
+            Name
+            <input
+              id="inspector-name"
+              className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+              value={element.name}
+              onChange={(event) => updateTextField(event.currentTarget.value)}
+            />
+          </label>
+
+          <div>
+            <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Geometry</div>
+            <div className="grid grid-cols-2 gap-2">
+              <InspectorNumberField
+                id="inspector-x"
+                label="X"
+                value={element.x}
+                min={0}
+                onChange={(value) => updateNumberField("x", value)}
+              />
+              <InspectorNumberField
+                id="inspector-y"
+                label="Y"
+                value={element.y}
+                min={0}
+                onChange={(value) => updateNumberField("y", value)}
+              />
+              <InspectorNumberField
+                id="inspector-width"
+                label="Width"
+                value={element.width}
+                min={1}
+                onChange={(value) => updateNumberField("width", value)}
+              />
+              <InspectorNumberField
+                id="inspector-height"
+                label="Height"
+                value={element.height}
+                min={1}
+                onChange={(value) => updateNumberField("height", value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={element.visible}
+                onChange={(event) => updateBooleanField("visible", event.currentTarget.checked)}
+              />
+              Visible
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={element.locked}
+                onChange={(event) => updateBooleanField("locked", event.currentTarget.checked)}
+              />
+              Locked
+            </label>
+          </div>
+
+          {rectElement?.success ? (
+            <div>
+              <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Fill</div>
+              <FillSwatches
+                value={rectElement.data.fill}
+                onChange={(fill) => {
+                  onUpdate(element.id, (currentElement) => {
+                    const currentRect = rectElementSchema.safeParse(currentElement);
+                    return currentRect.success ? { ...currentRect.data, fill } : currentElement;
+                  });
+                }}
+              />
+            </div>
+          ) : null}
+
+          {textElement?.success ? (
+            <div className="space-y-3">
+              <label
+                className="block text-xs font-medium text-muted-foreground"
+                htmlFor="inspector-text-content"
+              >
+                Text content
+                <textarea
+                  id="inspector-text-content"
+                  className="mt-1 min-h-20 w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={textElement.data.text}
+                  onChange={(event) => {
+                    onUpdate(element.id, (currentElement) => {
+                      const currentText = textElementSchema.safeParse(currentElement);
+                      return currentText.success
+                        ? { ...currentText.data, text: event.currentTarget.value }
+                        : currentElement;
+                    });
+                  }}
+                />
+              </label>
+              <div>
+                <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                  Text Fill
+                </div>
+                <FillSwatches
+                  value={textElement.data.style.fill}
+                  onChange={(fill) => {
+                    onUpdate(element.id, (currentElement) => {
+                      const currentText = textElementSchema.safeParse(currentElement);
+                      return currentText.success
+                        ? {
+                            ...currentText.data,
+                            style: { ...currentText.data.style, fill }
+                          }
+                        : currentElement;
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No layer selected</p>
+      )}
+    </section>
+  );
+}
+
+function InspectorNumberField({
+  id,
+  label,
+  value,
+  min,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block text-xs font-medium text-muted-foreground" htmlFor={id}>
+      {label}
+      <input
+        id={id}
+        type="number"
+        min={min}
+        step={1}
+        className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+        value={value}
+        onChange={(event) => {
+          const rawValue = event.currentTarget.value.trim();
+          if (rawValue.length === 0) {
+            return;
+          }
+          const nextValue = Number(rawValue);
+          if (Number.isFinite(nextValue)) {
+            onChange(nextValue);
+          }
+        }}
+      />
+    </label>
+  );
+}
+
+function FillSwatches({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const fills = [
+    { label: "Black fill", value: "#000000" },
+    { label: "White fill", value: "#ffffff" }
+  ];
+
+  return (
+    <div className="flex gap-2">
+      {fills.map((fill) => (
+        <Button
+          key={fill.value}
+          type="button"
+          variant={value === fill.value ? "secondary" : "outline"}
+          size="icon"
+          className="size-8"
+          title={fill.label}
+          aria-label={fill.label}
+          onClick={() => onChange(fill.value)}
+        >
+          <span
+            aria-hidden="true"
+            className="size-4 rounded-sm border border-border"
+            style={{ backgroundColor: fill.value }}
+          />
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function LayerList({
   document,
-  selectedElementId
+  selectedElementId,
+  onSelect
 }: {
   document: PrintDocument;
   selectedElementId: string | null;
+  onSelect: (elementId: string | null) => void;
 }) {
   const baseLayers = [
     {
@@ -561,13 +835,15 @@ function LayerList({
         );
       })}
       {document.elements.map((element) => (
-        <div
+        <button
           key={element.id}
-          className={`rounded-md border p-2 text-sm ${
+          type="button"
+          className={`w-full rounded-md border p-2 text-left text-sm ${
             selectedElementId === element.id
               ? "border-primary bg-primary/5"
               : "border-border bg-card"
           }`}
+          onClick={() => onSelect(element.id)}
         >
           <div className="flex items-center gap-2 font-medium">
             {element.type === "text" ? (
@@ -586,7 +862,7 @@ function LayerList({
                 ? `${Math.round(element.width)} x ${Math.round(element.height)}`
               : `${Math.round(element.x)}, ${Math.round(element.y)}`}
           </div>
-        </div>
+        </button>
       ))}
     </>
   );
@@ -927,6 +1203,24 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
 
 function formatBandCount(totalBands: number): string {
   return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function normalizeDotValue(value: number, minimum: number): number {
+  return Math.max(minimum, Math.round(value));
+}
+
+function formatElementType(type: string): string {
+  const labels: Record<string, string> = {
+    text: "Text",
+    image: "Image",
+    rect: "Rectangle",
+    line: "Line",
+    path: "Path",
+    qr: "QR",
+    barcode: "Barcode",
+    group: "Group"
+  };
+  return labels[type] ?? type;
 }
 
 function formatPaperMode(mode: string): string {

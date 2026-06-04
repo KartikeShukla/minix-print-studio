@@ -176,3 +176,20 @@ export function moveElement(
     )
   };
 }
+
+export function updateElement(
+  document: PrintDocument,
+  elementId: string,
+  updater: (
+    element: PrintDocument["elements"][number]
+  ) => PrintDocument["elements"][number],
+  options: { now?: Date } = {}
+): PrintDocument {
+  return {
+    ...document,
+    updatedAt: (options.now ?? new Date()).toISOString(),
+    elements: document.elements.map((element) =>
+      element.id === elementId ? updater(element) : element
+    )
+  };
+}

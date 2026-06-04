@@ -6,7 +6,8 @@ import {
   moveElement,
   printDocumentSchema,
   rectElementSchema,
-  textElementSchema
+  textElementSchema,
+  updateElement
 } from "../src/index";
 
 describe("default print document", () => {
@@ -92,5 +93,48 @@ describe("default print document", () => {
     expect(moved.elements[0].x).toBe(48);
     expect(moved.elements[0].y).toBe(96);
     expect(moved.updatedAt).toBe("2026-06-04T00:05:00.000Z");
+  });
+
+  it("updates an element immutably and bumps updatedAt", () => {
+    const document = createDefaultDocument({
+      title: "Inspector fixture",
+      now: new Date("2026-06-04T00:00:00.000Z")
+    });
+    const rule = createRectElement({
+      id: "el_rule",
+      name: "Rule",
+      x: 24,
+      y: 144,
+      width: 336,
+      height: 64
+    });
+    const withElement = {
+      ...document,
+      elements: [rule]
+    };
+
+    const updated = updateElement(
+      withElement,
+      "el_rule",
+      (element) => ({
+        ...element,
+        x: 40,
+        width: 300,
+        fill: "#ffffff"
+      }),
+      { now: new Date("2026-06-04T00:10:00.000Z") }
+    );
+
+    expect(withElement.elements[0]).toMatchObject({
+      x: 24,
+      width: 336,
+      fill: "#000000"
+    });
+    expect(updated.elements[0]).toMatchObject({
+      x: 40,
+      width: 300,
+      fill: "#ffffff"
+    });
+    expect(updated.updatedAt).toBe("2026-06-04T00:10:00.000Z");
   });
 });

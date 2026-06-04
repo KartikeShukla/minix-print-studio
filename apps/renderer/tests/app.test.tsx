@@ -305,7 +305,7 @@ describe("MiniX Print Studio shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Text" }));
 
-    expect(await screen.findAllByText("Double-click to edit")).toHaveLength(2);
+    expect(await screen.findAllByText("Double-click to edit")).toHaveLength(3);
     expect(screen.getByText("Text 1")).toBeInTheDocument();
 
     const stored = JSON.parse(
@@ -320,6 +320,55 @@ describe("MiniX Print Studio shell", () => {
         y: 56
       })
     ]);
+  });
+
+  it("edits the selected rectangle through the inspector and persists the document", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+
+    expect(await screen.findByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(screen.getAllByText("Rectangle 1")).not.toHaveLength(0);
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "X" }), {
+      target: { value: "48" }
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Width" }), {
+      target: { value: "280" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "White fill" }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "rect",
+          name: "Rectangle 1",
+          x: 48,
+          width: 280,
+          fill: "#ffffff"
+        })
+      ]);
+    });
+    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
   });
 
   it("adds a rectangle layer and keeps undo redo history persisted", async () => {
