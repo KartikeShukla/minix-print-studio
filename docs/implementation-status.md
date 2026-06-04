@@ -38,6 +38,8 @@
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
 - MCP daemon HTTP client for bearer-authenticated daemon health and document-preview requests.
 - MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
+- FastMCP stdio server wrapper that registers `get_daemon_status`, `preview_document`, and `print_note` against the core MCP tool handlers.
+- `minix-mcp` CLI entrypoint now runs the FastMCP stdio server instead of returning a static app-not-running response.
 
 ## Current Verification
 
@@ -51,7 +53,7 @@
 
 ## Next Implementation Slices
 
-1. Wrap MCP core tool handlers with an MCP SDK stdio server entrypoint.
-2. Real BLE scanner/connection manager with mock-first transport tests.
-3. Project/document persistence and editor canvas interactions.
-4. Persisted job history and diagnostics export.
+1. Real BLE scanner/connection manager with mock-first transport tests.
+2. Project/document persistence and editor canvas interactions.
+3. Persisted job history and diagnostics export.
+4. MCP runtime config handoff from Electron user data.

@@ -19,6 +19,10 @@ pnpm dev
 
 Python packages live in `daemon/` and `mcp/`.
 
+```bash
+.venv/bin/python -m pip install -e daemon -e mcp
+```
+
 ## Status
 
 This repository is being built from the implementation plan in `docs/Initial Spec.md`.

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
-
-from minix_mcp.daemon_client import build_app_not_running_response
+from minix_mcp.server import run_stdio_server
 
 
 def main() -> None:
-    print(json.dumps(build_app_not_running_response()))
+    run_stdio_server()
 
 
 if __name__ == "__main__":

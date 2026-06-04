@@ -9,6 +9,7 @@ description = "MCP stdio shim for MiniX Print Studio."
 readme = "../README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "mcp>=1.0.0",
   "pydantic>=2.10.0"
 ]
 
