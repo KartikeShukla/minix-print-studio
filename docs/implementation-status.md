@@ -30,6 +30,8 @@
 - `/v1/render/preview` endpoint that creates preview-bound approval artifacts.
 - `/v1/render/document-preview` endpoint that renders document JSON through the daemon before creating a preview-bound approval artifact.
 - `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
+- In-memory mock print queue that consumes preview-bound jobs and reports `completed_unverified` with user-check actions.
+- `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
 
 ## Current Verification
 
