@@ -177,6 +177,26 @@ describe("MiniX Print Studio shell", () => {
       tailBlankRowsDots: 160,
       safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"]
     });
+    const exportDiagnostics = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      createdAt: "2026-06-04T00:00:00.000Z",
+      redaction: {
+        projectContentIncluded: false,
+        rawImagesIncluded: false,
+        tokensIncluded: false
+      },
+      daemon: {
+        version: "0.1.0",
+        profileRegistryVersion: "2026.06.04",
+        mock: true,
+        os: "Darwin",
+        python: "3.13.12"
+      },
+      profiles: [{ id: "seznik-minix-s1-lyin48d-gy" }],
+      jobs: [{ jobId: "job_print", segments: [] }],
+      recentErrors: [],
+      recentMcpCalls: []
+    });
 
     render(
       <App
@@ -190,6 +210,7 @@ describe("MiniX Print Studio shell", () => {
           createDocumentPreview,
           planApprovedPreview,
           printApprovedPreview,
+          exportDiagnostics,
           scanPrinters: vi.fn(),
           readOnlyVerify: vi.fn()
         }}
@@ -200,9 +221,11 @@ describe("MiniX Print Studio shell", () => {
     await screen.findByText("Preview ready");
     fireEvent.click(screen.getByRole("button", { name: "Print" }));
 
-    expect(await screen.findByText("completed_unverified")).toBeInTheDocument();
+    expect(await screen.findAllByText("completed_unverified")).toHaveLength(2);
     expect(screen.getByText("User check required")).toBeInTheDocument();
     expect(screen.getByText("Confirm complete")).toBeInTheDocument();
+    expect(screen.getByText("Recent Jobs")).toBeInTheDocument();
+    expect(screen.getByText("job_print")).toBeInTheDocument();
     expect(printApprovedPreview).toHaveBeenCalledWith({
       previewId: "prev_print",
       approvalToken: "appr_print",
@@ -213,6 +236,28 @@ describe("MiniX Print Studio shell", () => {
       density: "medium",
       copies: 1,
       source: "ui"
+    });
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]");
+      expect(stored).toEqual([
+        expect.objectContaining({
+          jobId: "job_print",
+          state: "completed_unverified",
+          completionLevel: "unverified",
+          source: "ui",
+          totalBands: 5,
+          printedAt: expect.any(String)
+        })
+      ]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Export diagnostics" }));
+
+    expect(await screen.findByText("Diagnostics exported")).toBeInTheDocument();
+    expect(screen.getByText("1 job in bundle")).toBeInTheDocument();
+    expect(exportDiagnostics).toHaveBeenCalledWith({
+      includeProjectContent: false,
+      includeRawImages: false
     });
   });
 

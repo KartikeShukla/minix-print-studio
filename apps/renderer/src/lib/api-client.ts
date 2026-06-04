@@ -1,11 +1,14 @@
 import type { PrintDocument } from "@minix/design-model";
 import {
+  diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
   healthResponseSchema,
   printJobResponseSchema,
   printPlanResponseSchema,
   printerScanResponseSchema,
   readOnlyVerificationSchema,
+  type DiagnosticsExportRequest,
+  type DiagnosticsExportResponse,
   type DocumentPreviewResponse,
   type HealthResponse,
   type PrintJobResponse,
@@ -30,6 +33,7 @@ export type DaemonClient = {
   ) => Promise<DocumentPreviewResponse>;
   planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
   printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
+  exportDiagnostics?: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResponse>;
   scanPrinters: () => Promise<PrinterScanResponse>;
   readOnlyVerify: (deviceId: string) => Promise<ReadOnlyVerification>;
 };
@@ -79,6 +83,17 @@ export function createDaemonClient(): DaemonClient {
         },
         printJobResponseSchema.parse,
         "Daemon print job"
+      );
+    },
+    async exportDiagnostics(request) {
+      return requestDaemon(
+        "/v1/diagnostics/export",
+        {
+          method: "POST",
+          body: request
+        },
+        diagnosticsExportResponseSchema.parse,
+        "Daemon diagnostics export"
       );
     },
     async scanPrinters() {

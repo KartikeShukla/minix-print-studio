@@ -56,6 +56,7 @@ import {
   Transformer
 } from "react-konva";
 import type {
+  DiagnosticsExportResponse,
   DocumentPreviewResponse,
   HealthResponse,
   PrintJobResponse,
@@ -66,6 +67,12 @@ import type {
 } from "@minix/shared-api";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
 import { loadStoredDocument, saveStoredDocument } from "@/lib/document-storage";
+import {
+  loadStoredJobHistory,
+  prependStoredPrintJob,
+  saveStoredJobHistory,
+  type StoredPrintJob
+} from "@/lib/job-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -96,6 +103,12 @@ type PrintWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "completed"; job: PrintJobResponse }
+  | { status: "error"; message: string };
+
+type DiagnosticsWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "exported"; bundle: DiagnosticsExportResponse }
   | { status: "error"; message: string };
 
 type PrinterWorkflow =
@@ -151,6 +164,10 @@ export function App({ daemonClient }: AppProps) {
   const [healthError, setHealthError] = useState<string | null>(null);
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
+  const [jobHistory, setJobHistory] = useState<StoredPrintJob[]>(() => loadStoredJobHistory());
+  const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
+    status: "idle"
+  });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
@@ -508,6 +525,11 @@ export function App({ daemonClient }: AppProps) {
         copies: 1,
         source: "ui"
       });
+      setJobHistory((currentHistory) => {
+        const nextHistory = prependStoredPrintJob(currentHistory, job);
+        saveStoredJobHistory(nextHistory);
+        return nextHistory;
+      });
       setPrintWorkflow({ status: "completed", job });
     } catch (error: unknown) {
       setPrintWorkflow({
@@ -516,6 +538,29 @@ export function App({ daemonClient }: AppProps) {
       });
     }
   }, [client, document, previewWorkflow]);
+
+  const runDiagnosticsExport = useCallback(async () => {
+    if (!client.exportDiagnostics) {
+      setDiagnosticsWorkflow({
+        status: "error",
+        message: "Diagnostics export unavailable"
+      });
+      return;
+    }
+    setDiagnosticsWorkflow({ status: "running" });
+    try {
+      const bundle = await client.exportDiagnostics({
+        includeProjectContent: false,
+        includeRawImages: false
+      });
+      setDiagnosticsWorkflow({ status: "exported", bundle });
+    } catch (error: unknown) {
+      setDiagnosticsWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Diagnostics export failed"
+      });
+    }
+  }, [client]);
 
   const statusLabel = health
     ? health.mock
@@ -742,6 +787,12 @@ export function App({ daemonClient }: AppProps) {
                 </p>
               )}
             </section>
+
+            <RecentJobsPanel
+              jobs={jobHistory}
+              workflow={diagnosticsWorkflow}
+              onExport={runDiagnosticsExport}
+            />
           </aside>
         </main>
 
@@ -840,6 +891,66 @@ export function App({ daemonClient }: AppProps) {
         </footer>
       </div>
     </div>
+  );
+}
+
+function RecentJobsPanel({
+  jobs,
+  workflow,
+  onExport
+}: {
+  jobs: StoredPrintJob[];
+  workflow: DiagnosticsWorkflow;
+  onExport: () => void;
+}) {
+  if (jobs.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="border-t border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Boxes className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Recent Jobs</h2>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mb-3 w-full"
+        onClick={onExport}
+        disabled={workflow.status === "running"}
+      >
+        <FileText className="size-4" aria-hidden="true" />
+        {workflow.status === "running" ? "Exporting diagnostics" : "Export diagnostics"}
+      </Button>
+      {workflow.status === "exported" ? (
+        <div className="mb-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          <div className="font-medium">Diagnostics exported</div>
+          <div className="text-xs">{formatDiagnosticsJobCount(workflow.bundle.jobs.length)}</div>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+      <div className="space-y-2">
+        {jobs.slice(0, 5).map((job) => (
+          <div key={job.jobId} className="rounded-md border border-border bg-background p-2 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate font-medium">{job.jobId}</span>
+              <Badge variant={job.requiresUserCheck ? "warning" : "success"}>{job.state}</Badge>
+            </div>
+            <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+              <span>{job.completionLevel}</span>
+              <span>
+                {job.bandsSent}/{job.totalBands} bands
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -2108,6 +2219,10 @@ function formatElementLayerDetail(element: DocumentElement): string {
 
 function formatBandCount(totalBands: number): string {
   return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function formatDiagnosticsJobCount(totalJobs: number): string {
+  return `${totalJobs} ${totalJobs === 1 ? "job" : "jobs"} in bundle`;
 }
 
 function createQrMatrix(

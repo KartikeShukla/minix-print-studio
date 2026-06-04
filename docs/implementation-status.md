@@ -69,6 +69,9 @@
 - Renderer canvas footer controls zoom the artboard and Konva stage from 50% to 200% without mutating persisted print document data; inline text editing overlays scale with the zoomed canvas.
 - Renderer canvas footer controls pan the stage viewport in 48-dot steps and reset to origin without mutating persisted print document data.
 - Renderer selected layers show React Konva transformer handles for resize/rotate edits, persist transformed geometry through the document history path, and keep Undo available after a transform.
+- Renderer completed print jobs persist to a localStorage-backed Recent Jobs list with job id, status, completion level, and band progress.
+- Daemon `/v1/diagnostics/export` returns a redacted diagnostics bundle with daemon/version context, profile snapshot, job metadata, segment metadata without raw raster bytes, mock timing summaries, and completion decision explanation.
+- Renderer daemon client and Recent Jobs panel can request the redacted diagnostics export and show the exported bundle job count.
 
 ## Current Verification
 
@@ -86,9 +89,10 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: use footer zoom controls to move 100% -> 125% -> 100% -> 75%, verify canvas width changes and localStorage remains stable.
 - Playwright smoke against `http://127.0.0.1:5174/`: use footer pan controls to move 0,0 -> 48,0 -> 48,48 -> 0,0, verify reset disables and localStorage remains stable.
 - Playwright smoke against `http://127.0.0.1:5174/`: add rectangle, drag the selected layer's bottom-right transformer handle, verify localStorage geometry changes from `320 x 72` to `358 x 81`.
+- Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Persisted job history and diagnostics export.
-3. MCP runtime config handoff from Electron user data.
+2. MCP runtime config handoff from Electron user data.
+3. Diagnostics depth: disk-backed daemon job store, BLE timing capture, and downloadable archive bundle.

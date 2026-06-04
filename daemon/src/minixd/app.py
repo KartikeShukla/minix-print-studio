@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from minixd import __version__
+from minixd.api.diagnostics import create_diagnostics_router
 from minixd.api.jobs import create_jobs_router
 from minixd.api.printers import create_printers_router
 from minixd.api.render import create_render_router
@@ -55,6 +56,14 @@ def create_app(*, mock: bool = False) -> FastAPI:
             profiles=profiles_data,
             preview_store=preview_store,
             print_queue=print_queue,
+        )
+    )
+    app.include_router(
+        create_diagnostics_router(
+            profiles=profiles_data,
+            print_queue=print_queue,
+            mock=mock,
+            profile_registry_version=PROFILE_REGISTRY_VERSION,
         )
     )
 

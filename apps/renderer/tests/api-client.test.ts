@@ -239,4 +239,52 @@ describe("daemon API client", () => {
       }
     );
   });
+
+  it("exports redacted diagnostics through the daemon with auth", async () => {
+    const diagnosticsResponse = {
+      schemaVersion: 1,
+      createdAt: "2026-06-04T00:00:00.000Z",
+      redaction: {
+        projectContentIncluded: false,
+        rawImagesIncluded: false,
+        tokensIncluded: false
+      },
+      daemon: {
+        version: "0.1.0",
+        profileRegistryVersion: "2026.06.04",
+        mock: true,
+        os: "Darwin",
+        python: "3.13.12"
+      },
+      profiles: [{ id: "seznik-minix-s1-lyin48d-gy" }],
+      jobs: [{ jobId: "job_api", segments: [] }],
+      recentErrors: [],
+      recentMcpCalls: []
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => diagnosticsResponse });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    expect(client.exportDiagnostics).toBeDefined();
+    await expect(
+      client.exportDiagnostics!({ includeProjectContent: false, includeRawImages: false })
+    ).resolves.toEqual(diagnosticsResponse);
+
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:39281/v1/diagnostics/export", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ includeProjectContent: false, includeRawImages: false })
+    });
+  });
 });

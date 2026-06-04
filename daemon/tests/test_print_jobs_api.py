@@ -123,3 +123,59 @@ def test_print_endpoint_rejects_bad_approval_token_without_creating_job() -> Non
     assert response.status_code == 409
     assert response.json()["detail"] == "approval token mismatch"
     assert client.get("/v1/jobs").json() == {"jobs": []}
+
+
+def test_diagnostics_export_includes_redacted_job_and_segment_metadata() -> None:
+    client = TestClient(create_app(mock=True))
+    document = {
+        "schemaVersion": 1,
+        "id": "doc_diagnostics",
+        "title": "Diagnostics fixture /Users/alice/private-image.png",
+        "target": {
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": 16,
+            "dpi": 203,
+            "paperMode": "continuous",
+            "density": "medium",
+        },
+        "background": {"color": "#ffffff"},
+        "elements": [],
+        "assets": [],
+        "metadata": {},
+    }
+    preview = client.post(
+        "/v1/render/document-preview",
+        json={"document": document, "renderSettings": {"token": "super-secret-token"}},
+    ).json()
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": preview["documentHash"],
+            "renderSettingsHash": preview["renderSettingsHash"],
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+
+    response = client.post("/v1/diagnostics/export", json={"includeProjectContent": False})
+
+    assert response.status_code == 200
+    bundle = response.json()
+    assert bundle["schemaVersion"] == 1
+    assert bundle["redaction"]["projectContentIncluded"] is False
+    assert bundle["daemon"]["mock"] is True
+    assert bundle["profiles"][0]["id"] == "seznik-minix-s1-lyin48d-gy"
+    assert bundle["jobs"][0]["jobId"] == printed["jobId"]
+    assert bundle["jobs"][0]["completionDecision"]["level"] == "unverified"
+    assert bundle["jobs"][0]["completionDecision"]["requiresUserCheck"] is True
+    assert bundle["jobs"][0]["segments"][0]["rasterByteLength"] == 8_448
+    assert "raster" not in bundle["jobs"][0]["segments"][0]
+    assert "approvalToken" not in str(bundle)
+    assert "super-secret-token" not in str(bundle)
+    assert "/Users/alice" not in str(bundle)

@@ -109,6 +109,31 @@ export const printJobResponseSchema = z.object({
   safeActions: z.array(z.string())
 });
 
+export const diagnosticsExportResponseSchema = z
+  .object({
+    schemaVersion: z.number().int().positive(),
+    createdAt: z.string(),
+    redaction: z
+      .object({
+        projectContentIncluded: z.boolean(),
+        rawImagesIncluded: z.boolean(),
+        tokensIncluded: z.boolean()
+      })
+      .passthrough(),
+    daemon: z
+      .object({
+        version: z.string(),
+        profileRegistryVersion: z.string(),
+        mock: z.boolean()
+      })
+      .passthrough(),
+    profiles: z.array(z.record(z.unknown())),
+    jobs: z.array(z.record(z.unknown())),
+    recentErrors: z.array(z.unknown()),
+    recentMcpCalls: z.array(z.unknown())
+  })
+  .passthrough();
+
 export const printerCandidateSchema = z.object({
   deviceId: z.string(),
   name: z.string().nullable(),
@@ -203,6 +228,7 @@ export type RenderSettings = z.infer<typeof renderSettingsSchema>;
 export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
+export type DiagnosticsExportResponse = z.infer<typeof diagnosticsExportResponseSchema>;
 export type PrinterCandidate = z.infer<typeof printerCandidateSchema>;
 export type PrinterScanResponse = z.infer<typeof printerScanResponseSchema>;
 export type ReadOnlyVerification = z.infer<typeof readOnlyVerificationSchema>;
@@ -222,6 +248,11 @@ export type PrintPlanRequest = {
 export type PrintPreviewRequest = Omit<PrintPlanRequest, "jobId"> & {
   copies: number;
   source: string;
+};
+
+export type DiagnosticsExportRequest = {
+  includeProjectContent: boolean;
+  includeRawImages: boolean;
 };
 
 export type DiscoveredPrinter = {
