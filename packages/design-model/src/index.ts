@@ -28,6 +28,11 @@ export const textElementSchema = elementBaseSchema.extend({
   style: textStyleSchema
 });
 
+export const rectElementSchema = elementBaseSchema.extend({
+  type: z.literal("rect"),
+  fill: z.string()
+});
+
 export const printDocumentSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string(),
@@ -52,6 +57,7 @@ export const printDocumentSchema = z.object({
 
 export type PrintDocument = z.infer<typeof printDocumentSchema>;
 export type TextElement = z.infer<typeof textElementSchema>;
+export type RectElement = z.infer<typeof rectElementSchema>;
 
 export type DefaultDocumentOptions = {
   title?: string;
@@ -67,6 +73,16 @@ export type CreateTextElementOptions = {
   y: number;
   width: number;
   height: number;
+};
+
+export type CreateRectElementOptions = {
+  id?: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill?: string;
 };
 
 export function createDefaultDocument(options: DefaultDocumentOptions = {}): PrintDocument {
@@ -116,6 +132,22 @@ export function createTextElement(options: CreateTextElementOptions): TextElemen
       lineHeight: 1.1,
       fill: "#000000"
     }
+  };
+}
+
+export function createRectElement(options: CreateRectElementOptions): RectElement {
+  return {
+    id: options.id ?? `el_${crypto.randomUUID()}`,
+    type: "rect",
+    name: options.name,
+    x: options.x,
+    y: options.y,
+    width: options.width,
+    height: options.height,
+    rotation: 0,
+    locked: false,
+    visible: true,
+    fill: options.fill ?? "#000000"
   };
 }
 

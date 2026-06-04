@@ -53,6 +53,9 @@
 - Renderer document persistence hydrates and saves the current document through localStorage with schema validation.
 - Initial React Konva artboard renders the document model, supports adding text layers from the toolbar, selects/moves text elements, and keeps the daemon preview/print state invalidated after edits.
 - Renderer test harness includes a React Konva mock so canvas behavior can stay covered without depending on browser canvas support in unit tests.
+- Document model now includes typed rectangle elements aligned with the daemon's canonical rectangle renderer.
+- Renderer canvas can add rectangle layers, render them on the React Konva stage, show them in the layer list, and persist them with the current document.
+- Renderer editor state supports undo/redo for document edits without persisting history stacks to localStorage.
 
 ## Current Verification
 
@@ -67,6 +70,6 @@
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Canvas editor MVP depth: transformer handles, inline text editing, rectangle/image/QR layers, undo/redo, and inspector controls.
+2. Canvas editor MVP depth: transformer handles, inline text editing, image/QR layers, pan/zoom, and inspector controls.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

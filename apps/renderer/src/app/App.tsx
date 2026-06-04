@@ -10,19 +10,24 @@ import {
   MousePointer2,
   Printer,
   QrCode,
+  Redo2,
   ScanSearch,
   ShieldCheck,
   Square,
   Type,
+  Undo2,
   Wifi
 } from "lucide-react";
 import {
   appendElement,
   createDefaultDocument,
+  createRectElement,
   createTextElement,
   moveElement,
+  rectElementSchema,
   textElementSchema,
   type PrintDocument,
+  type RectElement,
   type TextElement
 } from "@minix/design-model";
 import { Layer, Rect, Stage, Text as KonvaText } from "react-konva";
@@ -74,17 +79,39 @@ type PrinterWorkflow =
   | { status: "verified"; candidates: PrinterCandidate[]; verification: ReadOnlyVerification }
   | { status: "error"; message: string };
 
+type EditorState = {
+  document: PrintDocument;
+  past: PrintDocument[];
+  future: PrintDocument[];
+  selectedElementId: string | null;
+};
+
+type DocumentCommit = (document: PrintDocument) => {
+  document: PrintDocument;
+  selectedElementId?: string | null;
+};
+
+type CanvasElement =
+  | { kind: "text"; element: TextElement }
+  | { kind: "rect"; element: RectElement };
+
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
-  const [document, setDocument] = useState(() => {
-    return loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
+  const [editorState, setEditorState] = useState<EditorState>(() => {
+    const document = loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
+    return {
+      document,
+      past: [],
+      future: [],
+      selectedElementId: null
+    };
   });
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const { document, past, future, selectedElementId } = editorState;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,8 +145,28 @@ export function App({ daemonClient }: AppProps) {
     setPrintWorkflow({ status: "idle" });
   }, []);
 
+  const commitDocument = useCallback(
+    (commit: DocumentCommit) => {
+      setEditorState((currentState) => {
+        const next = commit(currentState.document);
+        return {
+          document: next.document,
+          past: [...currentState.past, currentState.document].slice(-50),
+          future: [],
+          selectedElementId: next.selectedElementId ?? currentState.selectedElementId
+        };
+      });
+      invalidatePreview();
+    },
+    [invalidatePreview]
+  );
+
+  const selectElement = useCallback((elementId: string | null) => {
+    setEditorState((currentState) => ({ ...currentState, selectedElementId: elementId }));
+  }, []);
+
   const addTextLayer = useCallback(() => {
-    setDocument((currentDocument) => {
+    commitDocument((currentDocument) => {
       const textCount = currentDocument.elements.filter(
         (element) => element.type === "text"
       ).length;
@@ -131,20 +178,73 @@ export function App({ daemonClient }: AppProps) {
         width: currentDocument.target.widthDots - 48,
         height: 80
       });
-      setSelectedElementId(element.id);
-      return appendElement(currentDocument, element);
+      return {
+        document: appendElement(currentDocument, element),
+        selectedElementId: element.id
+      };
+    });
+  }, [commitDocument]);
+
+  const addRectangleLayer = useCallback(() => {
+    commitDocument((currentDocument) => {
+      const rectCount = currentDocument.elements.filter(
+        (element) => element.type === "rect"
+      ).length;
+      const element = createRectElement({
+        name: `Rectangle ${rectCount + 1}`,
+        x: 32,
+        y: 144 + rectCount * 32,
+        width: currentDocument.target.widthDots - 64,
+        height: 72
+      });
+      return {
+        document: appendElement(currentDocument, element),
+        selectedElementId: element.id
+      };
+    });
+  }, [commitDocument]);
+
+  const moveDocumentElement = useCallback(
+    (elementId: string, x: number, y: number) => {
+      commitDocument((currentDocument) => ({
+        document: moveElement(currentDocument, elementId, { x, y }),
+        selectedElementId: elementId
+      }));
+    },
+    [commitDocument]
+  );
+
+  const undoDocumentChange = useCallback(() => {
+    setEditorState((currentState) => {
+      const previousDocument = currentState.past.at(-1);
+      if (!previousDocument) {
+        return currentState;
+      }
+      return {
+        document: previousDocument,
+        past: currentState.past.slice(0, -1),
+        future: [currentState.document, ...currentState.future],
+        selectedElementId: null
+      };
     });
     invalidatePreview();
   }, [invalidatePreview]);
 
-  const moveDocumentElement = useCallback(
-    (elementId: string, x: number, y: number) => {
-      setDocument((currentDocument) => moveElement(currentDocument, elementId, { x, y }));
-      setSelectedElementId(elementId);
-      invalidatePreview();
-    },
-    [invalidatePreview]
-  );
+  const redoDocumentChange = useCallback(() => {
+    setEditorState((currentState) => {
+      const nextDocument = currentState.future[0];
+      if (!nextDocument) {
+        return currentState;
+      }
+      return {
+        document: nextDocument,
+        past: [...currentState.past, currentState.document].slice(-50),
+        future: currentState.future.slice(1),
+        selectedElementId: null
+      };
+    });
+    invalidatePreview();
+  }, [invalidatePreview]);
 
   const runPreview = useCallback(async () => {
     setPreviewWorkflow({ status: "running" });
@@ -233,6 +333,8 @@ export function App({ daemonClient }: AppProps) {
       ? "Daemon offline"
       : "Checking daemon";
   const previewReady = previewWorkflow.status === "ready";
+  const canUndo = past.length > 0;
+  const canRedo = future.length > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -255,6 +357,26 @@ export function App({ daemonClient }: AppProps) {
               <Wifi className="size-3.5" aria-hidden="true" />
               {statusLabel}
             </Badge>
+            <Button
+              variant="outline"
+              size="icon"
+              title="Undo"
+              aria-label="Undo"
+              onClick={undoDocumentChange}
+              disabled={!canUndo}
+            >
+              <Undo2 className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              title="Redo"
+              aria-label="Redo"
+              onClick={redoDocumentChange}
+              disabled={!canRedo}
+            >
+              <Redo2 className="size-4" aria-hidden="true" />
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -298,7 +420,13 @@ export function App({ daemonClient }: AppProps) {
                       size="icon"
                       title={tool.label}
                       aria-label={tool.label}
-                      onClick={tool.label === "Text" ? addTextLayer : undefined}
+                      onClick={
+                        tool.label === "Text"
+                          ? addTextLayer
+                          : tool.label === "Rectangle"
+                            ? addRectangleLayer
+                            : undefined
+                      }
                     >
                       <Icon className="size-4" aria-hidden="true" />
                     </Button>
@@ -325,7 +453,7 @@ export function App({ daemonClient }: AppProps) {
                 selectedElementId={selectedElementId}
                 previewReady={previewReady}
                 totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
-                onSelect={setSelectedElementId}
+                onSelect={selectElement}
                 onMove={moveDocumentElement}
               />
             </div>
@@ -444,6 +572,8 @@ function LayerList({
           <div className="flex items-center gap-2 font-medium">
             {element.type === "text" ? (
               <Type className="size-4 text-primary" aria-hidden="true" />
+            ) : element.type === "rect" ? (
+              <Square className="size-4 text-primary" aria-hidden="true" />
             ) : (
               <Layers3 className="size-4 text-primary" aria-hidden="true" />
             )}
@@ -452,6 +582,8 @@ function LayerList({
           <div className="mt-1 truncate text-xs text-muted-foreground">
             {element.type === "text" && typeof element.text === "string"
               ? element.text
+              : element.type === "rect"
+                ? `${Math.round(element.width)} x ${Math.round(element.height)}`
               : `${Math.round(element.x)}, ${Math.round(element.y)}`}
           </div>
         </div>
@@ -475,10 +607,21 @@ function DocumentCanvas({
   onSelect: (elementId: string | null) => void;
   onMove: (elementId: string, x: number, y: number) => void;
 }) {
-  const textElements = document.elements
-    .map((element) => textElementSchema.safeParse(element))
-    .filter((result) => result.success)
-    .map((result) => result.data);
+  const canvasElements = document.elements.reduce<CanvasElement[]>((items, element) => {
+    const textElement = textElementSchema.safeParse(element);
+    if (textElement.success) {
+      items.push({ kind: "text", element: textElement.data });
+      return items;
+    }
+
+    const rectElement = rectElementSchema.safeParse(element);
+    if (rectElement.success) {
+      items.push({ kind: "rect", element: rectElement.data });
+      return items;
+    }
+
+    return items;
+  }, []);
 
   return (
     <div className="receipt-artboard" aria-label="384 dot receipt artboard">
@@ -495,15 +638,25 @@ function DocumentCanvas({
               height={document.target.heightDots}
               fill={document.background.color}
             />
-            {textElements.map((element) => (
-              <CanvasTextElement
-                key={element.id}
-                element={element}
-                selected={selectedElementId === element.id}
-                onSelect={onSelect}
-                onMove={onMove}
-              />
-            ))}
+            {canvasElements.map((item) =>
+              item.kind === "text" ? (
+                <CanvasTextElement
+                  key={item.element.id}
+                  element={item.element}
+                  selected={selectedElementId === item.element.id}
+                  onSelect={onSelect}
+                  onMove={onMove}
+                />
+              ) : (
+                <CanvasRectElement
+                  key={item.element.id}
+                  element={item.element}
+                  selected={selectedElementId === item.element.id}
+                  onSelect={onSelect}
+                  onMove={onMove}
+                />
+              )
+            )}
           </Layer>
         </Stage>
         {document.elements.length === 0 ? (
@@ -553,6 +706,40 @@ function CanvasTextElement({
       align={element.style.align}
       lineHeight={element.style.lineHeight}
       fill={element.style.fill}
+      draggable={!element.locked}
+      visible={element.visible}
+      {...selectionProps}
+      onClick={() => onSelect(element.id)}
+      onTap={() => onSelect(element.id)}
+      onDragEnd={(event) => {
+        onMove(element.id, event.target.x(), event.target.y());
+      }}
+    />
+  );
+}
+
+function CanvasRectElement({
+  element,
+  selected,
+  onSelect,
+  onMove
+}: {
+  element: RectElement;
+  selected: boolean;
+  onSelect: (elementId: string) => void;
+  onMove: (elementId: string, x: number, y: number) => void;
+}) {
+  const selectionProps = selected ? { stroke: "#0f766e", strokeWidth: 2 } : {};
+
+  return (
+    <Rect
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      width={element.width}
+      height={element.height}
+      rotation={element.rotation}
+      fill={element.fill}
       draggable={!element.locked}
       visible={element.visible}
       {...selectionProps}

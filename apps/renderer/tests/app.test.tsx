@@ -321,4 +321,63 @@ describe("MiniX Print Studio shell", () => {
       })
     ]);
   });
+
+  it("adds a rectangle layer and keeps undo redo history persisted", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    const undo = screen.getByRole("button", { name: "Undo" });
+    const redo = screen.getByRole("button", { name: "Redo" });
+    expect(undo).toBeDisabled();
+    expect(redo).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+    expect(undo).toBeEnabled();
+    expect(redo).toBeDisabled();
+
+    let stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    expect(stored.elements).toEqual([
+      expect.objectContaining({
+        type: "rect",
+        name: "Rectangle 1",
+        x: 32,
+        y: 144,
+        width: 320,
+        height: 72
+      })
+    ]);
+
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Rectangle 1")).not.toBeInTheDocument();
+    });
+    expect(undo).toBeDisabled();
+    expect(redo).toBeEnabled();
+    stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    expect(stored.elements).toEqual([]);
+
+    fireEvent.click(redo);
+
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+    expect(undo).toBeEnabled();
+    expect(redo).toBeDisabled();
+  });
 });

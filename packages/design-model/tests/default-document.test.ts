@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   createDefaultDocument,
+  createRectElement,
   createTextElement,
   moveElement,
   printDocumentSchema,
+  rectElementSchema,
   textElementSchema
 } from "../src/index";
 
@@ -41,6 +43,24 @@ describe("default print document", () => {
     expect(element.style.fontFamily).toBe("Inter");
     expect(element.style.fontSize).toBe(28);
     expect(element.style.align).toBe("center");
+  });
+
+  it("creates a typed thermal rectangle element with stable defaults", () => {
+    const element = rectElementSchema.parse(
+      createRectElement({
+        id: "el_rule",
+        name: "Rule",
+        x: 24,
+        y: 144,
+        width: 336,
+        height: 64
+      })
+    );
+
+    expect(element.type).toBe("rect");
+    expect(element.fill).toBe("#000000");
+    expect(element.width).toBe(336);
+    expect(element.height).toBe(64);
   });
 
   it("moves an element immutably and bumps updatedAt", () => {
