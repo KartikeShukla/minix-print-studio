@@ -67,6 +67,7 @@
 - Renderer image import embeds local PNG/JPEG/WebP files into the document, displays imported images on the canvas, exposes fit/threshold/invert inspector controls, and persists them with undoable document edits.
 - Renderer text layers support double-click inline editing through an HTML canvas overlay that commits one undoable document edit on blur or Enter, and cancels with Escape.
 - Renderer canvas footer controls zoom the artboard and Konva stage from 50% to 200% without mutating persisted print document data; inline text editing overlays scale with the zoomed canvas.
+- Renderer canvas footer controls pan the stage viewport in 48-dot steps and reset to origin without mutating persisted print document data.
 
 ## Current Verification
 
@@ -82,10 +83,11 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: import PNG file, verify embedded image layer and preprocessing defaults in localStorage.
 - Playwright smoke against `http://127.0.0.1:5174/`: add text layer, double-click canvas text, edit the inline overlay, verify localStorage persistence and Undo enablement.
 - Playwright smoke against `http://127.0.0.1:5174/`: use footer zoom controls to move 100% -> 125% -> 100% -> 75%, verify canvas width changes and localStorage remains stable.
+- Playwright smoke against `http://127.0.0.1:5174/`: use footer pan controls to move 0,0 -> 48,0 -> 48,48 -> 0,0, verify reset disables and localStorage remains stable.
 
 ## Next Implementation Slices
 
 1. Physical hardware validation for read-only model/firmware probing on the printer.
-2. Canvas editor MVP depth: transformer handles and pan.
+2. Canvas editor MVP depth: transformer handles.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

@@ -435,6 +435,46 @@ describe("MiniX Print Studio shell", () => {
     expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
   });
 
+  it("pans the canvas viewport from footer controls without changing the print document", async () => {
+    const { container } = render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    await screen.findAllByText("Double-click to edit");
+
+    const initialStored = localStorage.getItem("minix.printStudio.currentDocument.v1");
+    expect(initialStored).toBeTruthy();
+
+    const viewport = container.querySelector('[data-testid="canvas-pan-viewport"]');
+    expect(viewport).toHaveStyle({ transform: "translate(0px, 0px)" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Pan right" }));
+    expect(viewport).toHaveStyle({ transform: "translate(48px, 0px)" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Pan down" }));
+    expect(viewport).toHaveStyle({ transform: "translate(48px, 48px)" });
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset pan" }));
+    expect(viewport).toHaveStyle({ transform: "translate(0px, 0px)" });
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+  });
+
   it("edits the selected rectangle through the inspector and persists the document", async () => {
     render(
       <App

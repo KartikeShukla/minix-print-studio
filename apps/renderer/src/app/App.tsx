@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Bluetooth,
   Boxes,
   CircleAlert,
@@ -71,6 +75,7 @@ const tools = [
 const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
 const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const DEFAULT_CANVAS_ZOOM_INDEX = 2;
+const CANVAS_PAN_STEP = 48;
 
 type PreviewWorkflow =
   | { status: "idle" }
@@ -133,6 +138,7 @@ export function App({ daemonClient }: AppProps) {
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const { document, past, future, selectedElementId } = editorState;
 
   useEffect(() => {
@@ -357,6 +363,17 @@ export function App({ daemonClient }: AppProps) {
     setCanvasZoomIndex(DEFAULT_CANVAS_ZOOM_INDEX);
   }, []);
 
+  const panCanvas = useCallback((x: number, y: number) => {
+    setCanvasPan((currentPan) => ({
+      x: currentPan.x + x,
+      y: currentPan.y + y
+    }));
+  }, []);
+
+  const resetCanvasPan = useCallback(() => {
+    setCanvasPan({ x: 0, y: 0 });
+  }, []);
+
   const undoDocumentChange = useCallback(() => {
     setEditingTextElementId(null);
     setEditorState((currentState) => {
@@ -484,6 +501,7 @@ export function App({ daemonClient }: AppProps) {
     CANVAS_ZOOM_STEPS[canvasZoomIndex] ?? CANVAS_ZOOM_STEPS[DEFAULT_CANVAS_ZOOM_INDEX];
   const canZoomOut = canvasZoomIndex > 0;
   const canZoomIn = canvasZoomIndex < CANVAS_ZOOM_STEPS.length - 1;
+  const canResetPan = canvasPan.x !== 0 || canvasPan.y !== 0;
   const selectedElement = useMemo(
     () => document.elements.find((element) => element.id === selectedElementId) ?? null,
     [document.elements, selectedElementId]
@@ -624,6 +642,7 @@ export function App({ daemonClient }: AppProps) {
                 totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
                 editingTextElementId={editingTextElementId}
                 zoom={canvasZoom}
+                pan={canvasPan}
                 onSelect={selectElement}
                 onMove={moveDocumentElement}
                 onStartTextEdit={startInlineTextEdit}
@@ -728,6 +747,59 @@ export function App({ daemonClient }: AppProps) {
               aria-label="Reset zoom"
               onClick={resetCanvasZoom}
               disabled={canvasZoomIndex === DEFAULT_CANVAS_ZOOM_INDEX}
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-1 border-l border-border pl-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Pan left"
+              aria-label="Pan left"
+              onClick={() => panCanvas(-CANVAS_PAN_STEP, 0)}
+            >
+              <ArrowLeft className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Pan up"
+              aria-label="Pan up"
+              onClick={() => panCanvas(0, -CANVAS_PAN_STEP)}
+            >
+              <ArrowUp className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Pan down"
+              aria-label="Pan down"
+              onClick={() => panCanvas(0, CANVAS_PAN_STEP)}
+            >
+              <ArrowDown className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Pan right"
+              aria-label="Pan right"
+              onClick={() => panCanvas(CANVAS_PAN_STEP, 0)}
+            >
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 rounded-sm"
+              title="Reset pan"
+              aria-label="Reset pan"
+              onClick={resetCanvasPan}
+              disabled={!canResetPan}
             >
               <RotateCcw className="size-3.5" aria-hidden="true" />
             </Button>
@@ -1195,6 +1267,7 @@ function DocumentCanvas({
   totalBands,
   editingTextElementId,
   zoom,
+  pan,
   onSelect,
   onMove,
   onStartTextEdit,
@@ -1207,6 +1280,7 @@ function DocumentCanvas({
   totalBands: number | null;
   editingTextElementId: string | null;
   zoom: number;
+  pan: { x: number; y: number };
   onSelect: (elementId: string | null) => void;
   onMove: (elementId: string, x: number, y: number) => void;
   onStartTextEdit: (elementId: string) => void;
@@ -1257,61 +1331,70 @@ function DocumentCanvas({
         {document.target.widthDots} dots
       </div>
       <div className="thermal-stage">
-        <Stage width={stageWidth} height={stageHeight} scaleX={zoom} scaleY={zoom}>
-          <Layer>
-            <Rect
-              x={0}
-              y={0}
-              width={document.target.widthDots}
-              height={document.target.heightDots}
-              fill={document.background.color}
+        <div
+          className="relative"
+          data-testid="canvas-pan-viewport"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            transformOrigin: "top left"
+          }}
+        >
+          <Stage width={stageWidth} height={stageHeight} scaleX={zoom} scaleY={zoom}>
+            <Layer>
+              <Rect
+                x={0}
+                y={0}
+                width={document.target.widthDots}
+                height={document.target.heightDots}
+                fill={document.background.color}
+              />
+              {canvasElements.map((item) =>
+                item.kind === "text" ? (
+                  <CanvasTextElement
+                    key={item.element.id}
+                    element={item.element}
+                    selected={selectedElementId === item.element.id}
+                    onSelect={onSelect}
+                    onMove={onMove}
+                    onEdit={onStartTextEdit}
+                  />
+                ) : item.kind === "rect" ? (
+                  <CanvasRectElement
+                    key={item.element.id}
+                    element={item.element}
+                    selected={selectedElementId === item.element.id}
+                    onSelect={onSelect}
+                    onMove={onMove}
+                  />
+                ) : item.kind === "image" ? (
+                  <CanvasImageElement
+                    key={item.element.id}
+                    element={item.element}
+                    selected={selectedElementId === item.element.id}
+                    onSelect={onSelect}
+                    onMove={onMove}
+                  />
+                ) : (
+                  <CanvasQrElement
+                    key={item.element.id}
+                    element={item.element}
+                    selected={selectedElementId === item.element.id}
+                    onSelect={onSelect}
+                    onMove={onMove}
+                  />
+                )
+              )}
+            </Layer>
+          </Stage>
+          {editingTextElement ? (
+            <InlineTextEditor
+              element={editingTextElement}
+              zoom={zoom}
+              onCommit={(text) => onCommitTextEdit(editingTextElement.id, text)}
+              onCancel={onCancelTextEdit}
             />
-            {canvasElements.map((item) =>
-              item.kind === "text" ? (
-                <CanvasTextElement
-                  key={item.element.id}
-                  element={item.element}
-                  selected={selectedElementId === item.element.id}
-                  onSelect={onSelect}
-                  onMove={onMove}
-                  onEdit={onStartTextEdit}
-                />
-              ) : item.kind === "rect" ? (
-                <CanvasRectElement
-                  key={item.element.id}
-                  element={item.element}
-                  selected={selectedElementId === item.element.id}
-                  onSelect={onSelect}
-                  onMove={onMove}
-                />
-              ) : item.kind === "image" ? (
-                <CanvasImageElement
-                  key={item.element.id}
-                  element={item.element}
-                  selected={selectedElementId === item.element.id}
-                  onSelect={onSelect}
-                  onMove={onMove}
-                />
-              ) : (
-                <CanvasQrElement
-                  key={item.element.id}
-                  element={item.element}
-                  selected={selectedElementId === item.element.id}
-                  onSelect={onSelect}
-                  onMove={onMove}
-                />
-              )
-            )}
-          </Layer>
-        </Stage>
-        {editingTextElement ? (
-          <InlineTextEditor
-            element={editingTextElement}
-            zoom={zoom}
-            onCommit={(text) => onCommitTextEdit(editingTextElement.id, text)}
-            onCancel={onCancelTextEdit}
-          />
-        ) : null}
+          ) : null}
+        </div>
         {document.elements.length === 0 ? (
           <div className="thermal-stage-empty">
             <Boxes className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden="true" />
