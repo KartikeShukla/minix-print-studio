@@ -19,7 +19,9 @@ describe("MiniX Print Studio shell", () => {
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
-          printApprovedPreview: vi.fn()
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
         }}
       />
     );
@@ -82,7 +84,9 @@ describe("MiniX Print Studio shell", () => {
           }),
           createDocumentPreview,
           planApprovedPreview,
-          printApprovedPreview
+          printApprovedPreview,
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
         }}
       />
     );
@@ -184,7 +188,9 @@ describe("MiniX Print Studio shell", () => {
           }),
           createDocumentPreview,
           planApprovedPreview,
-          printApprovedPreview
+          printApprovedPreview,
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
         }}
       />
     );
@@ -207,5 +213,73 @@ describe("MiniX Print Studio shell", () => {
       copies: 1,
       source: "ui"
     });
+  });
+
+  it("scans and read-only verifies a printer without enabling trusted print", async () => {
+    const scanPrinters = vi.fn().mockResolvedValue({
+      printers: [
+        {
+          deviceId: "mock-minix-0194",
+          name: "Seznik MiniX_0194_LE",
+          serviceUuids: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+          rssi: -42,
+          supportLevel: "detected_unverified",
+          candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
+          printable: false,
+          nextRequiredStage: "read_only_verification",
+          reason: "Service UUID and name match; model query required."
+        }
+      ]
+    });
+    const readOnlyVerify = vi.fn().mockResolvedValue({
+      status: "read_only_verified",
+      deviceId: "mock-minix-0194",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      profileSupportLevel: "official",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      printable: false,
+      nextRequiredStage: "protocol_sanity_test",
+      reason: "Model and firmware match profile; protocol sanity test required.",
+      services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
+      notifyCharacteristics: [
+        "0000ff01-0000-1000-8000-00805f9b34fb",
+        "0000ff03-0000-1000-8000-00805f9b34fb"
+      ],
+      rawNotifications: []
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters,
+          readOnlyVerify
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Scan printers" }));
+
+    expect(await screen.findByText("Seznik MiniX_0194_LE")).toBeInTheDocument();
+    expect(screen.getByText("Read-only verification required")).toBeInTheDocument();
+    expect(scanPrinters).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Verify printer identity" }));
+
+    expect(await screen.findByText("Read-only verified")).toBeInTheDocument();
+    expect(screen.getByText("S1_LYiN48D_GY")).toBeInTheDocument();
+    expect(screen.getByText("Protocol sanity test required")).toBeInTheDocument();
+    expect(screen.getByText("Printing still locked")).toBeInTheDocument();
+    expect(readOnlyVerify).toHaveBeenCalledWith("mock-minix-0194");
   });
 });

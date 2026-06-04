@@ -40,6 +40,12 @@
 - MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
 - FastMCP stdio server wrapper that registers `get_daemon_status`, `preview_document`, and `print_note` against the core MCP tool handlers.
 - `minix-mcp` CLI entrypoint now runs the FastMCP stdio server instead of returning a static app-not-running response.
+- Mock-first BLE discovery service that classifies profile/service/name matches as `detected_unverified` without granting print permission.
+- Read-only device verification flow that matches model and firmware against the printer profile while keeping printing locked until protocol sanity testing.
+- `/v1/printers/scan` endpoint with documented POST support, legacy GET smoke support, and `/v1/printers/read-only-verify` for mock adapter verification.
+- Shared TypeScript API schemas for printer scan candidates and read-only verification responses.
+- Renderer daemon client methods for authenticated printer scan and read-only verification.
+- Renderer Scan Printers flow that displays detected candidates, runs identity verification, and shows `Printing still locked` after read-only verification.
 
 ## Current Verification
 
@@ -53,7 +59,7 @@
 
 ## Next Implementation Slices
 
-1. Real BLE scanner/connection manager with mock-first transport tests.
+1. Bleak-backed BLE adapter and connection lifecycle with physical read-only hardware validation.
 2. Project/document persistence and editor canvas interactions.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

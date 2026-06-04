@@ -167,4 +167,76 @@ describe("daemon API client", () => {
       })
     });
   });
+
+  it("scans and read-only verifies printers through the daemon with auth", async () => {
+    const scanResponse = {
+      printers: [
+        {
+          deviceId: "mock-minix-0194",
+          name: "Seznik MiniX_0194_LE",
+          serviceUuids: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+          rssi: -42,
+          supportLevel: "detected_unverified",
+          candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
+          printable: false,
+          nextRequiredStage: "read_only_verification",
+          reason: "Service UUID and name match; model query required."
+        }
+      ]
+    };
+    const verificationResponse = {
+      status: "read_only_verified",
+      deviceId: "mock-minix-0194",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      profileSupportLevel: "official",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      printable: false,
+      nextRequiredStage: "protocol_sanity_test",
+      reason: "Model and firmware match profile; protocol sanity test required.",
+      services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
+      notifyCharacteristics: [
+        "0000ff01-0000-1000-8000-00805f9b34fb",
+        "0000ff03-0000-1000-8000-00805f9b34fb"
+      ],
+      rawNotifications: []
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => scanResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => verificationResponse });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    await expect(client.scanPrinters()).resolves.toEqual(scanResponse);
+    await expect(client.readOnlyVerify("mock-minix-0194")).resolves.toEqual(verificationResponse);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:39281/v1/printers/scan", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:39281/v1/printers/read-only-verify",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret-token",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ deviceId: "mock-minix-0194" })
+      }
+    );
+  });
 });

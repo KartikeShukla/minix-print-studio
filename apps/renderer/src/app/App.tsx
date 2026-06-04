@@ -22,6 +22,8 @@ import type {
   HealthResponse,
   PrintJobResponse,
   PrintPlanResponse,
+  PrinterCandidate,
+  ReadOnlyVerification,
   RenderSettings
 } from "@minix/shared-api";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
@@ -59,6 +61,14 @@ type PrintWorkflow =
   | { status: "completed"; job: PrintJobResponse }
   | { status: "error"; message: string };
 
+type PrinterWorkflow =
+  | { status: "idle" }
+  | { status: "scanning" }
+  | { status: "candidates"; candidates: PrinterCandidate[] }
+  | { status: "verifying"; candidates: PrinterCandidate[]; deviceId: string }
+  | { status: "verified"; candidates: PrinterCandidate[]; verification: ReadOnlyVerification }
+  | { status: "error"; message: string };
+
 export function App({ daemonClient }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const [document] = useState(() => createDefaultDocument({ heightDots: 900 }));
@@ -66,6 +76,7 @@ export function App({ daemonClient }: AppProps) {
   const [healthError, setHealthError] = useState<string | null>(null);
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
+  const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +124,35 @@ export function App({ daemonClient }: AppProps) {
       });
     }
   }, [client, document]);
+
+  const runPrinterScan = useCallback(async () => {
+    setPrinterWorkflow({ status: "scanning" });
+    try {
+      const response = await client.scanPrinters();
+      setPrinterWorkflow({ status: "candidates", candidates: response.printers });
+    } catch (error: unknown) {
+      setPrinterWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Printer scan failed"
+      });
+    }
+  }, [client]);
+
+  const runReadOnlyVerify = useCallback(
+    async (deviceId: string, candidates: PrinterCandidate[]) => {
+      setPrinterWorkflow({ status: "verifying", candidates, deviceId });
+      try {
+        const verification = await client.readOnlyVerify(deviceId);
+        setPrinterWorkflow({ status: "verified", candidates, verification });
+      } catch (error: unknown) {
+        setPrinterWorkflow({
+          status: "error",
+          message: error instanceof Error ? error.message : "Read-only verification failed"
+        });
+      }
+    },
+    [client]
+  );
 
   const runPrint = useCallback(async () => {
     if (previewWorkflow.status !== "ready") {
@@ -170,9 +210,14 @@ export function App({ daemonClient }: AppProps) {
               <Wifi className="size-3.5" aria-hidden="true" />
               {statusLabel}
             </Badge>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runPrinterScan}
+              disabled={printerWorkflow.status === "scanning"}
+            >
               <ScanSearch className="size-4" aria-hidden="true" />
-              Scan printers
+              {printerWorkflow.status === "scanning" ? "Scanning" : "Scan printers"}
             </Button>
             <Button
               variant="outline"
@@ -269,29 +314,7 @@ export function App({ daemonClient }: AppProps) {
           </section>
 
           <aside className="min-h-0 border-l border-border bg-card">
-            <section className="border-b border-border p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Printer</h2>
-                <Badge variant="muted">
-                  <Bluetooth className="size-3.5" aria-hidden="true" />
-                  Untrusted
-                </Badge>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Profile</span>
-                  <span>Seznik MiniX S1</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Paper</span>
-                  <span>Continuous</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Width</span>
-                  <span>384 dots</span>
-                </div>
-              </div>
-            </section>
+            <PrinterPanel workflow={printerWorkflow} onVerify={runReadOnlyVerify} />
 
             <section className="border-b border-border p-4">
               <div className="mb-3 flex items-center gap-2">
@@ -361,6 +384,130 @@ export function App({ daemonClient }: AppProps) {
   );
 }
 
+function PrinterPanel({
+  workflow,
+  onVerify
+}: {
+  workflow: PrinterWorkflow;
+  onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
+}) {
+  const candidates = "candidates" in workflow ? workflow.candidates : [];
+  const primaryCandidate = candidates[0];
+  const verification = workflow.status === "verified" ? workflow.verification : null;
+
+  return (
+    <section className="border-b border-border p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Printer</h2>
+        <Badge variant={verification ? "warning" : "muted"}>
+          <Bluetooth className="size-3.5" aria-hidden="true" />
+          {verification ? "Read-only verified" : "Untrusted"}
+        </Badge>
+      </div>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Profile</span>
+          <span>Seznik MiniX S1</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Paper</span>
+          <span>Continuous</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Width</span>
+          <span>384 dots</span>
+        </div>
+      </div>
+
+      <PrinterDiscoveryStatus
+        workflow={workflow}
+        candidate={primaryCandidate}
+        verification={verification}
+        onVerify={() => {
+          if (primaryCandidate) {
+            onVerify(primaryCandidate.deviceId, candidates);
+          }
+        }}
+      />
+    </section>
+  );
+}
+
+function PrinterDiscoveryStatus({
+  workflow,
+  candidate,
+  verification,
+  onVerify
+}: {
+  workflow: PrinterWorkflow;
+  candidate: PrinterCandidate | undefined;
+  verification: ReadOnlyVerification | null;
+  onVerify: () => void;
+}) {
+  if (workflow.status === "scanning") {
+    return <div className="mt-4 text-sm text-muted-foreground">Scanning</div>;
+  }
+
+  if (workflow.status === "error") {
+    return <div className="mt-4 text-sm text-destructive">{workflow.message}</div>;
+  }
+
+  if (!candidate) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate font-medium">{candidate.name ?? candidate.deviceId}</span>
+        <Badge variant="warning">{formatSupportLevel(candidate.supportLevel)}</Badge>
+      </div>
+      <div className="space-y-2">
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">Stage</span>
+          <span className="text-right">{formatDiscoveryStage(candidate.nextRequiredStage)}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">RSSI</span>
+          <span>{candidate.rssi ?? "Unknown"}</span>
+        </div>
+      </div>
+      {workflow.status === "verifying" ? (
+        <div className="text-muted-foreground">Verifying printer identity</div>
+      ) : verification ? (
+        <div className="space-y-2 border-t border-border pt-3">
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Model</span>
+            <span>{verification.modelResponse ?? "Unknown"}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Firmware</span>
+            <span>{verification.firmware ?? "Unknown"}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Next</span>
+            <span className="text-right">
+              {formatDiscoveryStage(verification.nextRequiredStage)}
+            </span>
+          </div>
+          <Badge variant="warning">Printing still locked</Badge>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onVerify}
+          disabled={candidate.nextRequiredStage !== "read_only_verification"}
+        >
+          <ShieldCheck className="size-4" aria-hidden="true" />
+          Verify printer identity
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
   if (workflow.status === "running") {
     return (
@@ -412,6 +559,27 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
 
 function formatBandCount(totalBands: number): string {
   return `${totalBands} ${totalBands === 1 ? "band" : "bands"}`;
+}
+
+function formatSupportLevel(level: string): string {
+  const labels: Record<string, string> = {
+    detected_unverified: "Detected",
+    official: "Official",
+    community_verified: "Community verified",
+    experimental: "Experimental",
+    unsupported: "Unsupported"
+  };
+  return labels[level] ?? level;
+}
+
+function formatDiscoveryStage(stage: string): string {
+  const labels: Record<string, string> = {
+    read_only_verification: "Read-only verification required",
+    protocol_sanity_test: "Protocol sanity test required",
+    supported_printer_test: "Supported-printer test required",
+    unsupported: "Unsupported"
+  };
+  return labels[stage] ?? stage;
 }
 
 function formatCoverage(preview: DocumentPreviewResponse): string {

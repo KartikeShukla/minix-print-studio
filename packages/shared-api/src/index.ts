@@ -10,6 +10,18 @@ export const supportLevelSchema = z.enum([
   "unsupported"
 ]);
 
+export const printerDiscoveryStageSchema = z.enum([
+  "read_only_verification",
+  "protocol_sanity_test",
+  "supported_printer_test",
+  "unsupported"
+]);
+
+export const readOnlyVerificationStatusSchema = z.enum([
+  "read_only_verified",
+  "read_only_mismatch"
+]);
+
 export const healthResponseSchema = z.object({
   ok: z.boolean(),
   version: z.string(),
@@ -97,6 +109,38 @@ export const printJobResponseSchema = z.object({
   safeActions: z.array(z.string())
 });
 
+export const printerCandidateSchema = z.object({
+  deviceId: z.string(),
+  name: z.string().nullable(),
+  serviceUuids: z.array(z.string()),
+  rssi: z.number().int().nullable(),
+  supportLevel: supportLevelSchema,
+  candidateProfileIds: z.array(z.string()),
+  printable: z.boolean(),
+  nextRequiredStage: printerDiscoveryStageSchema,
+  reason: z.string()
+});
+
+export const printerScanResponseSchema = z.object({
+  printers: z.array(printerCandidateSchema)
+});
+
+export const readOnlyVerificationSchema = z.object({
+  status: readOnlyVerificationStatusSchema,
+  deviceId: z.string(),
+  profileId: z.string().nullable(),
+  profileSupportLevel: supportLevelSchema.nullable(),
+  modelResponse: z.string().nullable(),
+  firmware: z.string().nullable(),
+  printable: z.boolean(),
+  nextRequiredStage: printerDiscoveryStageSchema,
+  reason: z.string(),
+  services: z.array(z.string()),
+  writeCharacteristics: z.array(z.string()),
+  notifyCharacteristics: z.array(z.string()),
+  rawNotifications: z.array(z.string())
+});
+
 export const printerProfileSchema = z.object({
   id: z.string(),
   displayName: z.string(),
@@ -154,6 +198,9 @@ export type RenderSettings = z.infer<typeof renderSettingsSchema>;
 export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
+export type PrinterCandidate = z.infer<typeof printerCandidateSchema>;
+export type PrinterScanResponse = z.infer<typeof printerScanResponseSchema>;
+export type ReadOnlyVerification = z.infer<typeof readOnlyVerificationSchema>;
 export type SupportLevel = z.infer<typeof supportLevelSchema>;
 
 export type PrintPlanRequest = {

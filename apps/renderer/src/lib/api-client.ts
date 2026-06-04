@@ -4,12 +4,16 @@ import {
   healthResponseSchema,
   printJobResponseSchema,
   printPlanResponseSchema,
+  printerScanResponseSchema,
+  readOnlyVerificationSchema,
   type DocumentPreviewResponse,
   type HealthResponse,
   type PrintJobResponse,
   type PrintPlanRequest,
   type PrintPlanResponse,
   type PrintPreviewRequest,
+  type PrinterScanResponse,
+  type ReadOnlyVerification,
   type RenderSettings
 } from "@minix/shared-api";
 
@@ -26,6 +30,8 @@ export type DaemonClient = {
   ) => Promise<DocumentPreviewResponse>;
   planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
   printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
+  scanPrinters: () => Promise<PrinterScanResponse>;
+  readOnlyVerify: (deviceId: string) => Promise<ReadOnlyVerification>;
 };
 
 declare global {
@@ -73,6 +79,27 @@ export function createDaemonClient(): DaemonClient {
         },
         printJobResponseSchema.parse,
         "Daemon print job"
+      );
+    },
+    async scanPrinters() {
+      return requestDaemon(
+        "/v1/printers/scan",
+        {
+          method: "POST"
+        },
+        printerScanResponseSchema.parse,
+        "Daemon printer scan"
+      );
+    },
+    async readOnlyVerify(deviceId) {
+      return requestDaemon(
+        "/v1/printers/read-only-verify",
+        {
+          method: "POST",
+          body: { deviceId }
+        },
+        readOnlyVerificationSchema.parse,
+        "Daemon read-only printer verification"
       );
     }
   };

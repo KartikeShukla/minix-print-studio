@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   classifyDiscoveredPrinter,
   healthResponseSchema,
+  printerCandidateSchema,
   printerProfileSchema,
+  readOnlyVerificationSchema,
   seznikMiniXProfile
 } from "../src/index";
 
@@ -50,5 +52,48 @@ describe("daemon health contract", () => {
     });
 
     expect(parsed.ok).toBe(true);
+  });
+});
+
+describe("printer discovery API contracts", () => {
+  it("validates a detected but untrusted printer candidate", () => {
+    const parsed = printerCandidateSchema.parse({
+      deviceId: "mock-minix-0194",
+      name: "Seznik MiniX_0194_LE",
+      serviceUuids: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      rssi: -42,
+      supportLevel: "detected_unverified",
+      candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
+      printable: false,
+      nextRequiredStage: "read_only_verification",
+      reason: "Service UUID and name match; model query required."
+    });
+
+    expect(parsed.printable).toBe(false);
+    expect(parsed.nextRequiredStage).toBe("read_only_verification");
+  });
+
+  it("validates read-only verification without granting print permission", () => {
+    const parsed = readOnlyVerificationSchema.parse({
+      status: "read_only_verified",
+      deviceId: "mock-minix-0194",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      profileSupportLevel: "official",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      printable: false,
+      nextRequiredStage: "protocol_sanity_test",
+      reason: "Model and firmware match profile; protocol sanity test required.",
+      services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
+      notifyCharacteristics: [
+        "0000ff01-0000-1000-8000-00805f9b34fb",
+        "0000ff03-0000-1000-8000-00805f9b34fb"
+      ],
+      rawNotifications: []
+    });
+
+    expect(parsed.printable).toBe(false);
+    expect(parsed.profileSupportLevel).toBe("official");
   });
 });
