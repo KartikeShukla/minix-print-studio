@@ -46,6 +46,9 @@
 - Shared TypeScript API schemas for printer scan candidates and read-only verification responses.
 - Renderer daemon client methods for authenticated printer scan and read-only verification.
 - Renderer Scan Printers flow that displays detected candidates, runs identity verification, and shows `Printing still locked` after read-only verification.
+- Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
+- Bleak read-only connection lifecycle with async connect/disconnect, GATT service/characteristic discovery, notify subscription, and raw notification capture.
+- Read-only identity probing is injectable and intentionally does not mark real hardware verified until profile-specific model/firmware query behavior is implemented and tested.
 
 ## Current Verification
 
@@ -59,7 +62,7 @@
 
 ## Next Implementation Slices
 
-1. Bleak-backed BLE adapter and connection lifecycle with physical read-only hardware validation.
+1. Profile-backed read-only model/firmware probe plus physical hardware validation.
 2. Project/document persistence and editor canvas interactions.
 3. Persisted job history and diagnostics export.
 4. MCP runtime config handoff from Electron user data.

@@ -11,7 +11,9 @@ from minixd import __version__
 from minixd.api.jobs import create_jobs_router
 from minixd.api.printers import create_printers_router
 from minixd.api.render import create_render_router
+from minixd.ble.bleak_adapter import BleakBleAdapter
 from minixd.ble.discovery import (
+    BleAdapter,
     BleAdvertisement,
     MockBleAdapter,
     PrinterDiscoveryService,
@@ -71,9 +73,9 @@ def create_app(*, mock: bool = False) -> FastAPI:
     return app
 
 
-def _create_ble_adapter(*, profiles: list[dict[str, Any]], mock: bool) -> MockBleAdapter:
+def _create_ble_adapter(*, profiles: list[dict[str, Any]], mock: bool) -> BleAdapter:
     if not mock:
-        return MockBleAdapter()
+        return BleakBleAdapter(service_uuids=_profile_service_uuids(profiles))
 
     profile = profiles[0]
     ble = profile.get("ble")
@@ -113,3 +115,15 @@ def _create_ble_adapter(*, profiles: list[dict[str, Any]], mock: bool) -> MockBl
             )
         },
     )
+
+
+def _profile_service_uuids(profiles: list[dict[str, Any]]) -> list[str]:
+    service_uuids: list[str] = []
+    for profile in profiles:
+        ble = profile.get("ble")
+        if not isinstance(ble, dict):
+            continue
+        service_uuid = ble.get("serviceUuid")
+        if isinstance(service_uuid, str):
+            service_uuids.append(service_uuid)
+    return service_uuids
