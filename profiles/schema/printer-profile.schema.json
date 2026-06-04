@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://minix-print-studio.local/schemas/printer-profile.schema.json",
+  "title": "MiniX Print Studio Printer Profile",
+  "type": "object",
+  "required": ["id", "displayName", "supportLevel", "profileVersion", "ble", "print", "safety"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "displayName": { "type": "string", "minLength": 1 },
+    "supportLevel": {
+      "type": "string",
+      "enum": [
+        "official",
+        "community_verified",
+        "experimental",
+        "detected_unverified",
+        "unsupported"
+      ]
+    },
+    "profileVersion": { "type": "string" },
+    "manufacturer": { "type": "string" },
+    "modelResponse": { "type": "string" },
+    "observedFirmware": { "type": "array", "items": { "type": "string" } },
+    "namePrefixes": { "type": "array", "items": { "type": "string" } },
+    "ble": {
+      "type": "object",
+      "required": ["serviceUuid", "writeCharUuid", "notifyCharUuids"],
+      "properties": {
+        "serviceUuid": { "type": "string" },
+        "writeCharUuid": { "type": "string" },
+        "notifyCharUuids": { "type": "array", "items": { "type": "string" } },
+        "defaultChunkSize": { "type": "integer", "minimum": 1 },
+        "writeWithResponse": { "type": "boolean" }
+      }
+    },
+    "print": { "type": "object" },
+    "safety": { "type": "object" }
+  }
+}

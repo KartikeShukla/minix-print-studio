@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MiniX Print Studio">
+  <rect width="64" height="64" rx="12" fill="#1a746b"/>
+  <path d="M18 18h28a6 6 0 0 1 6 6v15H12V24a6 6 0 0 1 6-6Z" fill="#ffffff"/>
+  <path d="M18 39h28v13H18z" fill="#f6b342"/>
+  <path d="M22 25h20M22 31h14M22 46h20" stroke="#1f2933" stroke-width="3" stroke-linecap="round"/>
+</svg>

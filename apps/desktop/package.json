@@ -1,0 +1,26 @@
+{
+  "name": "@minix/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@minix/integration-configs": "workspace:*",
+    "@minix/renderer": "workspace:*",
+    "electron-log": "^5.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "electron": "^34.0.0",
+    "electron-vite": "^3.0.0",
+    "vite": "^6.1.0",
+    "vitest": "^3.1.4"
+  }
+}

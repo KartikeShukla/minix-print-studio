@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "minix-mcp"
+version = "0.1.0"
+description = "MCP stdio shim for MiniX Print Studio."
+readme = "../README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.10.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.14.0",
+  "pytest>=8.3.0",
+  "ruff>=0.9.0"
+]
+
+[project.scripts]
+minix-mcp = "minix_mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/minix_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["minix_mcp"]

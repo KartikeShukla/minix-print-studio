@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 48 24% 97%;
+  --foreground: 220 19% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 19% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 19% 14%;
+  --primary: 174 64% 28%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 20% 92%;
+  --secondary-foreground: 220 19% 14%;
+  --muted: 210 18% 94%;
+  --muted-foreground: 218 9% 43%;
+  --accent: 42 92% 90%;
+  --accent-foreground: 35 64% 24%;
+  --destructive: 0 72% 42%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 18% 84%;
+  --input: 215 18% 84%;
+  --ring: 174 64% 28%;
+  --success: 152 55% 31%;
+  --warning: 35 85% 38%;
+  --safety: 35 85% 38%;
+  --workspace: 210 23% 91%;
+  --radius: 0.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 960px;
+  min-height: 680px;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+.receipt-artboard {
+  display: flex;
+  min-height: 620px;
+  width: min(384px, 100%);
+  flex-direction: column;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, hsl(0 0% 95%) 1px, transparent 1px),
+    linear-gradient(hsl(0 0% 95%) 1px, transparent 1px),
+    hsl(0 0% 100%);
+  background-size: 24px 24px;
+  box-shadow: 0 18px 42px hsl(220 20% 20% / 0.16);
+}

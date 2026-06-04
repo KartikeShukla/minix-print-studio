@@ -1,0 +1,15 @@
+{
+  "profileId": "seznik-minix-s1-lyin48d-gy",
+  "requiredHardwareSuites": [
+    "read_only_identification",
+    "tiny_print_continuous",
+    "long_print_safe",
+    "long_print_tail_margin",
+    "long_print_band_boundary"
+  ],
+  "mockSuites": [
+    "missing_final_ok_after_complete_transfer",
+    "mid_band_disconnect_partial_output",
+    "between_band_disconnect_requires_user_check"
+  ]
+}

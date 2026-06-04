@@ -4,12 +4,14 @@
 !.env.example
 
 node_modules/
+.pnpm-store/
 dist/
 build/
 out/
 coverage/
 .turbo/
 .vite/
+.playwright-mcp/
 playwright-report/
 test-results/
 

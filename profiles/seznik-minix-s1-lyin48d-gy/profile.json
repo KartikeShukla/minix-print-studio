@@ -1,0 +1,53 @@
+{
+  "id": "seznik-minix-s1-lyin48d-gy",
+  "displayName": "Seznik MiniX - S1_LYiN48D_GY",
+  "supportLevel": "official",
+  "profileVersion": "1.0.0",
+  "manufacturer": "unknown-or-confirm-after-user-input",
+  "modelResponse": "S1_LYiN48D_GY",
+  "observedFirmware": ["V1.9.11"],
+  "namePrefixes": ["Seznik MiniX"],
+  "ble": {
+    "serviceUuid": "0000ff00-0000-1000-8000-00805f9b34fb",
+    "writeCharUuid": "0000ff02-0000-1000-8000-00805f9b34fb",
+    "notifyCharUuids": [
+      "0000ff01-0000-1000-8000-00805f9b34fb",
+      "0000ff03-0000-1000-8000-00805f9b34fb"
+    ],
+    "defaultChunkSize": 90,
+    "minChunkSize": 20,
+    "maxTestedChunkSize": 90,
+    "writeWithResponse": true,
+    "defaultInterChunkDelayMs": 25,
+    "flowControlNotifyCharUuid": "0000ff03-0000-1000-8000-00805f9b34fb"
+  },
+  "print": {
+    "protocol": "aiyin-gs-v0-wrapper",
+    "widthDots": 384,
+    "rowBytes": 48,
+    "bitOrder": "msb-first",
+    "blackBit": 1,
+    "defaultPaperMode": "continuous",
+    "paperModes": ["continuous", "gap_label", "black_mark"],
+    "densityModes": ["light", "medium", "dark"],
+    "defaultDensity": "medium",
+    "longPrint": {
+      "transferMode": "banded_gs_v0",
+      "longPrintThresholdDots": 1200,
+      "defaultMaxBandHeightDots": 256,
+      "appendTailBlankRowsContinuous": 160,
+      "finalAckPolicy": "required_for_confirmed_optional_for_unverified",
+      "supportsResume": false,
+      "pauseOnlyBetweenBands": true
+    }
+  },
+  "safety": {
+    "maxHeightDotsManual": 1600,
+    "maxHeightDotsAgentDirect": 1000,
+    "maxCopiesAgentDirect": 1,
+    "warnTotalBlackCoverage": 0.35,
+    "blockAgentTotalBlackCoverage": 0.45,
+    "blockBandCoverage": 0.7,
+    "bandHeightDots": 64
+  }
+}
