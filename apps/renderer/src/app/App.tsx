@@ -72,6 +72,7 @@ import {
   desktopAgentIntegrationInstaller,
   loadAgentIntegrationPreview,
   type AgentIntegrationConnectionTestResult,
+  type AgentIntegrationExportResult,
   type AgentIntegrationInstallResult,
   type AgentIntegrationInstaller,
   type AgentIntegrationPreview,
@@ -137,7 +138,7 @@ type AgentIntegrationMutationWorkflow =
   | { status: "idle" }
   | {
       status: "running";
-      action: "install" | "uninstall" | "test";
+      action: "install" | "uninstall" | "test" | "export";
       targetId: AgentIntegrationTargetId;
     }
   | {
@@ -153,8 +154,14 @@ type AgentIntegrationMutationWorkflow =
       result: AgentIntegrationConnectionTestResult;
     }
   | {
+      status: "success";
+      action: "export";
+      targetId: AgentIntegrationTargetId;
+      result: AgentIntegrationExportResult;
+    }
+  | {
       status: "error";
-      action: "install" | "uninstall" | "test";
+      action: "install" | "uninstall" | "test" | "export";
       targetId: AgentIntegrationTargetId;
       message: string;
     };
@@ -773,6 +780,40 @@ export function App({
     [integrationInstaller]
   );
 
+  const exportAgentIntegrationTarget = useCallback(
+    async (target: AgentIntegrationPreviewTarget) => {
+      if (!target.exportable) {
+        return;
+      }
+      setAgentIntegrationMutation({
+        status: "running",
+        action: "export",
+        targetId: target.id
+      });
+      try {
+        const exportBundle = integrationInstaller.exportBundle;
+        if (!exportBundle) {
+          throw new Error("Agent integration export is unavailable");
+        }
+        const result = await exportBundle(target.id);
+        setAgentIntegrationMutation({
+          status: "success",
+          action: "export",
+          targetId: target.id,
+          result
+        });
+      } catch (error: unknown) {
+        setAgentIntegrationMutation({
+          status: "error",
+          action: "export",
+          targetId: target.id,
+          message: error instanceof Error ? error.message : "Export failed"
+        });
+      }
+    },
+    [integrationInstaller]
+  );
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -1008,6 +1049,7 @@ export function App({
               onInstall={installAgentIntegrationTarget}
               onUninstall={uninstallAgentIntegrationTarget}
               onTest={testAgentIntegrationTarget}
+              onExport={exportAgentIntegrationTarget}
             />
 
             <RecentJobsPanel
@@ -1184,7 +1226,8 @@ function AgentIntegrationsPanel({
   onCopy,
   onInstall,
   onUninstall,
-  onTest
+  onTest,
+  onExport
 }: {
   workflow: AgentIntegrationWorkflow;
   copiedTargetId: AgentIntegrationTargetId | null;
@@ -1194,6 +1237,7 @@ function AgentIntegrationsPanel({
   onInstall: (target: AgentIntegrationPreviewTarget) => void;
   onUninstall: (target: AgentIntegrationPreviewTarget) => void;
   onTest: (target: AgentIntegrationPreviewTarget) => void;
+  onExport: (target: AgentIntegrationPreviewTarget) => void;
 }) {
   return (
     <section className="border-t border-border p-4">
@@ -1260,6 +1304,20 @@ function AgentIntegrationsPanel({
                   <Wifi className="size-4" aria-hidden="true" />
                   Test
                 </Button>
+                {target.exportable ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    aria-label={`Export ${target.name} .mcpb`}
+                    onClick={() => onExport(target)}
+                    disabled={mutation.status === "running" && mutation.targetId === target.id}
+                  >
+                    <Download className="size-4" aria-hidden="true" />
+                    Export .mcpb
+                  </Button>
+                ) : null}
                 {target.installable ? (
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -1300,7 +1358,14 @@ function AgentIntegrationsPanel({
                 <div className="mt-2 text-xs font-medium text-success">
                   {mutation.action === "test"
                     ? mutation.result.message
-                    : `${mutation.action === "install" ? "Installed" : "Uninstalled"} ${target.name} config`}
+                    : mutation.action === "export"
+                      ? `Exported ${target.name} .mcpb`
+                      : `${mutation.action === "install" ? "Installed" : "Uninstalled"} ${target.name} config`}
+                  {mutation.action === "export" ? (
+                    <div className="mt-1 break-all font-normal text-muted-foreground">
+                      {mutation.result.targetPath}
+                    </div>
+                  ) : null}
                 </div>
               ) : mutation.status === "error" && mutation.targetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-destructive">

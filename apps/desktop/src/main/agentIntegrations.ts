@@ -23,6 +23,7 @@ export type AgentIntegrationPreviewTarget = {
   configPath: string;
   format: "json" | "shell" | "toml";
   installable: boolean;
+  exportable?: boolean;
   content: string;
 };
 
@@ -71,6 +72,7 @@ export function buildAgentIntegrationPreview({
         configPath: getClaudeDesktopConfigPath(platform),
         format: "json",
         installable: true,
+        exportable: true,
         content: JSON.stringify(buildClaudeDesktopConfig(shimPath, options), null, 2)
       },
       {

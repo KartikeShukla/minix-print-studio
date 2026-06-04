@@ -216,6 +216,66 @@ describe("MiniX Print Studio shell", () => {
     expect(await screen.findByText("Codex integration prerequisites are ready")).toBeInTheDocument();
   });
 
+  it("exports a Claude Desktop MCPB bundle from the target card", async () => {
+    const exportBundle = vi.fn().mockResolvedValue({
+      targetId: "claude-desktop",
+      targetPath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/agent-integrations/minix-print-studio-claude-desktop.mcpb",
+      createdAt: "2026-06-05T00:02:00.000Z",
+      entries: ["manifest.json", "server/minix-mcp-bridge", "README.md"]
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        agentIntegrationProvider={async () => ({
+          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          runtimeFilePath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
+          targets: [
+            {
+              id: "claude-desktop",
+              name: "Claude Desktop",
+              configPath:
+                "~/Library/Application Support/Claude/claude_desktop_config.json",
+              format: "json",
+              installable: true,
+              exportable: true,
+              content:
+                '{"mcpServers":{"minix-print":{"command":"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"}}}'
+            }
+          ]
+        })}
+        agentIntegrationInstaller={{
+          install: vi.fn(),
+          uninstall: vi.fn(),
+          testConnection: vi.fn(),
+          exportBundle
+        }}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export Claude Desktop .mcpb" }));
+
+    await waitFor(() => {
+      expect(exportBundle).toHaveBeenCalledWith("claude-desktop");
+    });
+    expect(await screen.findByText("Exported Claude Desktop .mcpb")).toBeInTheDocument();
+    expect(screen.getByText(/minix-print-studio-claude-desktop\.mcpb/)).toBeInTheDocument();
+  });
+
   it("requests a daemon preview and print plan before enabling print", async () => {
     const createDocumentPreview = vi.fn().mockResolvedValue({
       previewId: "prev_ready",

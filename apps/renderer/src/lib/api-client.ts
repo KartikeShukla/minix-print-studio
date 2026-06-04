@@ -1,6 +1,7 @@
 import type { PrintDocument } from "@minix/design-model";
 import type {
   AgentIntegrationConnectionTestResult,
+  AgentIntegrationExportResult,
   AgentIntegrationInstallResult,
   AgentIntegrationPreview,
   AgentIntegrationTargetId
@@ -59,6 +60,9 @@ declare global {
       testAgentIntegrationConnection?: (
         targetId: AgentIntegrationTargetId
       ) => Promise<AgentIntegrationConnectionTestResult>;
+      exportAgentIntegrationBundle?: (
+        targetId: AgentIntegrationTargetId
+      ) => Promise<AgentIntegrationExportResult>;
     };
   }
 }

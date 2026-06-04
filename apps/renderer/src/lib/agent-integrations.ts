@@ -11,6 +11,7 @@ export type AgentIntegrationPreviewTarget = {
   configPath: string;
   format: "json" | "shell" | "toml";
   installable?: boolean;
+  exportable?: boolean;
   content: string;
 };
 
@@ -43,12 +44,22 @@ export type AgentIntegrationConnectionTestResult = {
   missing: string[];
 };
 
+export type AgentIntegrationExportResult = {
+  targetId: "claude-desktop";
+  targetPath: string;
+  createdAt: string;
+  entries: string[];
+};
+
 export type AgentIntegrationInstaller = {
   install: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
   uninstall: (targetId: AgentIntegrationTargetId) => Promise<AgentIntegrationInstallResult>;
   testConnection: (
     targetId: AgentIntegrationTargetId
   ) => Promise<AgentIntegrationConnectionTestResult>;
+  exportBundle?: (
+    targetId: AgentIntegrationTargetId
+  ) => Promise<AgentIntegrationExportResult>;
 };
 
 export async function loadAgentIntegrationPreview(): Promise<AgentIntegrationPreview | null> {
@@ -76,5 +87,12 @@ export const desktopAgentIntegrationInstaller: AgentIntegrationInstaller = {
       throw new Error("Agent integration connection test is unavailable");
     }
     return testConnection(targetId);
+  },
+  async exportBundle(targetId) {
+    const exportBundle = window.minix?.exportAgentIntegrationBundle;
+    if (!exportBundle) {
+      throw new Error("Agent integration export is unavailable");
+    }
+    return exportBundle(targetId);
   }
 };

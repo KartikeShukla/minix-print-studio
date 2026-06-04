@@ -27,6 +27,11 @@ describe("agent integration previews", () => {
       "claude-desktop",
       "opencode"
     ]);
+    expect(preview.targets.find((target) => target.id === "claude-desktop")).toEqual(
+      expect.objectContaining({
+        exportable: true
+      })
+    );
     expect(preview.targets[0]).toEqual(
       expect.objectContaining({
         id: "codex",

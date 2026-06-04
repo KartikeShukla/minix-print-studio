@@ -12,6 +12,7 @@ import {
   uninstallAgentIntegrationConfig
 } from "./integrationInstaller";
 import { ensureMcpShim } from "./mcpShim";
+import { exportClaudeDesktopMcpb } from "./mcpbExport";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -99,6 +100,15 @@ ipcMain.handle("agent-integrations:test", (_event, targetId: AgentIntegrationTar
     repoRoot: getRepoRoot()
   })
 );
+ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentIntegrationTargetId) => {
+  if (targetId !== "claude-desktop") {
+    throw new Error(`${targetId} does not support MCPB export`);
+  }
+  return exportClaudeDesktopMcpb({
+    userDataPath: app.getPath("userData"),
+    repoRoot: getRepoRoot()
+  });
+});
 
 function getAgentIntegrationTarget(targetId: AgentIntegrationTargetId, userDataPath: string) {
   const preview = buildAgentIntegrationPreview({ userDataPath });
