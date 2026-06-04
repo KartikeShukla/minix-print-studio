@@ -21,10 +21,14 @@
 
 - AiYin/LuckPrinter command builder for density, paper mode, wake, enable, raster, feed, and stop commands.
 - MSB-first raster packing/unpacking helpers with coverage calculation.
+- Pillow-backed canonical renderer prototype for document JSON.
+- Deterministic rendering coverage for rectangle and text elements.
+- Exact packed-raster test for a 384-dot document fixture.
 - Print planner that appends continuous-paper tail rows and segments raster data into profile-sized bands.
 - Virtual reconstruction coverage for a 10,000-dot raster.
 - Preview store that binds document hash, render settings hash, raster hash, and approval token.
 - `/v1/render/preview` endpoint that creates preview-bound approval artifacts.
+- `/v1/render/document-preview` endpoint that renders document JSON through the daemon before creating a preview-bound approval artifact.
 - `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
 
 ## Current Verification

@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from minixd.render.canonical import document_hash, render_document, render_settings_hash
 from minixd.render.preview_store import PreviewRecord, PreviewStore
 
 
@@ -18,6 +19,14 @@ class RenderPreviewRequest(BaseModel):
     height_dots: Annotated[int, Field(alias="heightDots", gt=0)]
     raster_base64: Annotated[str, Field(alias="rasterBase64", min_length=1)]
     safety: dict[str, object]
+
+
+class RenderDocumentPreviewRequest(BaseModel):
+    document: dict[str, object]
+    render_settings: Annotated[
+        dict[str, object],
+        Field(alias="renderSettings", default_factory=dict),
+    ]
 
 
 def create_render_router(*, preview_store: PreviewStore) -> APIRouter:
@@ -34,6 +43,26 @@ def create_render_router(*, preview_store: PreviewStore) -> APIRouter:
             width_dots=request.width_dots,
             height_dots=request.height_dots,
             safety=request.safety,
+        )
+        return _serialize_preview_record(record, include_approval_token=True)
+
+    @router.post("/document-preview")
+    def render_document_preview(request: RenderDocumentPreviewRequest) -> dict[str, object]:
+        rendered = render_document(request.document)
+        target = request.document.get("target")
+        if not isinstance(target, dict):
+            raise HTTPException(status_code=422, detail="document.target is required")
+        profile_id = target.get("profileId")
+        if not isinstance(profile_id, str):
+            raise HTTPException(status_code=422, detail="document.target.profileId is required")
+        record = preview_store.create(
+            document_hash=document_hash(request.document),
+            render_settings_hash=render_settings_hash(request.render_settings),
+            raster=rendered.packed_raster,
+            profile_id=profile_id,
+            width_dots=rendered.width_dots,
+            height_dots=rendered.height_dots,
+            safety=rendered.safety,
         )
         return _serialize_preview_record(record, include_approval_token=True)
 
