@@ -2,6 +2,7 @@ import io
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from minixd.hardware_test_cli import HttpResponse, run
 
@@ -131,3 +132,73 @@ def test_hardware_test_cli_preserves_daemon_error_detail() -> None:
 
     assert exit_code == 2
     assert stderr.getvalue().strip() == "Bluetooth unavailable: Bluetooth is unsupported"
+
+
+def test_hardware_test_cli_inspects_valid_stage_a_artifact(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(artifact_path)
+    stdout = io.StringIO()
+
+    exit_code = run(["inspect-artifact", str(artifact_path)], stdout=stdout)
+
+    assert exit_code == 0
+    assert json.loads(stdout.getvalue()) == {
+        "status": "valid_stage_a_artifact",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "nextRequiredStage": "protocol_sanity_test",
+    }
+
+
+def test_hardware_test_cli_rejects_artifact_that_sent_print_commands(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(
+        artifact_path,
+        transfer_manifest={
+            "stage": "read_only_verification",
+            "deviceId": "mock-minix-0194",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "nextRequiredStage": "protocol_sanity_test",
+            "printCommandsSent": True,
+            "rasterBytesIncluded": False,
+        },
+    )
+    stderr = io.StringIO()
+
+    exit_code = run(["inspect-artifact", str(artifact_path)], stderr=stderr)
+
+    assert exit_code == 2
+    assert stderr.getvalue().strip() == "artifact is not read-only safe"
+
+
+def _write_stage_a_artifact(
+    artifact_path: Path,
+    *,
+    transfer_manifest: dict[str, object] | None = None,
+) -> None:
+    manifest = transfer_manifest or {
+        "stage": "read_only_verification",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "nextRequiredStage": "protocol_sanity_test",
+        "printCommandsSent": False,
+        "rasterBytesIncluded": False,
+    }
+    with ZipFile(artifact_path, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("device.json", json.dumps({"deviceId": "mock-minix-0194"}))
+        archive.writestr("profile.json", json.dumps({"id": "seznik-minix-s1-lyin48d-gy"}))
+        archive.writestr("ble-discovery.json", "{}")
+        archive.writestr("model-response.bin", b"S1_LYiN48D_GY")
+        archive.writestr("firmware-response.bin", b"V1.9.11")
+        archive.writestr("notifications.log", "")
+        archive.writestr("commands.log", "")
+        archive.writestr("print-transfer-manifest.json", json.dumps(manifest))
+        archive.writestr("band-manifest.json", json.dumps({"bands": []}))
+        archive.writestr("finalizer-result.json", json.dumps({"status": "not_applicable"}))
+        archive.writestr(
+            "safety-report.json",
+            json.dumps({"printingLocked": True, "certificationComplete": False}),
+        )
+        archive.writestr("user-confirmation.json", "{}")
+        archive.writestr("app-version.json", "{}")
+        archive.writestr("README.md", "Stage A")

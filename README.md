@@ -28,6 +28,7 @@ Stage A hardware validation against a running daemon can be driven from the repo
 ```bash
 scripts/hardware-test.sh scan
 scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir ./hardware-artifacts
+scripts/hardware-test.sh inspect-artifact ./hardware-artifacts/hardware-test-<timestamp>.zip
 ```
 
 ## Status

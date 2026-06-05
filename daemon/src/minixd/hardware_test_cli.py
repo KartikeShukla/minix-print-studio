@@ -10,6 +10,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO, cast
+from zipfile import BadZipFile, ZipFile
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,24 @@ type HttpTransport = Callable[[str, str, bytes | None, Mapping[str, str], float]
 
 class HardwareTestCliError(RuntimeError):
     """Raised when the hardware-test CLI cannot complete the requested operation."""
+
+
+STAGE_A_ARTIFACT_REQUIRED_FILES = (
+    "device.json",
+    "profile.json",
+    "ble-discovery.json",
+    "model-response.bin",
+    "firmware-response.bin",
+    "notifications.log",
+    "commands.log",
+    "print-transfer-manifest.json",
+    "band-manifest.json",
+    "finalizer-result.json",
+    "safety-report.json",
+    "user-confirmation.json",
+    "app-version.json",
+    "README.md",
+)
 
 
 class HardwareTestClient:
@@ -127,6 +146,16 @@ def run(
             )
             stdout.write(f"{artifact_path}\n")
             return 0
+        if args.command == "inspect-artifact":
+            stdout.write(
+                json.dumps(
+                    inspect_stage_a_artifact(Path(args.artifact_path)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            stdout.write("\n")
+            return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
@@ -169,7 +198,90 @@ def _build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Directory for the hardware-test ZIP artifact.",
     )
+
+    inspect_parser = subparsers.add_parser(
+        "inspect-artifact",
+        help="Inspect a Stage A hardware-test ZIP artifact without contacting the daemon.",
+    )
+    inspect_parser.add_argument("artifact_path", help="Path to a Stage A hardware-test ZIP.")
     return parser
+
+
+def inspect_stage_a_artifact(artifact_path: Path) -> dict[str, object]:
+    try:
+        with ZipFile(artifact_path) as archive:
+            _require_stage_a_artifact_files(archive)
+            transfer_manifest = _read_zip_json_object(
+                archive,
+                "print-transfer-manifest.json",
+            )
+            safety_report = _read_zip_json_object(archive, "safety-report.json")
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("artifact not found") from exc
+    except BadZipFile as exc:
+        raise HardwareTestCliError("artifact is not a ZIP file") from exc
+
+    _validate_read_only_safety(transfer_manifest, safety_report)
+    return {
+        "status": "valid_stage_a_artifact",
+        "deviceId": _required_json_string(
+            transfer_manifest,
+            "deviceId",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": _required_json_string(
+            transfer_manifest,
+            "profileId",
+            "print-transfer-manifest.json",
+        ),
+        "nextRequiredStage": _required_json_string(
+            transfer_manifest,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        ),
+    }
+
+
+def _require_stage_a_artifact_files(archive: ZipFile) -> None:
+    artifact_files = set(archive.namelist())
+    for filename in STAGE_A_ARTIFACT_REQUIRED_FILES:
+        if filename not in artifact_files:
+            raise HardwareTestCliError(f"artifact missing required file: {filename}")
+
+
+def _read_zip_json_object(archive: ZipFile, filename: str) -> dict[str, object]:
+    try:
+        decoded = json.loads(archive.read(filename).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HardwareTestCliError(f"artifact file is invalid JSON: {filename}") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError(f"artifact file is not a JSON object: {filename}")
+    return cast(dict[str, object], decoded)
+
+
+def _validate_read_only_safety(
+    transfer_manifest: Mapping[str, object],
+    safety_report: Mapping[str, object],
+) -> None:
+    if (
+        transfer_manifest.get("stage") != "read_only_verification"
+        or transfer_manifest.get("printCommandsSent") is not False
+        or transfer_manifest.get("rasterBytesIncluded") is not False
+        or safety_report.get("printingLocked") is not True
+        or safety_report.get("certificationComplete") is not False
+    ):
+        raise HardwareTestCliError("artifact is not read-only safe")
+
+
+def _required_json_string(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> str:
+    field_value = value.get(field)
+    if not isinstance(field_value, str) or not field_value:
+        raise HardwareTestCliError(f"artifact missing required field: {filename}.{field}")
+    return field_value
 
 
 def urllib_transport(
