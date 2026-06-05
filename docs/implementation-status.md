@@ -37,7 +37,7 @@
 - Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Release evidence validator can check a downloaded manual workflow run for successful metadata, platform-named macOS/Windows artifacts, checksum coverage, bundled sidecars, and forbidden runtime/scratch paths before making Windows release claims.
 - Private GitHub remote `KartikeShukla/minix-print-studio` is configured for pre-publication validation, with `main` and `codex/bootstrap-minix-print-studio` pushed.
-- Manual Release Package workflow run `27013383603` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py`.
+- Manual Release Package workflow run `27020656293` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py` with the Bluetooth usage-description gate enabled.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
 - CodeQL workflow scans JavaScript/TypeScript and Python with the `security-extended` query suite on pull requests, pushes to `main`, weekly schedule, and manual dispatch.
 - CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, opt into GitHub's Node 24 JavaScript action runtime, and open-source readiness validation rejects missing or `write-all` workflow permissions. CodeQL includes `actions: read` for workflow-run metadata plus `security-events: write` for scan uploads, and skips while the repository is private unless `MINIX_ENABLE_PRIVATE_CODEQL=true`.
@@ -163,7 +163,7 @@
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.
-- Earlier GitHub Release Package workflow run `27013383603` on `codex/bootstrap-minix-print-studio`: macOS unsigned package completed in 2m20s, Windows unsigned package completed in 5m30s, and downloaded artifacts passed the then-current `node scripts/run_python.mjs scripts/validate_release_evidence.py`; capture fresh release evidence after the Bluetooth usage-description gate before a public release claim.
+- GitHub Release Package workflow run `27020656293` on `codex/bootstrap-minix-print-studio`: macOS unsigned package completed in 1m57s, Windows unsigned package completed in 3m21s, and downloaded artifacts passed `node scripts/run_python.mjs scripts/validate_release_evidence.py` including bundled sidecars, checksum manifests, forbidden-path exclusions, and macOS Bluetooth usage descriptions.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`
@@ -211,7 +211,7 @@
 - TDD red/green checks requiring the release notes template in both open-source readiness and tracked source-package validation.
 - TDD red/green checks requiring community issue and pull request templates in open-source readiness and tracked source-package validation.
 - Unsigned macOS package smoke via `pnpm package:mac`; electron-builder produced `dist/release/mac-arm64` with bundled sidecars and skipped code signing because `identity` is `null`.
-- Earlier unsigned Windows directory package scaffold smoke via `pnpm package:win` produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled before sidecar binaries were added to the package contract. Current Windows sidecar package validation is covered by Release Package workflow run `27013383603`.
+- Earlier unsigned Windows directory package scaffold smoke via `pnpm package:win` produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled before sidecar binaries were added to the package contract. Current Windows sidecar package validation is covered by Release Package workflow run `27020656293`.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
