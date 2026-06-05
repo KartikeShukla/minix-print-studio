@@ -51,6 +51,13 @@ def test_source_package_check_requires_sidecar_build_script() -> None:
     assert Path("scripts/build_sidecars.py") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_release_package_workflow_and_python_runner() -> None:
+    validator = _load_validator()
+
+    assert Path(".github/workflows/release-package.yml") in validator.REQUIRED_SOURCE_PATHS
+    assert Path("scripts/run_python.mjs") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

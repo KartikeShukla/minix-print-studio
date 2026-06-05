@@ -8,7 +8,7 @@ physical validation before a stable public release.
 | Platform | Status | Notes |
 | --- | --- | --- |
 | macOS | Development target | Unsigned local Electron package includes target-host daemon and MCP sidecars; signing and notarization are not complete. |
-| Windows | Planned build target | Package script builds Windows sidecars on Windows only; Windows-runner validation, installer packaging, and signing are pending. |
+| Windows | Planned build target | Release package workflow runs `pnpm package:win` on Windows; artifact evidence, installer packaging, and signing are pending. |
 | Linux | Developer-only | Not a first supported desktop release target. |
 
 ## Printer Profiles

@@ -18,7 +18,8 @@ not yet a stable public installer.
 - Daemon and MCP sidecar binary production and package inclusion are implemented
   for target-host builds.
 - Windows sidecar package validation must run on a Windows runner because
-  PyInstaller does not cross-compile.
+  PyInstaller does not cross-compile; the workflow exists, but artifact evidence
+  from a completed run is still pending.
 - macOS signing and notarization are not configured.
 - Windows installer packaging and signing are not implemented.
 - Linux is not a supported first release target.

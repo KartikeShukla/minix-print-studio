@@ -7,8 +7,8 @@ from pathlib import Path
 
 
 ROOT_REQUIRED_PACKAGE_SCRIPTS = {
-    "release-package-check": "python3 scripts/validate_release_packaging.py",
-    "build:sidecars": "python3 scripts/build_sidecars.py",
+    "release-package-check": "node scripts/run_python.mjs scripts/validate_release_packaging.py",
+    "build:sidecars": "node scripts/run_python.mjs scripts/build_sidecars.py",
     "package:mac": "pnpm --filter @minix/desktop package:mac",
     "package:win": "pnpm --filter @minix/desktop package:win",
 }
@@ -19,6 +19,7 @@ DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
+RELEASE_PACKAGE_WORKFLOW_PATH = Path(".github/workflows/release-package.yml")
 BUILDER_REQUIRED_SNIPPETS = (
     "appId: org.minix.printstudio",
     "productName: MiniX Print Studio",
@@ -41,6 +42,27 @@ PRIVATE_PATH_MARKERS = (
     "/Users/",
     "/home/",
     "C:\\Users\\",
+)
+
+RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
+    ("pnpm/action-setup@v4", "release package workflow missing pnpm setup"),
+    ("actions/setup-node@v4", "release package workflow missing Node setup"),
+    ("actions/setup-python@v5", "release package workflow missing Python setup"),
+    (
+        "pnpm install --frozen-lockfile",
+        "release package workflow missing command: pnpm install --frozen-lockfile",
+    ),
+    (
+        "python -m pip install -e daemon[dev] -e mcp[dev]",
+        "release package workflow missing command: "
+        "python -m pip install -e daemon[dev] -e mcp[dev]",
+    ),
+    (
+        "pnpm release-package-check",
+        "release package workflow missing command: pnpm release-package-check",
+    ),
+    ("pnpm package:mac", "release package workflow missing command: pnpm package:mac"),
+    ("pnpm package:win", "release package workflow missing command: pnpm package:win"),
 )
 
 
@@ -81,6 +103,16 @@ def validate_repository(root: Path) -> list[str]:
     for snippet in BUILDER_REQUIRED_SNIPPETS:
         if snippet not in text:
             issues.append(f"electron-builder config missing required setting: {snippet}")
+
+    release_workflow = root / RELEASE_PACKAGE_WORKFLOW_PATH
+    if not release_workflow.is_file():
+        issues.append(f"missing required file: {RELEASE_PACKAGE_WORKFLOW_PATH.as_posix()}")
+    else:
+        issues.extend(
+            validate_release_package_workflow_text(
+                release_workflow.read_text(encoding="utf-8")
+            )
+        )
     return issues
 
 
@@ -116,6 +148,20 @@ def validate_builder_config_text(text: str) -> list[str]:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
             break
+    return issues
+
+
+def validate_release_package_workflow_text(text: str) -> list[str]:
+    issues: list[str] = []
+    if "runs-on: macos-latest" not in text and "os: macos-latest" not in text:
+        issues.append("release package workflow missing macOS runner")
+    if "runs-on: windows-latest" not in text and "os: windows-latest" not in text:
+        issues.append("release package workflow missing Windows runner")
+    issues.extend(
+        issue
+        for snippet, issue in RELEASE_WORKFLOW_REQUIRED_SNIPPETS
+        if snippet not in text
+    )
     return issues
 
 

@@ -28,6 +28,8 @@
 - PyInstaller sidecar build script creates one-file daemon and MCP binaries under `dist/sidecars` using the repo virtualenv when available and a workspace-local PyInstaller cache.
 - Daemon sidecar binaries bundle the public printer profile data and resolve profiles from `MINIX_PROFILE_ROOT`, PyInstaller's bundle root, or the source tree.
 - Electron package commands build target-specific sidecars before packaging and include them as `resources/sidecars`; cross-platform sidecar builds are rejected because PyInstaller does not cross-compile.
+- Release package workflow defines unsigned macOS and Windows package smokes on native GitHub Actions runners so Windows PyInstaller sidecar validation can run on Windows instead of a cross-compile path.
+- Root Python-backed pnpm scripts use a cross-platform Node launcher that prefers `MINIX_PYTHON`, the repo virtualenv, then platform Python commands.
 
 ### Daemon Core Slice
 
@@ -126,6 +128,7 @@
 - `pnpm release-package-check`
 - `pnpm build:sidecars --target-platform darwin`
 - `pnpm package:mac`
+- Release package workflow contract validation for `macos-latest`, `windows-latest`, sidecar Python dependency setup, and `pnpm package:mac` / `pnpm package:win`.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`
@@ -177,6 +180,6 @@
 
 ## Next Implementation Slices
 
-1. Run `pnpm package:win` on a Windows runner to validate Windows PyInstaller sidecars and package inclusion.
+1. Trigger the release package workflow and capture the Windows `pnpm package:win` artifact evidence from a Windows runner.
 2. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
 3. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.

@@ -40,6 +40,14 @@ def test_release_packaging_check_requires_packaging_scripts() -> None:
     ]
 
 
+def test_release_packaging_check_requires_cross_platform_python_runner() -> None:
+    validator = _load_validator()
+
+    assert validator.ROOT_REQUIRED_PACKAGE_SCRIPTS["build:sidecars"].startswith(
+        "node scripts/run_python.mjs "
+    )
+
+
 def test_release_packaging_check_requires_windows_x64_package_command() -> None:
     validator = _load_validator()
     current_host_arch_command = (
@@ -57,6 +65,35 @@ def test_release_packaging_check_requires_windows_x64_package_command() -> None:
     )
 
     assert issues == ["apps/desktop/package.json missing package:win script"]
+
+
+def test_release_packaging_check_requires_windows_package_workflow() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        """
+name: Release Package
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm package:mac
+"""
+    )
+
+    assert issues == [
+        "release package workflow missing Windows runner",
+        "release package workflow missing Node setup",
+        "release package workflow missing Python setup",
+        "release package workflow missing command: pnpm install --frozen-lockfile",
+        "release package workflow missing command: "
+        "python -m pip install -e daemon[dev] -e mcp[dev]",
+        "release package workflow missing command: pnpm release-package-check",
+        "release package workflow missing command: pnpm package:win",
+    ]
 
 
 def test_release_packaging_check_requires_sidecar_resources() -> None:

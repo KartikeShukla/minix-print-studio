@@ -16,6 +16,7 @@ REQUIRED_FILES = (
     Path("pnpm-workspace.yaml"),
     Path("turbo.json"),
     Path(".github/workflows/ci.yml"),
+    Path(".github/workflows/release-package.yml"),
 )
 
 REQUIRED_DOCS = (
@@ -59,9 +60,9 @@ SHAREABLE_TEXT_GLOBS = (
 )
 
 REQUIRED_PACKAGE_SCRIPTS = {
-    "open-source-check": "python3 scripts/validate_open_source_readiness.py",
-    "source-package-check": "python3 scripts/validate_source_package.py",
-    "release-package-check": "python3 scripts/validate_release_packaging.py",
+    "open-source-check": "node scripts/run_python.mjs scripts/validate_open_source_readiness.py",
+    "source-package-check": "node scripts/run_python.mjs scripts/validate_source_package.py",
+    "release-package-check": "node scripts/run_python.mjs scripts/validate_release_packaging.py",
 }
 
 REQUIRED_NON_HARDWARE_GATE_COMMANDS = (

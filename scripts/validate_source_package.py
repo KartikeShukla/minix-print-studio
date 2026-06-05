@@ -15,6 +15,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("pnpm-lock.yaml"),
     Path("pnpm-workspace.yaml"),
     Path("turbo.json"),
+    Path(".github/workflows/release-package.yml"),
     Path("docs/architecture.md"),
     Path("docs/release.md"),
     Path("docs/release-notes-template.md"),
@@ -22,6 +23,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("docs/known-limitations.md"),
     Path("apps/desktop/electron-builder.yml"),
     Path("scripts/validate_release_packaging.py"),
+    Path("scripts/run_python.mjs"),
     Path("scripts/build_sidecars.py"),
 )
 

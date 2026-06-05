@@ -33,12 +33,17 @@ Use `darwin` on macOS and `win32` on Windows. PyInstaller does not
 cross-compile, so sidecar builds must run on the same operating system as the
 package target.
 
+The release package workflow at `.github/workflows/release-package.yml` runs
+unsigned package smokes on native macOS and Windows runners. Use that workflow to
+validate Windows sidecar binaries and package inclusion before making Windows
+release claims.
+
 ## Packaging Targets
 
 - macOS: unsigned local Electron package via `pnpm package:mac`; signed release
   build and notarization before stable release.
-- Windows: unsigned local Electron package via `pnpm package:win` on a Windows
-  runner; signed installer before stable release.
+- Windows: unsigned Electron package via `pnpm package:win` on a Windows runner;
+  signed installer before stable release.
 - Daemon and MCP sidecars: built with PyInstaller into `dist/sidecars` and
   included in the packaged app as `resources/sidecars`; the daemon sidecar
   bundles the public printer profile data it needs at startup.

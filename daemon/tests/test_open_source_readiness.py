@@ -73,7 +73,9 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
 
     issues = validator.validate_package_scripts(
         {
-            "open-source-check": "python3 scripts/validate_open_source_readiness.py",
+            "open-source-check": (
+                "node scripts/run_python.mjs scripts/validate_open_source_readiness.py"
+            ),
         }
     )
 
@@ -81,6 +83,14 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
         "package.json missing source-package-check script",
         "package.json missing release-package-check script",
     ]
+
+
+def test_open_source_readiness_check_requires_cross_platform_python_runner() -> None:
+    validator = _load_validator()
+
+    assert validator.REQUIRED_PACKAGE_SCRIPTS["open-source-check"].startswith(
+        "node scripts/run_python.mjs "
+    )
 
 
 def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> None:
