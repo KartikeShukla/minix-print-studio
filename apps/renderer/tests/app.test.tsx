@@ -1073,4 +1073,66 @@ describe("MiniX Print Studio shell", () => {
     expect(undo).toBeEnabled();
     expect(redo).toBeDisabled();
   });
+
+  it("loads and saves projects through the daemon project API", async () => {
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_saved",
+          name: "Saved checklist",
+          documentId: "doc_saved",
+          updatedAt: "2026-06-05T00:00:00Z"
+        }
+      ]
+    });
+    const createProject = vi.fn().mockResolvedValue({
+      projectId: "prj_new",
+      name: "Untitled print",
+      document: {
+        id: "doc_new"
+      },
+      createdAt: "2026-06-05T00:01:00Z",
+      updatedAt: "2026-06-05T00:01:00Z"
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          createProject
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+
+    expect(await screen.findByText("Saved checklist")).toBeInTheDocument();
+    expect(listProjects).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+
+    await waitFor(() => {
+      expect(createProject).toHaveBeenCalledWith({
+        name: "Untitled print",
+        document: expect.objectContaining({
+          title: "Untitled print",
+          target: expect.objectContaining({
+            profileId: "seznik-minix-s1-lyin48d-gy"
+          })
+        })
+      });
+    });
+    expect(await screen.findByText("Saved project prj_new")).toBeInTheDocument();
+  });
 });

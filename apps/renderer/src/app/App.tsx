@@ -11,6 +11,7 @@ import {
   Download,
   FileSearch,
   FileText,
+  FolderOpen,
   Image as ImageIcon,
   Layers3,
   MousePointer2,
@@ -18,6 +19,7 @@ import {
   QrCode,
   Redo2,
   RotateCcw,
+  Save,
   ScanSearch,
   ShieldCheck,
   Square,
@@ -62,6 +64,8 @@ import type {
   DiagnosticsExportResponse,
   DocumentPreviewResponse,
   HealthResponse,
+  ProjectResponse,
+  ProjectSummary,
   PrintJobResponse,
   PrintPlanResponse,
   PrinterCandidate,
@@ -101,6 +105,17 @@ type AppDaemonClient = Pick<
   | "readOnlyVerify"
   | "exportDiagnostics"
   | "exportHardwareTest"
+> &
+  Partial<
+    Pick<
+      DaemonClient,
+      | "listProjects"
+      | "createProject"
+      | "getProject"
+      | "updateProject"
+      | "deleteProject"
+      | "uploadProjectAsset"
+    >
 >;
 
 export type AppProps = {
@@ -192,6 +207,14 @@ type PrinterWorkflow =
   | { status: "verified"; candidates: PrinterCandidate[]; verification: ReadOnlyVerification }
   | { status: "error"; message: string };
 
+type ProjectWorkflow =
+  | { status: "idle"; projects: ProjectSummary[] }
+  | { status: "loading"; projects: ProjectSummary[] }
+  | { status: "ready"; projects: ProjectSummary[] }
+  | { status: "saving"; projects: ProjectSummary[] }
+  | { status: "saved"; projects: ProjectSummary[]; savedProjectId: string }
+  | { status: "error"; projects: ProjectSummary[]; message: string };
+
 type EditorState = {
   document: PrintDocument;
   past: PrintDocument[];
@@ -250,6 +273,10 @@ export function App({
   const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
   const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
   const [jobHistory, setJobHistory] = useState<StoredPrintJob[]>(() => loadStoredJobHistory());
+  const [projectWorkflow, setProjectWorkflow] = useState<ProjectWorkflow>({
+    status: "idle",
+    projects: []
+  });
   const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
     status: "idle"
   });
@@ -634,6 +661,58 @@ export function App({
     },
     [client]
   );
+
+  const loadProjects = useCallback(async () => {
+    if (!client.listProjects) {
+      setProjectWorkflow((current) => ({
+        status: "error",
+        projects: current.projects,
+        message: "Project API unavailable"
+      }));
+      return;
+    }
+    setProjectWorkflow((current) => ({ status: "loading", projects: current.projects }));
+    try {
+      const response = await client.listProjects();
+      setProjectWorkflow({ status: "ready", projects: response.projects });
+    } catch (error: unknown) {
+      setProjectWorkflow((current) => ({
+        status: "error",
+        projects: current.projects,
+        message: error instanceof Error ? error.message : "Project list failed"
+      }));
+    }
+  }, [client]);
+
+  const saveProject = useCallback(async () => {
+    if (!client.createProject) {
+      setProjectWorkflow((current) => ({
+        status: "error",
+        projects: current.projects,
+        message: "Project API unavailable"
+      }));
+      return;
+    }
+    setProjectWorkflow((current) => ({ status: "saving", projects: current.projects }));
+    try {
+      const savedProject = await client.createProject({
+        name: document.title,
+        document
+      });
+      const summary = projectSummaryFromResponse(savedProject);
+      setProjectWorkflow((current) => ({
+        status: "saved",
+        projects: upsertProjectSummary(current.projects, summary),
+        savedProjectId: savedProject.projectId
+      }));
+    } catch (error: unknown) {
+      setProjectWorkflow((current) => ({
+        status: "error",
+        projects: current.projects,
+        message: error instanceof Error ? error.message : "Project save failed"
+      }));
+    }
+  }, [client, document]);
 
   const runPrint = useCallback(async () => {
     if (previewWorkflow.status !== "ready") {
@@ -1033,6 +1112,13 @@ export function App({
           </section>
 
           <aside className="min-h-0 overflow-auto border-l border-border bg-card">
+            <ProjectsPanel
+              workflow={projectWorkflow}
+              canLoad={Boolean(client.listProjects)}
+              canSave={Boolean(client.createProject)}
+              onLoad={loadProjects}
+              onSave={saveProject}
+            />
             <PrinterPanel
               workflow={printerWorkflow}
               hardwareArtifactWorkflow={hardwareArtifactWorkflow}
@@ -1212,6 +1298,80 @@ export function App({
         </footer>
       </div>
     </div>
+  );
+}
+
+function ProjectsPanel({
+  workflow,
+  canLoad,
+  canSave,
+  onLoad,
+  onSave
+}: {
+  workflow: ProjectWorkflow;
+  canLoad: boolean;
+  canSave: boolean;
+  onLoad: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="border-b border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <FolderOpen className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Projects</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Load projects"
+          onClick={onLoad}
+          disabled={!canLoad || workflow.status === "loading"}
+        >
+          <FolderOpen className="size-4" aria-hidden="true" />
+          {workflow.status === "loading" ? "Loading" : "Load"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Save project"
+          onClick={onSave}
+          disabled={!canSave || workflow.status === "saving"}
+        >
+          <Save className="size-4" aria-hidden="true" />
+          {workflow.status === "saving" ? "Saving" : "Save"}
+        </Button>
+      </div>
+      {workflow.status === "saved" ? (
+        <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          Saved project {workflow.savedProjectId}
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+      {workflow.projects.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {workflow.projects.slice(0, 5).map((project) => (
+            <div
+              key={project.projectId}
+              className="rounded-md border border-border bg-background p-2 text-sm"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-medium">{project.name}</span>
+                <Badge variant="muted">{project.documentId}</Badge>
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {project.projectId}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -2784,6 +2944,26 @@ function createQrMatrix(
       data: fallbackQr.modules.data
     };
   }
+}
+
+function projectSummaryFromResponse(project: ProjectResponse): ProjectSummary {
+  const documentId = typeof project.document.id === "string" ? project.document.id : "";
+  return {
+    projectId: project.projectId,
+    name: project.name,
+    documentId,
+    updatedAt: project.updatedAt
+  };
+}
+
+function upsertProjectSummary(
+  projects: ProjectSummary[],
+  nextProject: ProjectSummary
+): ProjectSummary[] {
+  const remainingProjects = projects.filter(
+    (project) => project.projectId !== nextProject.projectId
+  );
+  return [nextProject, ...remainingProjects];
 }
 
 function normalizeDotValue(value: number, minimum: number): number {
