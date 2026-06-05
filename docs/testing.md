@@ -53,6 +53,17 @@ The macOS artifact must include Bluetooth usage descriptions in `Info.plist` so
 first-run permission prompts explain local printer access. The current release
 evidence baseline is Release Package workflow run `27020656293`.
 
+## Public History Gate
+
+Before switching the repository from private to public, run:
+
+```bash
+pnpm public-history-check
+```
+
+This checks the `origin/main..HEAD` commit range for private local-host author and
+committer metadata. It is a pre-public gate, not a hardware gate.
+
 ## Dependency Maintenance
 
 Dependabot opens weekly update pull requests for the npm workspace, GitHub Actions,

@@ -147,4 +147,6 @@ Use the release docs for package evidence capture:
 
 The repository stays private during pre-publication validation. Before public release,
 the branch needs passing non-hardware gates, reviewed release package evidence, and the
-hardware certification evidence described above.
+hardware certification evidence described above. Run `pnpm public-history-check`
+before making the repository public so branch history does not expose private
+local-host author or committer metadata.

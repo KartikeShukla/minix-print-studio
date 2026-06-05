@@ -66,6 +66,20 @@ diagnostics, hardware artifacts, or electron-builder scratch files. The macOS
 artifact must also include Bluetooth usage descriptions in `Info.plist` explaining
 that Bluetooth is used only to connect to the local MiniX thermal printer.
 
+## Public History Gate
+
+Before making the repository public, verify that the branch history does not expose
+private local-host author or committer metadata:
+
+```bash
+pnpm public-history-check
+```
+
+The default range is `origin/main..HEAD`. Pass an explicit range when auditing a
+different branch or a release tag candidate. If the check reports private metadata,
+rewrite the still-private branch history with a reviewed plan and use
+`--force-with-lease` only for the branch being sanitized.
+
 ## Packaging Targets
 
 - macOS: unsigned local Electron package via `pnpm package:mac`; signed release

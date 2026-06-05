@@ -83,6 +83,7 @@ REQUIRED_PACKAGE_SCRIPTS = {
     "open-source-check": "node scripts/run_python.mjs scripts/validate_open_source_readiness.py",
     "source-package-check": "node scripts/run_python.mjs scripts/validate_source_package.py",
     "release-package-check": "node scripts/run_python.mjs scripts/validate_release_packaging.py",
+    "public-history-check": "node scripts/run_python.mjs scripts/validate_public_history.py",
 }
 
 REQUIRED_PACKAGE_AUTHOR = "MiniX Print Studio Contributors"

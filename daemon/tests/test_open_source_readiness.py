@@ -287,6 +287,7 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
     assert issues == [
         "package.json missing source-package-check script",
         "package.json missing release-package-check script",
+        "package.json missing public-history-check script",
     ]
 
 
@@ -315,6 +316,15 @@ def test_open_source_readiness_check_requires_cross_platform_python_runner() -> 
 
     assert validator.REQUIRED_PACKAGE_SCRIPTS["open-source-check"].startswith(
         "node scripts/run_python.mjs "
+    )
+
+
+def test_open_source_readiness_check_requires_public_history_script() -> None:
+    validator = _load_validator()
+
+    assert (
+        validator.REQUIRED_PACKAGE_SCRIPTS["public-history-check"]
+        == "node scripts/run_python.mjs scripts/validate_public_history.py"
     )
 
 

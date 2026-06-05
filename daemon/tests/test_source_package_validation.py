@@ -91,6 +91,12 @@ def test_source_package_check_requires_release_evidence_validator() -> None:
     assert Path("scripts/validate_release_evidence.py") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_public_history_validator() -> None:
+    validator = _load_validator()
+
+    assert Path("scripts/validate_public_history.py") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",
