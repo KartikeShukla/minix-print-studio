@@ -38,7 +38,8 @@ artifacts, or private file paths.
 Release notes should include:
 
 - Supported printer profiles and certification stage.
-- Known limitations.
+- Known limitations from [known-limitations.md](known-limitations.md).
+- Support status from [support-matrix.md](support-matrix.md).
 - Upgrade and uninstall notes.
 - Diagnostics redaction statement.
 - Hardware validation evidence summary.

@@ -25,6 +25,8 @@ REQUIRED_DOCS = (
     Path("docs/mcp-integrations.md"),
     Path("docs/safety.md"),
     Path("docs/release.md"),
+    Path("docs/support-matrix.md"),
+    Path("docs/known-limitations.md"),
     Path("docs/testing.md"),
     Path("docs/troubleshooting.md"),
 )

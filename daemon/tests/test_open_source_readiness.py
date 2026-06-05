@@ -42,6 +42,13 @@ def test_open_source_readiness_check_requires_community_governance_docs() -> Non
     assert Path("CODE_OF_CONDUCT.md") in validator.REQUIRED_FILES
 
 
+def test_open_source_readiness_check_requires_public_support_docs() -> None:
+    validator = _load_validator()
+
+    assert Path("docs/support-matrix.md") in validator.REQUIRED_DOCS
+    assert Path("docs/known-limitations.md") in validator.REQUIRED_DOCS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location("open_source_readiness", READINESS_SCRIPT)
     assert spec is not None

@@ -18,6 +18,7 @@
 - CI skeleton.
 - Open-source readiness validator for required public docs, ignored runtime state, CI wiring, and private-path redaction.
 - Contributor governance docs for contribution flow, conduct expectations, validation gates, and hardware-artifact redaction.
+- Public support matrix and known limitations docs that distinguish mock/development support from hardware-certified support.
 
 ### Daemon Core Slice
 
