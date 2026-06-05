@@ -9,6 +9,8 @@ REQUIRED_FILES = (
     Path("README.md"),
     Path("LICENSE"),
     Path("SECURITY.md"),
+    Path("CONTRIBUTING.md"),
+    Path("CODE_OF_CONDUCT.md"),
     Path(".gitignore"),
     Path("package.json"),
     Path("pnpm-workspace.yaml"),

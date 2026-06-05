@@ -35,6 +35,13 @@ def test_open_source_readiness_check_rejects_private_paths(tmp_path: Path) -> No
     assert issues == ["README.md contains private path marker: /Users/"]
 
 
+def test_open_source_readiness_check_requires_community_governance_docs() -> None:
+    validator = _load_validator()
+
+    assert Path("CONTRIBUTING.md") in validator.REQUIRED_FILES
+    assert Path("CODE_OF_CONDUCT.md") in validator.REQUIRED_FILES
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location("open_source_readiness", READINESS_SCRIPT)
     assert spec is not None

@@ -17,6 +17,7 @@
 - Printer profile data for `seznik-minix-s1-lyin48d-gy`.
 - CI skeleton.
 - Open-source readiness validator for required public docs, ignored runtime state, CI wiring, and private-path redaction.
+- Contributor governance docs for contribution flow, conduct expectations, validation gates, and hardware-artifact redaction.
 
 ### Daemon Core Slice
 
