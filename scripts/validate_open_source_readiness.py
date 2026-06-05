@@ -40,6 +40,16 @@ REQUIRED_DOCS = (
     Path("docs/troubleshooting.md"),
 )
 
+REQUIRED_README_SECTIONS = (
+    "## Project Status",
+    "## Safety Model",
+    "## Supported Printers",
+    "## Development",
+    "## Hardware Certification",
+    "## Agent Integrations",
+    "## Release and Validation",
+)
+
 REQUIRED_GITIGNORE_ENTRIES = (
     ".env",
     ".env.*",
@@ -132,6 +142,7 @@ def validate_repository(root: Path) -> list[str]:
     issues: list[str] = []
     issues.extend(_missing_paths(root, REQUIRED_FILES))
     issues.extend(_missing_paths(root, REQUIRED_DOCS))
+    issues.extend(_readme_section_issues(root))
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
@@ -157,6 +168,18 @@ def validate_private_path_redaction(*, root: Path, paths: list[Path]) -> list[st
 
 def _missing_paths(root: Path, paths: tuple[Path, ...]) -> list[str]:
     return [f"missing required file: {path.as_posix()}" for path in paths if not (root / path).is_file()]
+
+
+def _readme_section_issues(root: Path) -> list[str]:
+    readme = root / "README.md"
+    if not readme.is_file():
+        return []
+    text = readme.read_text(encoding="utf-8")
+    return [
+        f"README.md missing required section: {section}"
+        for section in REQUIRED_README_SECTIONS
+        if section not in text
+    ]
 
 
 def _missing_gitignore_entries(root: Path) -> list[str]:

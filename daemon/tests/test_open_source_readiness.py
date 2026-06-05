@@ -62,6 +62,26 @@ def test_open_source_readiness_check_requires_public_support_docs() -> None:
     assert Path("docs/known-limitations.md") in validator.REQUIRED_DOCS
 
 
+def test_open_source_readiness_check_requires_shareable_readme_sections(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _write_minimum_ready_repository(tmp_path, validator)
+    (tmp_path / "README.md").write_text("# MiniX Print Studio\n", encoding="utf-8")
+
+    issues = validator.validate_repository(tmp_path)
+
+    assert issues == [
+        "README.md missing required section: ## Project Status",
+        "README.md missing required section: ## Safety Model",
+        "README.md missing required section: ## Supported Printers",
+        "README.md missing required section: ## Development",
+        "README.md missing required section: ## Hardware Certification",
+        "README.md missing required section: ## Agent Integrations",
+        "README.md missing required section: ## Release and Validation",
+    ]
+
+
 def test_open_source_readiness_check_requires_release_notes_template() -> None:
     validator = _load_validator()
 
@@ -413,6 +433,7 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         json.dumps({"scripts": validator.REQUIRED_PACKAGE_SCRIPTS}),
         encoding="utf-8",
     )
+    (root / "README.md").write_text(_readme_text(validator), encoding="utf-8")
     (root / ".github" / "workflows" / "ci.yml").write_text(
         _ci_workflow_text(),
         encoding="utf-8",
@@ -442,6 +463,12 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
 
 def _gate_doc_text(commands: tuple[str, ...]) -> str:
     return "Run the non-hardware gates:\n\n```bash\n" + "\n".join(commands) + "\n```\n"
+
+
+def _readme_text(validator: object) -> str:
+    return "# MiniX Print Studio\n\n" + "\n".join(
+        f"{section}\n" for section in validator.REQUIRED_README_SECTIONS
+    )
 
 
 def _ci_workflow_text() -> str:

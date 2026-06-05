@@ -17,6 +17,7 @@
 - Printer profile data for `seznik-minix-s1-lyin48d-gy`.
 - CI skeleton.
 - Open-source readiness validator for required public docs, ignored runtime state, CI wiring, and private-path redaction.
+- Open-source readiness validator requires the README to explain project status, safety model, supported printer scope, development setup, hardware certification, agent integrations, and release validation.
 - Contributor governance docs for contribution flow, conduct expectations, validation gates, and hardware-artifact redaction.
 - Public support matrix and known limitations docs that distinguish mock/development support from hardware-certified support.
 - Source package validator that checks the tracked release source set for required public files and forbidden runtime/build/cache paths.
@@ -202,6 +203,7 @@
 - TDD red/green checks for Stage C tiny visual card preflight planning, unsafe artifact rejection, Electron bridge propagation, and renderer checklist display.
 - TDD red/green checks for redacted Stage A evidence summary generation, Electron bridge propagation, and renderer summary display.
 - TDD red/green checks for open-source readiness validation and private path rejection.
+- TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for release packaging scaffold validation, including package scripts, runtime-state exclusions, disabled publishing, and absent signing identity.
 - TDD red/green checks for release packaging rejection of tracked hardware-artifact includes.
