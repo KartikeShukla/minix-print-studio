@@ -1,17 +1,25 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from minixd.projects.store import ProjectRecord, ProjectStore
+from minixd.projects.store import ProjectAssetRecord, ProjectRecord, ProjectStore
 
 
 class CreateProjectRequest(BaseModel):
     name: Annotated[str, Field(min_length=1)]
     document: dict[str, Any]
+
+
+class UploadProjectAssetRequest(BaseModel):
+    file_name: Annotated[str, Field(alias="fileName", min_length=1)]
+    mime_type: Annotated[str, Field(alias="mimeType", min_length=1)]
+    data_base64: Annotated[str, Field(alias="dataBase64", min_length=1)]
 
 
 def create_projects_router(*, project_store: ProjectStore) -> APIRouter:
@@ -51,6 +59,19 @@ def create_projects_router(*, project_store: ProjectStore) -> APIRouter:
             raise HTTPException(status_code=404, detail="project not found")
         return Response(status_code=204)
 
+    @router.post("/{project_id}/assets", status_code=201)
+    def upload_asset(project_id: str, request: UploadProjectAssetRequest) -> dict[str, object]:
+        _validate_image_mime_type(request.mime_type)
+        record = project_store.add_asset(
+            project_id,
+            file_name=request.file_name,
+            mime_type=request.mime_type,
+            data=_decode_base64(request.data_base64),
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        return _serialize_asset(record)
+
     return router
 
 
@@ -74,5 +95,27 @@ def _serialize_project_summary(record: ProjectRecord) -> dict[str, object]:
     }
 
 
+def _serialize_asset(record: ProjectAssetRecord) -> dict[str, object]:
+    return {
+        "assetId": record.asset_id,
+        "sha256": record.sha256,
+        "fileName": record.file_name,
+        "mimeType": record.mime_type,
+        "byteLength": record.byte_length,
+    }
+
+
 def _format_timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _decode_base64(value: str) -> bytes:
+    try:
+        return base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="asset dataBase64 is invalid") from exc
+
+
+def _validate_image_mime_type(mime_type: str) -> None:
+    if mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status_code=422, detail="asset mimeType is not supported")

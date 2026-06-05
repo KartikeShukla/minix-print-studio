@@ -1,3 +1,5 @@
+import base64
+import hashlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -82,6 +84,42 @@ def test_project_update_and_delete_persist_with_data_dir(tmp_path: Path) -> None
     assert restarted.get(f"/v1/projects/{created['projectId']}").status_code == 404
     assert restarted.get("/v1/projects").json() == {"projects": []}
     assert not (tmp_path / "projects" / created["projectId"]).exists()
+
+
+def test_project_asset_upload_stores_image_by_hash_without_returning_paths(tmp_path: Path) -> None:
+    client = TestClient(create_app(mock=True, data_dir=tmp_path))
+    created = client.post(
+        "/v1/projects",
+        json={"name": "Asset project", "document": _document("doc_asset")},
+    ).json()
+    image_bytes = b"\x89PNG\r\n\x1a\nminix-asset"
+    digest = hashlib.sha256(image_bytes).hexdigest()
+
+    upload_response = client.post(
+        f"/v1/projects/{created['projectId']}/assets",
+        json={
+            "fileName": "badge.png",
+            "mimeType": "image/png",
+            "dataBase64": base64.b64encode(image_bytes).decode("ascii"),
+        },
+    )
+
+    assert upload_response.status_code == 201
+    uploaded = upload_response.json()
+    assert uploaded == {
+        "assetId": f"sha256-{digest}",
+        "sha256": digest,
+        "fileName": "badge.png",
+        "mimeType": "image/png",
+        "byteLength": len(image_bytes),
+    }
+    assert "path" not in uploaded
+    asset_path = tmp_path / "projects" / created["projectId"] / "assets" / f"sha256-{digest}.png"
+    assert asset_path.read_bytes() == image_bytes
+
+    restarted = TestClient(create_app(mock=True, data_dir=tmp_path))
+    assert restarted.get(f"/v1/projects/{created['projectId']}").status_code == 200
+    assert asset_path.read_bytes() == image_bytes
 
 
 def _document(document_id: str) -> dict[str, object]:

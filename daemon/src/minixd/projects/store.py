@@ -6,6 +6,7 @@ import uuid
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,15 @@ class ProjectRecord:
     document: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ProjectAssetRecord:
+    asset_id: str
+    sha256: str
+    file_name: str
+    mime_type: str
+    byte_length: int
 
 
 class ProjectStore:
@@ -79,6 +89,31 @@ class ProjectStore:
             shutil.rmtree(self._root / project_id, ignore_errors=True)
         return True
 
+    def add_asset(
+        self,
+        project_id: str,
+        *,
+        file_name: str,
+        mime_type: str,
+        data: bytes,
+    ) -> ProjectAssetRecord | None:
+        if project_id not in self._records:
+            return None
+        digest = sha256(data).hexdigest()
+        asset_id = f"sha256-{digest}"
+        record = ProjectAssetRecord(
+            asset_id=asset_id,
+            sha256=digest,
+            file_name=file_name,
+            mime_type=mime_type,
+            byte_length=len(data),
+        )
+        if self._root is not None:
+            asset_dir = self._root / project_id / "assets"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            (asset_dir / f"{asset_id}{_asset_extension(mime_type)}").write_bytes(data)
+        return record
+
     def _load_existing(self) -> None:
         if self._root is None:
             return
@@ -140,3 +175,15 @@ def _format_timestamp(value: datetime) -> str:
 
 def _parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+
+
+def _asset_extension(mime_type: str) -> str:
+    extensions = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/webp": ".webp",
+    }
+    try:
+        return extensions[mime_type]
+    except KeyError as exc:
+        raise ValueError(f"unsupported asset MIME type: {mime_type}") from exc
