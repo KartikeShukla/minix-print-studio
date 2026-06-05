@@ -83,6 +83,38 @@ def test_open_source_readiness_check_requires_dependabot_config() -> None:
     assert Path(".github/dependabot.yml") in validator.REQUIRED_FILES
 
 
+def test_open_source_readiness_check_requires_codeql_workflow() -> None:
+    validator = _load_validator()
+
+    assert Path(".github/workflows/codeql.yml") in validator.REQUIRED_FILES
+
+
+def test_open_source_readiness_check_validates_codeql_workflow() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_codeql_workflow_text(
+        """
+name: CodeQL
+jobs:
+  analyze:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v4
+"""
+    )
+
+    assert issues == [
+        "CodeQL workflow missing Python analysis",
+        "CodeQL workflow must run on pull requests",
+        "CodeQL workflow must run on pushes to main",
+        "CodeQL workflow must run on a weekly schedule",
+        "CodeQL workflow must use the security-extended query suite",
+    ]
+
+
 def test_open_source_readiness_check_validates_dependabot_config() -> None:
     validator = _load_validator()
 
@@ -241,6 +273,10 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         _ci_workflow_text(),
         encoding="utf-8",
     )
+    (root / ".github" / "workflows" / "codeql.yml").write_text(
+        _codeql_workflow_text(),
+        encoding="utf-8",
+    )
     (root / ".github" / "dependabot.yml").write_text(
         _dependabot_config_text(),
         encoding="utf-8",
@@ -269,6 +305,26 @@ jobs:
       - run: python3 scripts/validate_open_source_readiness.py
       - run: pnpm source-package-check
       - run: pnpm release-package-check
+"""
+
+
+def _codeql_workflow_text() -> str:
+    return """
+name: CodeQL
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "21 3 * * 1"
+jobs:
+  analyze:
+    steps:
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript, python
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4
 """
 
 

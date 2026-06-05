@@ -17,6 +17,7 @@ REQUIRED_FILES = (
     Path("turbo.json"),
     Path(".github/dependabot.yml"),
     Path(".github/workflows/ci.yml"),
+    Path(".github/workflows/codeql.yml"),
     Path(".github/workflows/release-package.yml"),
     Path(".github/PULL_REQUEST_TEMPLATE.md"),
     Path(".github/ISSUE_TEMPLATE/bug_report.yml"),
@@ -118,6 +119,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
+    issues.extend(_codeql_workflow_issues(root))
     issues.extend(_dependabot_config_issues(root))
     issues.extend(_missing_documented_gate_commands(root))
     issues.extend(validate_private_path_redaction(root=root, paths=_shareable_text_paths(root)))
@@ -209,6 +211,34 @@ def validate_ci_workflow(text: str) -> list[str]:
     )
     issues.extend(_pnpm_setup_issues(text))
     return issues
+
+
+def validate_codeql_workflow_text(text: str) -> list[str]:
+    issues: list[str] = []
+    if "javascript-typescript" not in text:
+        issues.append("CodeQL workflow missing JavaScript/TypeScript analysis")
+    if "python" not in text:
+        issues.append("CodeQL workflow missing Python analysis")
+    if "pull_request:" not in text:
+        issues.append("CodeQL workflow must run on pull requests")
+    if "push:" not in text or "branches: [main]" not in text:
+        issues.append("CodeQL workflow must run on pushes to main")
+    if "schedule:" not in text or "cron:" not in text:
+        issues.append("CodeQL workflow must run on a weekly schedule")
+    if "github/codeql-action/init@v4" not in text:
+        issues.append("CodeQL workflow must use github/codeql-action/init@v4")
+    if "github/codeql-action/analyze@v4" not in text:
+        issues.append("CodeQL workflow must use github/codeql-action/analyze@v4")
+    if "security-extended" not in text:
+        issues.append("CodeQL workflow must use the security-extended query suite")
+    return issues
+
+
+def _codeql_workflow_issues(root: Path) -> list[str]:
+    codeql_workflow = root / ".github" / "workflows" / "codeql.yml"
+    if not codeql_workflow.is_file():
+        return ["missing required file: .github/workflows/codeql.yml"]
+    return validate_codeql_workflow_text(codeql_workflow.read_text(encoding="utf-8"))
 
 
 def validate_dependabot_config_text(text: str) -> list[str]:

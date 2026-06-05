@@ -31,3 +31,9 @@ pnpm release-package-check
 Dependabot opens weekly update pull requests for the npm workspace, GitHub Actions,
 and the Python daemon/MCP packages. These updates must still pass the local gates
 above before merge.
+
+## Static Analysis
+
+CodeQL runs in GitHub Actions for JavaScript/TypeScript and Python on pull
+requests, pushes to `main`, weekly schedule, and manual dispatch. Local validation
+keeps the workflow present and configured for the `security-extended` query suite.

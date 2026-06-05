@@ -21,6 +21,7 @@ REQUIRED_SOURCE_PATHS = (
     Path(".github/ISSUE_TEMPLATE/feature_request.yml"),
     Path(".github/ISSUE_TEMPLATE/hardware_profile.yml"),
     Path(".github/workflows/release-package.yml"),
+    Path(".github/workflows/codeql.yml"),
     Path("docs/architecture.md"),
     Path("docs/release.md"),
     Path("docs/release-notes-template.md"),

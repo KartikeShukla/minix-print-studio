@@ -17,3 +17,4 @@ Please open a private security advisory or contact the maintainers before publis
 - MCP tools are semantic and cannot send raw BLE commands.
 - Agent direct printing is disabled by default.
 - Integration installers must preview changes, create backups, and support revert.
+- CodeQL scans JavaScript/TypeScript and Python changes with the `security-extended` query suite.

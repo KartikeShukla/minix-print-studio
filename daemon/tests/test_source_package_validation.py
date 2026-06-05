@@ -55,6 +55,7 @@ def test_source_package_check_requires_release_package_workflow_and_python_runne
     validator = _load_validator()
 
     assert Path(".github/workflows/release-package.yml") in validator.REQUIRED_SOURCE_PATHS
+    assert Path(".github/workflows/codeql.yml") in validator.REQUIRED_SOURCE_PATHS
     assert Path("scripts/run_python.mjs") in validator.REQUIRED_SOURCE_PATHS
 
 

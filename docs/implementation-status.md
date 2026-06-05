@@ -34,6 +34,7 @@
 - Desktop package builds use tracked MiniX Print Studio icon assets instead of the default Electron icon, with a reproducible icon generator plus release/source package validators that require the macOS PNG and Windows ICO assets.
 - Release package workflow writes a deterministic `SHA256SUMS.txt` manifest for uploaded unsigned package artifacts, excludes electron-builder scratch files, and validators require the checksum script and workflow step.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
+- CodeQL workflow scans JavaScript/TypeScript and Python with the `security-extended` query suite on pull requests, pushes to `main`, weekly schedule, and manual dispatch.
 
 ### Daemon Core Slice
 
@@ -138,6 +139,7 @@
 - Unsigned macOS package smoke verified `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/icon.icns` and `CFBundleIconFile => icon.icns`, with no default Electron icon fallback warning.
 - TDD red/green checks for release checksum manifest generation, relative CLI paths, source-package inclusion, and release workflow checksum wiring.
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
+- TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`
