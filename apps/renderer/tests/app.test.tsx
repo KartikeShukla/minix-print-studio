@@ -1150,6 +1150,61 @@ describe("MiniX Print Studio shell", () => {
     expect(redo).toBeDisabled();
   });
 
+  it("inserts long-print test markers from the canvas tool and keeps undo history", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    const undo = screen.getByRole("button", { name: "Undo" });
+    expect(undo).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Insert long-print test markers" }));
+
+    expect(await screen.findAllByText("END LP-TEST checksum: 7F3A")).not.toHaveLength(0);
+    expect(screen.getAllByText("25% marker")).not.toHaveLength(0);
+    expect(undo).toBeEnabled();
+
+    let stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    expect(stored.target.heightDots).toBe(8000);
+    expect(stored.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "lp_test_marker_start",
+          type: "text",
+          text: "START LP-TEST job_fixture"
+        }),
+        expect.objectContaining({
+          id: "lp_test_marker_end",
+          type: "text",
+          text: "END LP-TEST checksum: 7F3A",
+          y: 7904
+        })
+      ])
+    );
+
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+      expect(stored.target.heightDots).toBe(900);
+      expect(stored.elements).toEqual([]);
+    });
+  });
+
   it("loads and saves projects through the daemon project API", async () => {
     const listProjects = vi.fn().mockResolvedValue({
       projects: [

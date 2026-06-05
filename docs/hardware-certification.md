@@ -110,3 +110,14 @@ Before a physical protocol sanity run, review the offline preflight output:
 
 The preflight output is not a certification result. It is the deterministic
 command plan for the next physical test.
+
+## Long-Print Test Fixture
+
+The renderer toolbar includes `Insert long-print test markers` for preparing a
+deterministic continuous-paper fixture before later physical reliability tests.
+The command extends the document to 8000 dots and inserts visible
+`START LP-TEST`, 25%, 50%, 75%, and `END LP-TEST checksum: 7F3A` markers.
+
+This fixture helps compare the preview, band plan, and physical output. It does
+not unlock trusted printing or replace the Stage B, tiny visual card, or
+long-print reliability hardware runs.

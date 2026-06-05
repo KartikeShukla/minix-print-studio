@@ -6,6 +6,7 @@ import {
   createRectElement,
   createTextElement,
   imageElementSchema,
+  insertLongPrintTestMarkers,
   moveElement,
   printDocumentSchema,
   qrElementSchema,
@@ -181,5 +182,77 @@ describe("default print document", () => {
       fill: "#ffffff"
     });
     expect(updated.updatedAt).toBe("2026-06-04T00:10:00.000Z");
+  });
+
+  it("inserts deterministic long-print test markers without dropping existing content", () => {
+    const document = createDefaultDocument({
+      title: "Long print fixture",
+      now: new Date("2026-06-04T00:00:00.000Z")
+    });
+    const existing = createTextElement({
+      id: "el_existing",
+      name: "Existing note",
+      text: "Keep me",
+      x: 24,
+      y: 56,
+      width: 336,
+      height: 80
+    });
+
+    const marked = printDocumentSchema.parse(
+      insertLongPrintTestMarkers(
+        {
+          ...document,
+          elements: [existing]
+        },
+        {
+          now: new Date("2026-06-04T00:05:00.000Z")
+        }
+      )
+    );
+
+    expect(marked.target.heightDots).toBe(8000);
+    expect(marked.updatedAt).toBe("2026-06-04T00:05:00.000Z");
+    expect(marked.elements[0]).toEqual(existing);
+    expect(marked.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "lp_test_marker_start",
+          type: "text",
+          text: "START LP-TEST job_fixture",
+          y: 24
+        }),
+        expect.objectContaining({
+          id: "lp_test_marker_25",
+          type: "text",
+          text: "25% marker",
+          y: 2000
+        }),
+        expect.objectContaining({
+          id: "lp_test_marker_50",
+          type: "text",
+          text: "50% marker",
+          y: 4000
+        }),
+        expect.objectContaining({
+          id: "lp_test_marker_75",
+          type: "text",
+          text: "75% marker",
+          y: 6000
+        }),
+        expect.objectContaining({
+          id: "lp_test_marker_end",
+          type: "text",
+          text: "END LP-TEST checksum: 7F3A",
+          y: 7904
+        })
+      ])
+    );
+    expect(marked.metadata.longPrintTest).toEqual({
+      version: 1,
+      heightDots: 8000,
+      checksum: "7F3A",
+      markerRows: [24, 2000, 4000, 6000, 7904]
+    });
   });
 });

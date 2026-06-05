@@ -19,6 +19,7 @@ import {
   QrCode,
   Redo2,
   RotateCcw,
+  Ruler,
   Save,
   ScanSearch,
   ShieldCheck,
@@ -38,6 +39,7 @@ import {
   createRectElement,
   createTextElement,
   imageElementSchema,
+  insertLongPrintTestMarkers,
   moveElement,
   printDocumentSchema,
   qrElementSchema,
@@ -145,7 +147,8 @@ const tools = [
   { label: "Text", icon: Type },
   { label: "Rectangle", icon: Square },
   { label: "Image", icon: ImageIcon },
-  { label: "QR", icon: QrCode }
+  { label: "QR", icon: QrCode },
+  { label: "Insert long-print test markers", icon: Ruler }
 ];
 
 const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
@@ -548,6 +551,39 @@ export function App({
       };
     });
   }, [commitDocument]);
+
+  const addLongPrintTestMarkers = useCallback(() => {
+    commitDocument((currentDocument) => {
+      const documentWithMarkers = insertLongPrintTestMarkers(currentDocument);
+      return {
+        document: documentWithMarkers,
+        selectedElementId: "lp_test_marker_start"
+      };
+    });
+  }, [commitDocument]);
+
+  const runTool = useCallback(
+    (toolLabel: string) => {
+      switch (toolLabel) {
+        case "Text":
+          addTextLayer();
+          break;
+        case "Rectangle":
+          addRectangleLayer();
+          break;
+        case "Image":
+          imageInputRef.current?.click();
+          break;
+        case "QR":
+          addQrLayer();
+          break;
+        case "Insert long-print test markers":
+          addLongPrintTestMarkers();
+          break;
+      }
+    },
+    [addLongPrintTestMarkers, addQrLayer, addRectangleLayer, addTextLayer]
+  );
 
   const importImageFile = useCallback(
     (file: File) => {
@@ -1286,7 +1322,7 @@ export function App({
           <aside className="min-h-0 border-r border-border bg-muted/30">
             <section className="border-b border-border p-3">
               <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Tools</div>
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-6 gap-1">
                 {tools.map((tool) => {
                   const Icon = tool.icon;
                   return (
@@ -1296,17 +1332,7 @@ export function App({
                       size="icon"
                       title={tool.label}
                       aria-label={tool.label}
-                      onClick={
-                        tool.label === "Text"
-                          ? addTextLayer
-                          : tool.label === "Rectangle"
-                            ? addRectangleLayer
-                            : tool.label === "Image"
-                              ? () => imageInputRef.current?.click()
-                            : tool.label === "QR"
-                              ? addQrLayer
-                            : undefined
-                      }
+                      onClick={() => runTool(tool.label)}
                     >
                       <Icon className="size-4" aria-hidden="true" />
                     </Button>

@@ -95,6 +95,8 @@
 - Renderer canvas footer controls zoom the artboard and Konva stage from 50% to 200% without mutating persisted print document data; inline text editing overlays scale with the zoomed canvas.
 - Renderer canvas footer controls pan the stage viewport in 48-dot steps and reset to origin without mutating persisted print document data.
 - Renderer selected layers show React Konva transformer handles for resize/rotate edits, persist transformed geometry through the document history path, and keep Undo available after a transform.
+- Design model can insert deterministic long-print test markers with `START LP-TEST`, 25%, 50%, 75%, and `END LP-TEST checksum: 7F3A` sentinels while preserving existing document content.
+- Renderer toolbar exposes `Insert long-print test markers`, persists the 8000-dot marker fixture through the normal document history path, and keeps Undo available after insertion.
 - Renderer completed print jobs persist to a localStorage-backed Recent Jobs list with job id, status, completion level, and band progress.
 - Daemon `/v1/diagnostics/export` returns a redacted diagnostics bundle with daemon/version context, profile snapshot, job metadata, segment metadata without raw raster bytes, mock timing summaries, and completion decision explanation.
 - Renderer daemon client and Recent Jobs panel can request the redacted diagnostics export and show the exported bundle job count.
@@ -157,6 +159,7 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: use footer pan controls to move 0,0 -> 48,0 -> 48,48 -> 0,0, verify reset disables and localStorage remains stable.
 - Playwright smoke against `http://127.0.0.1:5174/`: add rectangle, drag the selected layer's bottom-right transformer handle, verify localStorage geometry changes from `320 x 72` to `358 x 81`.
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
+- TDD red/green checks for deterministic long-print marker generation in the shared document model and renderer toolbar insertion with persisted Undo history.
 - TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
 - TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
 - TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.

@@ -152,6 +152,14 @@ export type CreateQrElementOptions = {
   errorCorrectionLevel?: QrElement["errorCorrectionLevel"];
 };
 
+export type InsertLongPrintTestMarkersOptions = {
+  heightDots?: number;
+  now?: Date;
+};
+
+export const LONG_PRINT_TEST_DEFAULT_HEIGHT_DOTS = 8000;
+export const LONG_PRINT_TEST_CHECKSUM = "7F3A";
+
 export function createDefaultDocument(options: DefaultDocumentOptions = {}): PrintDocument {
   const now = (options.now ?? new Date()).toISOString();
 
@@ -301,5 +309,79 @@ export function updateElement(
     elements: document.elements.map((element) =>
       element.id === elementId ? updater(element) : element
     )
+  };
+}
+
+export function insertLongPrintTestMarkers(
+  document: PrintDocument,
+  options: InsertLongPrintTestMarkersOptions = {}
+): PrintDocument {
+  const heightDots = Math.max(
+    document.target.heightDots,
+    options.heightDots ?? LONG_PRINT_TEST_DEFAULT_HEIGHT_DOTS
+  );
+  const markerRows = [
+    { suffix: "start", text: "START LP-TEST job_fixture", y: 24 },
+    { suffix: "25", text: "25% marker", y: Math.round(heightDots * 0.25) },
+    { suffix: "50", text: "50% marker", y: Math.round(heightDots * 0.5) },
+    { suffix: "75", text: "75% marker", y: Math.round(heightDots * 0.75) },
+    {
+      suffix: "end",
+      text: `END LP-TEST checksum: ${LONG_PRINT_TEST_CHECKSUM}`,
+      y: Math.max(24, heightDots - 96)
+    }
+  ];
+  const markerElements = markerRows.flatMap(({ suffix, text, y }) => {
+    const marker = createTextElement({
+      id: `lp_test_marker_${suffix}`,
+      name: `LP marker ${suffix}`,
+      text,
+      x: 24,
+      y,
+      width: document.target.widthDots - 48,
+      height: 32
+    });
+    const rule = createRectElement({
+      id: `lp_test_rule_${suffix}`,
+      name: `LP rule ${suffix}`,
+      x: 24,
+      y: y + 36,
+      width: document.target.widthDots - 48,
+      height: 2
+    });
+    return [
+      {
+        ...marker,
+        style: {
+          ...marker.style,
+          fontSize: 18,
+          align: "left" as const,
+          lineHeight: 1
+        }
+      },
+      rule
+    ];
+  });
+
+  return {
+    ...document,
+    updatedAt: (options.now ?? new Date()).toISOString(),
+    target: {
+      ...document.target,
+      heightDots
+    },
+    elements: [
+      ...document.elements.filter((element) => !element.id.startsWith("lp_test_")),
+      ...markerElements
+    ],
+    metadata: {
+      ...document.metadata,
+      longPrintTest: {
+        version: 1,
+        heightDots,
+        checksum: LONG_PRINT_TEST_CHECKSUM,
+        markerRows: markerRows.map((marker) => marker.y)
+      }
+    }
   };
 }
