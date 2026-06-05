@@ -49,7 +49,9 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 
 This validates the successful workflow metadata, macOS and Windows unsigned package
 artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
-The current release evidence baseline is Release Package workflow run `27013383603`.
+The macOS artifact must include Bluetooth usage descriptions in `Info.plist` so
+first-run permission prompts explain local printer access. Capture fresh release
+evidence after packaging metadata changes before making a public release claim.
 
 ## Dependency Maintenance
 

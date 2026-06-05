@@ -27,6 +27,7 @@ and evidence-backed.
 ## Installation
 
 - Fresh install notes:
+- macOS Bluetooth permission note:
 - Upgrade notes:
 - Uninstall notes:
 - Known installer limitations:

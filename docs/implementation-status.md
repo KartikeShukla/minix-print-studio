@@ -32,6 +32,7 @@
 - Root Python-backed pnpm scripts use a cross-platform Node launcher that prefers `MINIX_PYTHON`, the repo virtualenv, then platform Python commands.
 - Community intake templates cover bug reports, feature requests, hardware profile evidence, and pull requests with safety, privacy, reproduction, and validation prompts.
 - Desktop package builds use tracked MiniX Print Studio icon assets instead of the default Electron icon, with a reproducible icon generator plus release/source package validators that require the macOS PNG and Windows ICO assets.
+- macOS package metadata declares Bluetooth usage descriptions for local MiniX printer access, and release validators require those Info.plist keys in both source config and downloaded package evidence.
 - Release package workflow writes a deterministic `SHA256SUMS.txt` manifest for uploaded unsigned package artifacts, excludes electron-builder scratch files, and validators require the checksum script and workflow step.
 - Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Release evidence validator can check a downloaded manual workflow run for successful metadata, platform-named macOS/Windows artifacts, checksum coverage, bundled sidecars, and forbidden runtime/scratch paths before making Windows release claims.
@@ -154,6 +155,7 @@
 - Release package workflow contract validation for `macos-latest`, `windows-latest`, sidecar Python dependency setup, and `pnpm package:mac` / `pnpm package:win`.
 - Desktop icon generation check via `.venv/bin/python scripts/generate_desktop_icons.py --check`.
 - TDD red/green checks for explicit desktop package icon configuration and tracked icon assets in release/source package validation.
+- TDD red/green checks for macOS Bluetooth usage descriptions in electron-builder config and downloaded release evidence.
 - Unsigned macOS package smoke verified `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/icon.icns` and `CFBundleIconFile => icon.icns`, with no default Electron icon fallback warning.
 - TDD red/green checks for release checksum manifest generation, relative CLI paths, source-package inclusion, and release workflow checksum wiring.
 - TDD red/green checks for release workflow manual dispatch and platform-named artifact evidence uploads.
@@ -161,7 +163,7 @@
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.
-- GitHub Release Package workflow run `27013383603` on `codex/bootstrap-minix-print-studio`: macOS unsigned package completed in 2m20s, Windows unsigned package completed in 5m30s, and downloaded artifacts passed `node scripts/run_python.mjs scripts/validate_release_evidence.py`.
+- Earlier GitHub Release Package workflow run `27013383603` on `codex/bootstrap-minix-print-studio`: macOS unsigned package completed in 2m20s, Windows unsigned package completed in 5m30s, and downloaded artifacts passed the then-current `node scripts/run_python.mjs scripts/validate_release_evidence.py`; capture fresh release evidence after the Bluetooth usage-description gate before a public release claim.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`

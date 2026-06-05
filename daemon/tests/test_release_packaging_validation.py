@@ -7,6 +7,15 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_PACKAGING_SCRIPT = PROJECT_ROOT / "scripts" / "validate_release_packaging.py"
+BLUETOOTH_USAGE_DESCRIPTION = (
+    "MiniX Print Studio uses Bluetooth only to connect to your local "
+    "MiniX thermal printer."
+)
+BLUETOOTH_EXTEND_INFO = (
+    "  extendInfo:\n"
+    f"    NSBluetoothAlwaysUsageDescription: {BLUETOOTH_USAGE_DESCRIPTION}\n"
+    f"    NSBluetoothPeripheralUsageDescription: {BLUETOOTH_USAGE_DESCRIPTION}\n"
+)
 
 
 def test_release_packaging_check_passes_for_repository() -> None:
@@ -143,11 +152,12 @@ def test_release_packaging_check_requires_sidecar_resources() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
   signAndEditExecutable: false
@@ -158,11 +168,34 @@ publish: null
     assert issues == ["electron-builder config must include sidecar binaries"]
 
 
-def test_release_packaging_check_rejects_runtime_state_and_signing_identity() -> None:
+def test_release_packaging_check_requires_macos_bluetooth_usage_descriptions() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
         """
+files:
+  - out/**
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
+mac:
+  icon: build/icon.png
+  identity: null
+win:
+  icon: build/icon.ico
+  signAndEditExecutable: false
+publish: null
+"""
+    )
+
+    assert issues == ["electron-builder config must set macOS Bluetooth usage descriptions"]
+
+
+def test_release_packaging_check_rejects_runtime_state_and_signing_identity() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_builder_config_text(
+        f"""
 appId: app.example.private
 productName: Private App
 directories:
@@ -176,6 +209,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
   identity: Developer ID Application: Example Person
 win:
   icon: build/icon.ico
@@ -197,7 +231,7 @@ def test_release_packaging_check_rejects_hardware_artifact_inclusion() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
   - hardware-artifacts/**
@@ -206,6 +240,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
   signAndEditExecutable: false
@@ -220,7 +255,7 @@ def test_release_packaging_check_requires_windows_resource_editing_disabled() ->
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 win:
   target:
     - target: dir
@@ -231,6 +266,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
 publish: null
@@ -246,7 +282,7 @@ def test_release_packaging_check_requires_explicit_package_icons() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
 extraResources:
@@ -254,6 +290,7 @@ extraResources:
     to: sidecars
 mac:
   identity: null
+{BLUETOOTH_EXTEND_INFO}\
 win:
   signAndEditExecutable: false
 publish: null

@@ -38,6 +38,13 @@ BUILDER_REQUIRED_SNIPPETS = (
     "signAndEditExecutable: false",
     "publish: null",
 )
+MAC_BLUETOOTH_USAGE_DESCRIPTION = (
+    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
+)
+MAC_BLUETOOTH_USAGE_KEYS = (
+    "NSBluetoothAlwaysUsageDescription",
+    "NSBluetoothPeripheralUsageDescription",
+)
 FORBIDDEN_PACKAGED_PREFIXES = (
     "runtime/",
     "logs/",
@@ -184,6 +191,8 @@ def validate_builder_config_text(text: str) -> list[str]:
         issues.append("electron-builder config must set mac icon: build/icon.png")
     if not _windows_icon_configured(text):
         issues.append("electron-builder config must set Windows icon: build/icon.ico")
+    if not _mac_bluetooth_usage_descriptions_configured(text):
+        issues.append("electron-builder config must set macOS Bluetooth usage descriptions")
     for marker in PRIVATE_PATH_MARKERS:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
@@ -288,6 +297,13 @@ def _mac_icon_configured(text: str) -> bool:
 
 def _windows_icon_configured(text: str) -> bool:
     return "icon: build/icon.ico" in text
+
+
+def _mac_bluetooth_usage_descriptions_configured(text: str) -> bool:
+    return all(
+        f"{key}: {MAC_BLUETOOTH_USAGE_DESCRIPTION}" in text
+        for key in MAC_BLUETOOTH_USAGE_KEYS
+    )
 
 
 def _sidecar_resources_included(text: str) -> bool:

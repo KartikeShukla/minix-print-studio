@@ -62,7 +62,9 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 The evidence validator requires a successful manual `Release Package` run,
 platform-named macOS and Windows unsigned artifact directories, matching
 `SHA256SUMS.txt` manifests, bundled daemon/MCP sidecars, and no runtime state,
-diagnostics, hardware artifacts, or electron-builder scratch files.
+diagnostics, hardware artifacts, or electron-builder scratch files. The macOS
+artifact must also include Bluetooth usage descriptions in `Info.plist` explaining
+that Bluetooth is used only to connect to the local MiniX thermal printer.
 
 ## Packaging Targets
 
