@@ -3,7 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "description": "Desktop design and safe print studio for MiniX thermal printers.",
+  "author": "MiniX Print Studio Contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KartikeShukla/minix-print-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KartikeShukla/minix-print-studio/issues"
+  },
+  "homepage": "https://github.com/KartikeShukla/minix-print-studio#readme",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20.19.0",

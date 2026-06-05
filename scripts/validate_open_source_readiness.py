@@ -85,6 +85,11 @@ REQUIRED_PACKAGE_SCRIPTS = {
     "release-package-check": "node scripts/run_python.mjs scripts/validate_release_packaging.py",
 }
 
+REQUIRED_PACKAGE_AUTHOR = "MiniX Print Studio Contributors"
+REQUIRED_PACKAGE_REPOSITORY_URL = "https://github.com/KartikeShukla/minix-print-studio.git"
+REQUIRED_PACKAGE_BUGS_URL = "https://github.com/KartikeShukla/minix-print-studio/issues"
+REQUIRED_PACKAGE_HOMEPAGE = "https://github.com/KartikeShukla/minix-print-studio#readme"
+
 REQUIRED_NON_HARDWARE_GATE_COMMANDS = (
     "pnpm lint",
     "pnpm typecheck",
@@ -144,7 +149,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_paths(root, REQUIRED_DOCS))
     issues.extend(_readme_section_issues(root))
     issues.extend(_missing_gitignore_entries(root))
-    issues.extend(_missing_package_scripts(root))
+    issues.extend(_package_json_issues(root))
     issues.extend(_missing_ci_commands(root))
     issues.extend(_workflow_permission_issues(root))
     issues.extend(_workflow_node24_runtime_issues(root))
@@ -198,15 +203,39 @@ def _missing_gitignore_entries(root: Path) -> list[str]:
     ]
 
 
-def _missing_package_scripts(root: Path) -> list[str]:
+def _package_json_issues(root: Path) -> list[str]:
     package_json = root / "package.json"
     if not package_json.is_file():
         return ["missing required file: package.json"]
     payload = json.loads(package_json.read_text(encoding="utf-8"))
+    issues = validate_package_metadata(payload)
     scripts = payload.get("scripts")
     if not isinstance(scripts, dict):
-        return ["package.json missing scripts object"]
-    return validate_package_scripts(scripts)
+        return [*issues, "package.json missing scripts object"]
+    return [*issues, *validate_package_scripts(scripts)]
+
+
+def validate_package_metadata(payload: dict[str, object]) -> list[str]:
+    issues: list[str] = []
+    if payload.get("author") != REQUIRED_PACKAGE_AUTHOR:
+        issues.append("package.json missing public package author")
+
+    repository = payload.get("repository")
+    repository_url = repository.get("url") if isinstance(repository, dict) else None
+    if repository_url != REQUIRED_PACKAGE_REPOSITORY_URL:
+        issues.append(
+            "package.json missing repository: "
+            f"{REQUIRED_PACKAGE_REPOSITORY_URL}"
+        )
+
+    bugs = payload.get("bugs")
+    bugs_url = bugs.get("url") if isinstance(bugs, dict) else None
+    if bugs_url != REQUIRED_PACKAGE_BUGS_URL:
+        issues.append(f"package.json missing bugs URL: {REQUIRED_PACKAGE_BUGS_URL}")
+
+    if payload.get("homepage") != REQUIRED_PACKAGE_HOMEPAGE:
+        issues.append(f"package.json missing homepage: {REQUIRED_PACKAGE_HOMEPAGE}")
+    return issues
 
 
 def validate_package_scripts(scripts: dict[str, object]) -> list[str]:

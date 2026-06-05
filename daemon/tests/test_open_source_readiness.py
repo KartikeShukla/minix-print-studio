@@ -290,6 +290,26 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
     ]
 
 
+def test_open_source_readiness_check_requires_public_package_metadata(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _write_minimum_ready_repository(tmp_path, validator)
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": validator.REQUIRED_PACKAGE_SCRIPTS}),
+        encoding="utf-8",
+    )
+
+    issues = validator.validate_repository(tmp_path)
+
+    assert issues == [
+        "package.json missing public package author",
+        "package.json missing repository: https://github.com/KartikeShukla/minix-print-studio.git",
+        "package.json missing bugs URL: https://github.com/KartikeShukla/minix-print-studio/issues",
+        "package.json missing homepage: https://github.com/KartikeShukla/minix-print-studio#readme",
+    ]
+
+
 def test_open_source_readiness_check_requires_cross_platform_python_runner() -> None:
     validator = _load_validator()
 
@@ -430,7 +450,18 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         encoding="utf-8",
     )
     (root / "package.json").write_text(
-        json.dumps({"scripts": validator.REQUIRED_PACKAGE_SCRIPTS}),
+        json.dumps(
+            {
+                "author": validator.REQUIRED_PACKAGE_AUTHOR,
+                "repository": {
+                    "type": "git",
+                    "url": validator.REQUIRED_PACKAGE_REPOSITORY_URL,
+                },
+                "bugs": {"url": validator.REQUIRED_PACKAGE_BUGS_URL},
+                "homepage": validator.REQUIRED_PACKAGE_HOMEPAGE,
+                "scripts": validator.REQUIRED_PACKAGE_SCRIPTS,
+            }
+        ),
         encoding="utf-8",
     )
     (root / "README.md").write_text(_readme_text(validator), encoding="utf-8")
