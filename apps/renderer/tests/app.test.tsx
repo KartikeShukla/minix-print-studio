@@ -1283,4 +1283,53 @@ describe("MiniX Print Studio shell", () => {
     expect(createProject).not.toHaveBeenCalled();
     expect(await screen.findByText("Saved project prj_loaded")).toBeInTheDocument();
   });
+
+  it("confirms and deletes a saved daemon project from the project list", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_delete",
+          name: "Delete checklist",
+          documentId: "doc_delete",
+          updatedAt: "2026-06-05T00:06:00Z"
+        }
+      ]
+    });
+    const deleteProject = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          deleteProject
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+    expect(await screen.findByText("Delete checklist")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Delete checklist project" }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Delete checklist"));
+    await waitFor(() => {
+      expect(deleteProject).toHaveBeenCalledWith("prj_delete");
+    });
+    expect(await screen.findByText("Deleted project prj_delete")).toBeInTheDocument();
+    expect(screen.queryByText("Delete checklist")).not.toBeInTheDocument();
+
+    confirm.mockRestore();
+  });
 });
