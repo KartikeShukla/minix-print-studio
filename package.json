@@ -19,8 +19,11 @@
     "test:python": "pytest daemon/tests mcp/tests",
     "open-source-check": "python3 scripts/validate_open_source_readiness.py",
     "source-package-check": "python3 scripts/validate_source_package.py",
+    "release-package-check": "python3 scripts/validate_release_packaging.py",
+    "package:mac": "pnpm --filter @minix/desktop package:mac",
+    "package:win": "pnpm --filter @minix/desktop package:win",
     "format": "prettier --check .",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm open-source-check && pnpm source-package-check"
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm open-source-check && pnpm source-package-check && pnpm release-package-check"
   },
   "devDependencies": {
     "prettier": "^3.5.3",

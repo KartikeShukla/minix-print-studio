@@ -60,6 +60,7 @@ SHAREABLE_TEXT_GLOBS = (
 REQUIRED_PACKAGE_SCRIPTS = {
     "open-source-check": "python3 scripts/validate_open_source_readiness.py",
     "source-package-check": "python3 scripts/validate_source_package.py",
+    "release-package-check": "python3 scripts/validate_release_packaging.py",
 }
 
 
@@ -148,6 +149,7 @@ def validate_ci_workflow(text: str) -> list[str]:
     required_commands = (
         "python3 scripts/validate_open_source_readiness.py",
         "pnpm source-package-check",
+        "pnpm release-package-check",
     )
     issues.extend(
         f"CI missing command: {command}" for command in required_commands if command not in text

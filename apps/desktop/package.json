@@ -2,11 +2,15 @@
   "name": "@minix/desktop",
   "version": "0.1.0",
   "private": true,
+  "description": "MiniX Print Studio desktop shell.",
+  "author": "MiniX Print Studio Contributors",
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "package:mac": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
+    "package:win": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --publish never",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
@@ -18,7 +22,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
+    "cross-env": "^7.0.3",
     "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
     "electron-vite": "^3.0.0",
     "vite": "^6.1.0",
     "vitest": "^3.1.4"

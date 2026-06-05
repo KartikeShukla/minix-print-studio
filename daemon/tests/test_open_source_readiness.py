@@ -58,7 +58,10 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
         }
     )
 
-    assert issues == ["package.json missing source-package-check script"]
+    assert issues == [
+        "package.json missing source-package-check script",
+        "package.json missing release-package-check script",
+    ]
 
 
 def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> None:
@@ -74,7 +77,10 @@ jobs:
 """
     )
 
-    assert issues == ["CI command requires pnpm setup before use: pnpm source-package-check"]
+    assert issues == [
+        "CI missing command: pnpm release-package-check",
+        "CI command requires pnpm setup before use: pnpm source-package-check",
+    ]
 
 
 def _load_validator() -> object:
