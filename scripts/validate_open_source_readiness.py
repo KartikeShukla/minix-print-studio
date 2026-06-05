@@ -140,13 +140,41 @@ def _missing_ci_commands(root: Path) -> list[str]:
     if not workflow.is_file():
         return ["missing required file: .github/workflows/ci.yml"]
     text = workflow.read_text(encoding="utf-8")
+    return validate_ci_workflow(text)
+
+
+def validate_ci_workflow(text: str) -> list[str]:
+    issues: list[str] = []
     required_commands = (
         "python3 scripts/validate_open_source_readiness.py",
         "pnpm source-package-check",
     )
-    return [
+    issues.extend(
         f"CI missing command: {command}" for command in required_commands if command not in text
-    ]
+    )
+    issues.extend(_pnpm_setup_issues(text))
+    return issues
+
+
+def _pnpm_setup_issues(text: str) -> list[str]:
+    issues: list[str] = []
+    pnpm_setup_seen = False
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if _is_workflow_job_header(line):
+            pnpm_setup_seen = False
+            continue
+        if "pnpm/action-setup" in stripped:
+            pnpm_setup_seen = True
+        if stripped.startswith("- run: pnpm ") and not pnpm_setup_seen:
+            command = stripped.removeprefix("- run: ")
+            issues.append(f"CI command requires pnpm setup before use: {command}")
+    return issues
+
+
+def _is_workflow_job_header(line: str) -> bool:
+    return line.startswith("  ") and not line.startswith("    ") and line.strip().endswith(":")
 
 
 def _shareable_text_paths(root: Path) -> list[Path]:

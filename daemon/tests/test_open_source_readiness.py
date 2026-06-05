@@ -61,6 +61,22 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
     assert issues == ["package.json missing source-package-check script"]
 
 
+def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_ci_workflow(
+        """
+jobs:
+  python:
+    steps:
+      - run: python3 scripts/validate_open_source_readiness.py
+      - run: pnpm source-package-check
+"""
+    )
+
+    assert issues == ["CI command requires pnpm setup before use: pnpm source-package-check"]
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location("open_source_readiness", READINESS_SCRIPT)
     assert spec is not None
