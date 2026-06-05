@@ -221,6 +221,54 @@ def test_hardware_test_cli_plans_protocol_sanity_preflight_from_stage_a_artifact
     }
 
 
+def test_hardware_test_cli_plans_tiny_visual_card_preflight_from_stage_a_artifact(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(artifact_path)
+    stdout = io.StringIO()
+
+    exit_code = run(["tiny-visual-card-preflight", str(artifact_path)], stdout=stdout)
+
+    result = json.loads(stdout.getvalue())
+    assert exit_code == 0
+    assert result["status"] == "tiny_visual_card_preflight_ready"
+    assert result["stage"] == "tiny_visual_test_card"
+    assert result["deviceId"] == "mock-minix-0194"
+    assert result["profileId"] == "seznik-minix-s1-lyin48d-gy"
+    assert result["requiredPriorStage"] == "protocol_sanity_test"
+    assert result["displayText"] == "MINIX TEST 7K4P"
+    assert result["widthDots"] == 384
+    assert result["heightDots"] == 160
+    assert result["rowBytes"] == 48
+    assert result["density"] == "medium"
+    assert result["paperMode"] == "continuous"
+    assert result["printCommandsSent"] is False
+    assert result["rasterBytesIncluded"] is False
+    assert result["plannedRaster"] == {
+        "commandName": "raster_test_card",
+        "payloadBytes": 7688,
+        "rasterBytes": 7680,
+        "rawBytesIncluded": False,
+        "contentSha256": result["plannedRaster"]["contentSha256"],
+    }
+    assert len(result["plannedRaster"]["contentSha256"]) == 64
+    assert result["confirmationChecklist"] == [
+        "Text MINIX TEST 7K4P is readable.",
+        "Left and right edge markers are visible.",
+        "Output is not mirrored or upside down.",
+        "Feed is smooth with no stall, overheat warning, disconnect, or fatal error.",
+    ]
+    assert result["safety"] == {
+        "requiresPhysicalPrinter": True,
+        "requiresUserConfirmation": True,
+        "requiresPriorProtocolSanity": True,
+        "sendsRasterIfExecuted": True,
+        "unlocksPrinting": False,
+        "preflightOnly": True,
+    }
+
+
 def test_hardware_test_cli_rejects_protocol_sanity_preflight_for_unsafe_artifact(
     tmp_path: Path,
 ) -> None:
@@ -239,6 +287,29 @@ def test_hardware_test_cli_rejects_protocol_sanity_preflight_for_unsafe_artifact
     stderr = io.StringIO()
 
     exit_code = run(["protocol-sanity-preflight", str(artifact_path)], stderr=stderr)
+
+    assert exit_code == 2
+    assert stderr.getvalue().strip() == "artifact is not read-only safe"
+
+
+def test_hardware_test_cli_rejects_tiny_visual_card_preflight_for_unsafe_artifact(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(
+        artifact_path,
+        transfer_manifest={
+            "stage": "read_only_verification",
+            "deviceId": "mock-minix-0194",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "nextRequiredStage": "protocol_sanity_test",
+            "printCommandsSent": True,
+            "rasterBytesIncluded": False,
+        },
+    )
+    stderr = io.StringIO()
+
+    exit_code = run(["tiny-visual-card-preflight", str(artifact_path)], stderr=stderr)
 
     assert exit_code == 2
     assert stderr.getvalue().strip() == "artifact is not read-only safe"
@@ -269,6 +340,8 @@ def _write_stage_a_artifact(
                         "notifyCharUuids": ["0000ff01-0000-1000-8000-00805f9b34fb"],
                     },
                     "print": {
+                        "widthDots": 384,
+                        "rowBytes": 48,
                         "defaultDensity": "medium",
                         "defaultPaperMode": "continuous",
                     },

@@ -34,7 +34,8 @@ physical validation before a stable public release.
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |
 | Stage B physical protocol sanity | Pending hardware run | Future hardware-test artifact |
-| Tiny visual test card | Pending | Future hardware-test artifact |
+| Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
+| Stage C physical tiny visual test card | Pending hardware run | Future hardware-test artifact |
 | Long-print reliability | Pending | Future hardware-test artifact |
 
 Do not treat BLE detection or Stage A alone as permission to print.

@@ -3413,6 +3413,8 @@ function HardwarePreflightStatus({
   onInspect: () => void;
 }) {
   const preflight = workflow.status === "ready" ? workflow.result.preflight : null;
+  const visualCardPreflight =
+    workflow.status === "ready" ? workflow.result.visualCardPreflight : null;
 
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
@@ -3450,6 +3452,24 @@ function HardwarePreflightStatus({
               </div>
             ))}
           </div>
+          {visualCardPreflight ? (
+            <div className="border-t border-warning/20 pt-3">
+              <div className="font-medium text-warning">Tiny visual card preflight ready</div>
+              <div className="mt-2 grid grid-cols-[112px_minmax(0,1fr)] gap-x-2 gap-y-1">
+                <span className="text-muted-foreground">Text</span>
+                <span className="font-mono text-xs">{visualCardPreflight.displayText}</span>
+                <span className="text-muted-foreground">Height</span>
+                <span>{visualCardPreflight.heightDots} dots</span>
+                <span className="text-muted-foreground">Prerequisite</span>
+                <span>Visual card still requires Stage B pass</span>
+              </div>
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                {visualCardPreflight.confirmationChecklist.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <Badge variant="warning">Printing remains locked</Badge>
         </div>
       ) : workflow.status === "ready" ? (

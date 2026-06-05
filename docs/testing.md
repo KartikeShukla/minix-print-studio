@@ -24,6 +24,9 @@ pnpm release-package-check
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
+- Offline certification-preflight tests cover Stage B protocol command metadata
+  and Stage C tiny-card metadata without sending BLE writes or including printable
+  raster bytes.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.

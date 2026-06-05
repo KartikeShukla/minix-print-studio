@@ -823,6 +823,43 @@ describe("MiniX Print Studio shell", () => {
           sendsRaster: false,
           unlocksPrinting: false
         }
+      },
+      visualCardPreflight: {
+        status: "tiny_visual_card_preflight_ready",
+        stage: "tiny_visual_test_card",
+        deviceId: "mock-minix-0194",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        requiredPriorStage: "protocol_sanity_test",
+        displayText: "MINIX TEST 7K4P",
+        widthDots: 384,
+        heightDots: 160,
+        rowBytes: 48,
+        density: "medium",
+        paperMode: "continuous",
+        printCommandsSent: false,
+        rasterBytesIncluded: false,
+        plannedRaster: {
+          commandName: "raster_test_card",
+          payloadBytes: 7688,
+          rasterBytes: 7680,
+          rawBytesIncluded: false,
+          contentSha256:
+            "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+        },
+        confirmationChecklist: [
+          "Text MINIX TEST 7K4P is readable.",
+          "Left and right edge markers are visible.",
+          "Output is not mirrored or upside down.",
+          "Feed is smooth with no stall, overheat warning, disconnect, or fatal error."
+        ],
+        safety: {
+          requiresPhysicalPrinter: true,
+          requiresUserConfirmation: true,
+          requiresPriorProtocolSanity: true,
+          sendsRasterIfExecuted: true,
+          unlocksPrinting: false,
+          preflightOnly: true
+        }
       }
     });
 
@@ -854,6 +891,15 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("mock-minix-0194")).toBeInTheDocument();
     expect(screen.getByText("wake")).toBeInTheDocument();
     expect(screen.getByText("10 ff 10 00 01")).toBeInTheDocument();
+    expect(screen.getByText("Tiny visual card preflight ready")).toBeInTheDocument();
+    expect(screen.getByText("MINIX TEST 7K4P")).toBeInTheDocument();
+    expect(screen.getByText("160 dots")).toBeInTheDocument();
+    expect(
+      screen.getByText("Visual card still requires Stage B pass")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Text MINIX TEST 7K4P is readable.")
+    ).toBeInTheDocument();
     expect(screen.getByText("Printing remains locked")).toBeInTheDocument();
   });
 
