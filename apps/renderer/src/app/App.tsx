@@ -39,6 +39,7 @@ import {
   createTextElement,
   imageElementSchema,
   moveElement,
+  printDocumentSchema,
   qrElementSchema,
   rectElementSchema,
   textElementSchema,
@@ -213,6 +214,8 @@ type ProjectWorkflow =
   | { status: "ready"; projects: ProjectSummary[] }
   | { status: "saving"; projects: ProjectSummary[] }
   | { status: "saved"; projects: ProjectSummary[]; savedProjectId: string }
+  | { status: "opening"; projects: ProjectSummary[]; projectId: string }
+  | { status: "opened"; projects: ProjectSummary[]; openedProjectId: string }
   | { status: "error"; projects: ProjectSummary[]; message: string };
 
 type EditorState = {
@@ -714,6 +717,48 @@ export function App({
     }
   }, [client, document]);
 
+  const openProject = useCallback(
+    async (projectId: string) => {
+      if (!client.getProject) {
+        setProjectWorkflow((current) => ({
+          status: "error",
+          projects: current.projects,
+          message: "Project API unavailable"
+        }));
+        return;
+      }
+      setProjectWorkflow((current) => ({
+        status: "opening",
+        projects: current.projects,
+        projectId
+      }));
+      try {
+        const project = await client.getProject(projectId);
+        const loadedDocument = printDocumentSchema.parse(project.document);
+        setEditingTextElementId(null);
+        setEditorState({
+          document: loadedDocument,
+          past: [],
+          future: [],
+          selectedElementId: null
+        });
+        invalidatePreview();
+        setProjectWorkflow((current) => ({
+          status: "opened",
+          projects: upsertProjectSummary(current.projects, projectSummaryFromResponse(project)),
+          openedProjectId: project.projectId
+        }));
+      } catch (error: unknown) {
+        setProjectWorkflow((current) => ({
+          status: "error",
+          projects: current.projects,
+          message: error instanceof Error ? error.message : "Project open failed"
+        }));
+      }
+    },
+    [client, invalidatePreview]
+  );
+
   const runPrint = useCallback(async () => {
     if (previewWorkflow.status !== "ready") {
       return;
@@ -1116,8 +1161,10 @@ export function App({
               workflow={projectWorkflow}
               canLoad={Boolean(client.listProjects)}
               canSave={Boolean(client.createProject)}
+              canOpen={Boolean(client.getProject)}
               onLoad={loadProjects}
               onSave={saveProject}
+              onOpen={openProject}
             />
             <PrinterPanel
               workflow={printerWorkflow}
@@ -1305,14 +1352,18 @@ function ProjectsPanel({
   workflow,
   canLoad,
   canSave,
+  canOpen,
   onLoad,
-  onSave
+  onSave,
+  onOpen
 }: {
   workflow: ProjectWorkflow;
   canLoad: boolean;
   canSave: boolean;
+  canOpen: boolean;
   onLoad: () => void;
   onSave: () => void;
+  onOpen: (projectId: string) => void;
 }) {
   return (
     <section className="border-b border-border p-4">
@@ -1348,6 +1399,10 @@ function ProjectsPanel({
         <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
           Saved project {workflow.savedProjectId}
         </div>
+      ) : workflow.status === "opened" ? (
+        <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          Opened project {workflow.openedProjectId}
+        </div>
       ) : workflow.status === "error" ? (
         <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
           {workflow.message}
@@ -1367,6 +1422,23 @@ function ProjectsPanel({
               <div className="mt-1 truncate text-xs text-muted-foreground">
                 {project.projectId}
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full"
+                aria-label={`Open ${project.name} project`}
+                onClick={() => onOpen(project.projectId)}
+                disabled={
+                  !canOpen ||
+                  (workflow.status === "opening" && workflow.projectId === project.projectId)
+                }
+              >
+                <FolderOpen className="size-4" aria-hidden="true" />
+                {workflow.status === "opening" && workflow.projectId === project.projectId
+                  ? "Opening"
+                  : "Open"}
+              </Button>
             </div>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createDefaultDocument } from "@minix/design-model";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app/App";
 
@@ -1134,5 +1135,63 @@ describe("MiniX Print Studio shell", () => {
       });
     });
     expect(await screen.findByText("Saved project prj_new")).toBeInTheDocument();
+  });
+
+  it("opens a saved daemon project into the editor", async () => {
+    const loadedDocument = createDefaultDocument({
+      title: "Loaded checklist",
+      now: new Date("2026-06-05T00:02:00.000Z")
+    });
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_loaded",
+          name: "Loaded checklist",
+          documentId: loadedDocument.id,
+          updatedAt: "2026-06-05T00:02:00Z"
+        }
+      ]
+    });
+    const getProject = vi.fn().mockResolvedValue({
+      projectId: "prj_loaded",
+      name: "Loaded checklist",
+      document: loadedDocument,
+      createdAt: "2026-06-05T00:02:00Z",
+      updatedAt: "2026-06-05T00:02:00Z"
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          getProject
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+    expect(await screen.findByText("Loaded checklist")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Loaded checklist project" }));
+
+    await waitFor(() => {
+      expect(getProject).toHaveBeenCalledWith("prj_loaded");
+    });
+    expect(await screen.findByText("Opened project prj_loaded")).toBeInTheDocument();
+    expect(screen.getByText("Loaded checklist - continuous paper")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
+      loadedDocument
+    );
   });
 });
