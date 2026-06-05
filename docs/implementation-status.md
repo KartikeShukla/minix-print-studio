@@ -100,6 +100,7 @@
 - BLE read-only verification captures timing metadata for notify setup, notifications, writes, and notify teardown without recording raw command payloads.
 - `/v1/diagnostics/hardware-test` runs Stage A read-only verification and exports a hardware-test ZIP with device/profile snapshots, BLE discovery metadata, model/firmware response files, notification/command logs, safety report, and explicit evidence that no print commands or raster bytes were sent.
 - Renderer printer setup exposes `Export read-only artifact` after read-only verification so a hardware tester can capture the Stage A validation record without terminal steps.
+- Electron exposes an offline Stage A artifact inspector from the Printer panel that reuses the shared hardware-test CLI safety checks and shows the Stage B protocol sanity preflight without BLE writes.
 - Non-mock BLE scan now maps host Bluetooth-unavailable failures to a structured `503` response, and the renderer daemon client preserves daemon `detail` text so the UI can show actionable setup errors.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
@@ -138,6 +139,7 @@
 - TDD red/green checks for the Stage A hardware-test CLI scan/export flow and daemon error-detail preservation.
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
+- TDD red/green checks for the Electron artifact-inspection bridge and renderer Stage B preflight summary from an exported Stage A artifact.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
@@ -145,6 +147,7 @@
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
 - TDD red/green checks for renderer daemon-project session persistence, startup restore before local document cache fallback, and active-project session cleanup on delete.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects/session/image-asset changes, the Image import button and Projects panel render, and the browser console only shows the React DevTools hint.
+- Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
 - Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.

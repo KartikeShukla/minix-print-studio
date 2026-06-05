@@ -589,6 +589,80 @@ describe("MiniX Print Studio shell", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:hardware-test");
   });
 
+  it("inspects an exported Stage A artifact and shows the protocol sanity preflight", async () => {
+    const inspect = vi.fn().mockResolvedValue({
+      artifactPath: "/tmp/hardware-test-stage-a.zip",
+      inspection: {
+        status: "valid_stage_a_artifact",
+        deviceId: "mock-minix-0194",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        nextRequiredStage: "protocol_sanity_test"
+      },
+      preflight: {
+        status: "protocol_sanity_preflight_ready",
+        stage: "protocol_sanity_test",
+        deviceId: "mock-minix-0194",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        writeCharacteristic: "0000ff02-0000-1000-8000-00805f9b34fb",
+        notifyCharacteristics: ["0000ff01-0000-1000-8000-00805f9b34fb"],
+        density: "medium",
+        paperMode: "continuous",
+        printCommandsSent: false,
+        rasterBytesIncluded: false,
+        commands: [
+          {
+            index: 0,
+            name: "wake",
+            payloadBytes: 12,
+            hex: "00 00 00 00 00 00 00 00 00 00 00 00"
+          },
+          {
+            index: 1,
+            name: "set_density",
+            payloadBytes: 5,
+            hex: "10 ff 10 00 01"
+          }
+        ],
+        safety: {
+          requiresPhysicalPrinter: true,
+          requiresUserConfirmation: true,
+          sendsRaster: false,
+          unlocksPrinting: false
+        }
+      }
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        hardwareArtifactInspector={{ inspect }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Inspect Stage A artifact" }));
+
+    await waitFor(() => {
+      expect(inspect).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText("Protocol sanity preflight ready")).toBeInTheDocument();
+    expect(screen.getByText("mock-minix-0194")).toBeInTheDocument();
+    expect(screen.getByText("wake")).toBeInTheDocument();
+    expect(screen.getByText("10 ff 10 00 01")).toBeInTheDocument();
+    expect(screen.getByText("Printing remains locked")).toBeInTheDocument();
+  });
+
   it("adds a text layer from the canvas tool and persists the document", async () => {
     render(
       <App

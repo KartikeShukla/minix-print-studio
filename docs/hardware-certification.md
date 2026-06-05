@@ -34,6 +34,10 @@ After read-only verification, use `Export read-only artifact` in the Printer pan
 The daemon runs a fresh `/v1/diagnostics/hardware-test` request for the selected
 device and returns a `hardware-test-<timestamp>.zip` artifact.
 
+Use `Inspect Stage A artifact` in the Printer panel to select an exported artifact,
+run the same offline safety inspection used by the CLI, and review the Stage B
+protocol sanity preflight without sending BLE writes.
+
 For command-line validation against a running daemon:
 
 ```bash

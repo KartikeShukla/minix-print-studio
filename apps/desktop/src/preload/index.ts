@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld("minix", {
   testAgentIntegrationConnection: (targetId: string) =>
     ipcRenderer.invoke("agent-integrations:test", targetId),
   exportAgentIntegrationBundle: (targetId: string) =>
-    ipcRenderer.invoke("agent-integrations:export-bundle", targetId)
+    ipcRenderer.invoke("agent-integrations:export-bundle", targetId),
+  inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect")
 });

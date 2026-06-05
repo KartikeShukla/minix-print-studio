@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 import log from "electron-log";
 import {
   buildAgentIntegrationPreview,
@@ -13,6 +13,7 @@ import {
 } from "./integrationInstaller";
 import { ensureMcpShim } from "./mcpShim";
 import { exportClaudeDesktopMcpb } from "./mcpbExport";
+import { inspectHardwareArtifact } from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -107,6 +108,24 @@ ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentInteg
   }
   return exportClaudeDesktopMcpb({
     userDataPath: app.getPath("userData"),
+    repoRoot: getRepoRoot()
+  });
+});
+ipcMain.handle("hardware-artifacts:inspect", async () => {
+  const options: OpenDialogOptions = {
+    title: "Inspect Stage A artifact",
+    properties: ["openFile"],
+    filters: [{ name: "Hardware-test ZIP", extensions: ["zip"] }]
+  };
+  const selection = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  const artifactPath = selection.filePaths[0];
+  if (selection.canceled || !artifactPath) {
+    return null;
+  }
+  return inspectHardwareArtifact({
+    artifactPath,
     repoRoot: getRepoRoot()
   });
 });

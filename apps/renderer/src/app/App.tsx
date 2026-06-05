@@ -97,6 +97,11 @@ import {
   saveStoredProjectSession
 } from "@/lib/document-storage";
 import {
+  desktopHardwareArtifactInspector,
+  type HardwareArtifactInspectionResult,
+  type HardwareArtifactInspector
+} from "@/lib/hardware-artifacts";
+import {
   loadStoredJobHistory,
   prependStoredPrintJob,
   saveStoredJobHistory,
@@ -132,6 +137,7 @@ export type AppProps = {
   daemonClient?: AppDaemonClient;
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
+  hardwareArtifactInspector?: HardwareArtifactInspector;
 };
 
 const tools = [
@@ -170,6 +176,12 @@ type HardwareArtifactWorkflow =
   | { status: "running"; deviceId: string }
   | { status: "exported"; deviceId: string; sizeBytes: number }
   | { status: "error"; deviceId: string; message: string };
+
+type HardwarePreflightWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: HardwareArtifactInspectionResult }
+  | { status: "error"; message: string };
 
 type AgentIntegrationWorkflow =
   | { status: "loading" }
@@ -261,7 +273,8 @@ type CanvasElement =
 export function App({
   daemonClient,
   agentIntegrationProvider,
-  agentIntegrationInstaller
+  agentIntegrationInstaller,
+  hardwareArtifactInspector
 }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const integrationProvider = useMemo(
@@ -271,6 +284,10 @@ export function App({
   const integrationInstaller = useMemo(
     () => agentIntegrationInstaller ?? desktopAgentIntegrationInstaller,
     [agentIntegrationInstaller]
+  );
+  const artifactInspector = useMemo(
+    () => hardwareArtifactInspector ?? desktopHardwareArtifactInspector,
+    [hardwareArtifactInspector]
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
@@ -299,6 +316,8 @@ export function App({
     useState<HardwareArtifactWorkflow>({
       status: "idle"
     });
+  const [hardwarePreflightWorkflow, setHardwarePreflightWorkflow] =
+    useState<HardwarePreflightWorkflow>({ status: "idle" });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
     useState<AgentIntegrationWorkflow>({
       status: "loading"
@@ -1013,6 +1032,19 @@ export function App({
     [client]
   );
 
+  const inspectHardwareArtifact = useCallback(async () => {
+    setHardwarePreflightWorkflow({ status: "running" });
+    try {
+      const result = await artifactInspector.inspect();
+      setHardwarePreflightWorkflow(result ? { status: "ready", result } : { status: "idle" });
+    } catch (error: unknown) {
+      setHardwarePreflightWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Hardware artifact inspection failed"
+      });
+    }
+  }, [artifactInspector]);
+
   const copyAgentIntegrationConfig = useCallback(async (target: AgentIntegrationPreviewTarget) => {
     try {
       if (!navigator.clipboard?.writeText) {
@@ -1343,8 +1375,10 @@ export function App({
             <PrinterPanel
               workflow={printerWorkflow}
               hardwareArtifactWorkflow={hardwareArtifactWorkflow}
+              hardwarePreflightWorkflow={hardwarePreflightWorkflow}
               onVerify={runReadOnlyVerify}
               onExportHardwareArtifact={runHardwareArtifactExport}
+              onInspectHardwareArtifact={inspectHardwareArtifact}
             />
             <ElementInspector element={selectedElement} onUpdate={updateDocumentElement} />
 
@@ -2882,13 +2916,17 @@ function CanvasQrElement({
 function PrinterPanel({
   workflow,
   hardwareArtifactWorkflow,
+  hardwarePreflightWorkflow,
   onVerify,
-  onExportHardwareArtifact
+  onExportHardwareArtifact,
+  onInspectHardwareArtifact
 }: {
   workflow: PrinterWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
+  hardwarePreflightWorkflow: HardwarePreflightWorkflow;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
   onExportHardwareArtifact: (deviceId: string) => void;
+  onInspectHardwareArtifact: () => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
@@ -2934,7 +2972,71 @@ function PrinterPanel({
           }
         }}
       />
+      <HardwarePreflightStatus
+        workflow={hardwarePreflightWorkflow}
+        onInspect={onInspectHardwareArtifact}
+      />
     </section>
+  );
+}
+
+function HardwarePreflightStatus({
+  workflow,
+  onInspect
+}: {
+  workflow: HardwarePreflightWorkflow;
+  onInspect: () => void;
+}) {
+  const preflight = workflow.status === "ready" ? workflow.result.preflight : null;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onInspect}
+        disabled={workflow.status === "running"}
+      >
+        <FileSearch className="size-4" aria-hidden="true" />
+        {workflow.status === "running" ? "Inspecting artifact" : "Inspect Stage A artifact"}
+      </Button>
+      {workflow.status === "ready" && preflight ? (
+        <div className="space-y-3 rounded-md border border-warning/30 bg-warning/10 p-3">
+          <div>
+            <div className="font-medium text-warning">Protocol sanity preflight ready</div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Device</span>
+              <span className="text-right">{preflight.deviceId}</span>
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Profile</span>
+              <span className="text-right">{preflight.profileId}</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {preflight.commands.map((command) => (
+              <div
+                key={`${command.index}-${command.name}`}
+                className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 rounded-sm bg-background/70 px-2 py-1"
+              >
+                <span>{command.name}</span>
+                <span className="min-w-0 break-words font-mono text-xs">{command.hex}</span>
+              </div>
+            ))}
+          </div>
+          <Badge variant="warning">Printing remains locked</Badge>
+        </div>
+      ) : workflow.status === "ready" ? (
+        <div className="rounded-md border border-border bg-muted/40 p-2 text-muted-foreground">
+          Stage A artifact valid
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
