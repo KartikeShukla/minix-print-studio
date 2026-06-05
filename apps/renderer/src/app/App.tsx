@@ -280,6 +280,7 @@ export function App({
     status: "idle",
     projects: []
   });
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
     status: "idle"
   });
@@ -688,6 +689,40 @@ export function App({
   }, [client]);
 
   const saveProject = useCallback(async () => {
+    const request = {
+      name: document.title,
+      document
+    };
+
+    if (activeProjectId) {
+      if (!client.updateProject) {
+        setProjectWorkflow((current) => ({
+          status: "error",
+          projects: current.projects,
+          message: "Project API unavailable"
+        }));
+        return;
+      }
+      setProjectWorkflow((current) => ({ status: "saving", projects: current.projects }));
+      try {
+        const savedProject = await client.updateProject(activeProjectId, request);
+        const summary = projectSummaryFromResponse(savedProject);
+        setActiveProjectId(savedProject.projectId);
+        setProjectWorkflow((current) => ({
+          status: "saved",
+          projects: upsertProjectSummary(current.projects, summary),
+          savedProjectId: savedProject.projectId
+        }));
+      } catch (error: unknown) {
+        setProjectWorkflow((current) => ({
+          status: "error",
+          projects: current.projects,
+          message: error instanceof Error ? error.message : "Project save failed"
+        }));
+      }
+      return;
+    }
+
     if (!client.createProject) {
       setProjectWorkflow((current) => ({
         status: "error",
@@ -698,11 +733,9 @@ export function App({
     }
     setProjectWorkflow((current) => ({ status: "saving", projects: current.projects }));
     try {
-      const savedProject = await client.createProject({
-        name: document.title,
-        document
-      });
+      const savedProject = await client.createProject(request);
       const summary = projectSummaryFromResponse(savedProject);
+      setActiveProjectId(savedProject.projectId);
       setProjectWorkflow((current) => ({
         status: "saved",
         projects: upsertProjectSummary(current.projects, summary),
@@ -715,7 +748,7 @@ export function App({
         message: error instanceof Error ? error.message : "Project save failed"
       }));
     }
-  }, [client, document]);
+  }, [activeProjectId, client, document]);
 
   const openProject = useCallback(
     async (projectId: string) => {
@@ -742,6 +775,7 @@ export function App({
           future: [],
           selectedElementId: null
         });
+        setActiveProjectId(project.projectId);
         invalidatePreview();
         setProjectWorkflow((current) => ({
           status: "opened",
@@ -1160,7 +1194,9 @@ export function App({
             <ProjectsPanel
               workflow={projectWorkflow}
               canLoad={Boolean(client.listProjects)}
-              canSave={Boolean(client.createProject)}
+              canSave={
+                activeProjectId ? Boolean(client.updateProject) : Boolean(client.createProject)
+              }
               canOpen={Boolean(client.getProject)}
               onLoad={loadProjects}
               onSave={saveProject}

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { createDefaultDocument } from "@minix/design-model";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app/App";
+import type { ProjectMutationRequest } from "../src/lib/api-client";
 
 describe("MiniX Print Studio shell", () => {
   afterEach(() => {
@@ -1193,5 +1194,93 @@ describe("MiniX Print Studio shell", () => {
     expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
       loadedDocument
     );
+  });
+
+  it("updates the opened daemon project when saving document changes", async () => {
+    const loadedDocument = createDefaultDocument({
+      title: "Loaded checklist",
+      now: new Date("2026-06-05T00:03:00.000Z")
+    });
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_loaded",
+          name: "Loaded checklist",
+          documentId: loadedDocument.id,
+          updatedAt: "2026-06-05T00:03:00Z"
+        }
+      ]
+    });
+    const getProject = vi.fn().mockResolvedValue({
+      projectId: "prj_loaded",
+      name: "Loaded checklist",
+      document: loadedDocument,
+      createdAt: "2026-06-05T00:03:00Z",
+      updatedAt: "2026-06-05T00:03:00Z"
+    });
+    const createProject = vi.fn().mockResolvedValue({
+      projectId: "prj_duplicate",
+      name: "Loaded checklist",
+      document: loadedDocument,
+      createdAt: "2026-06-05T00:04:00Z",
+      updatedAt: "2026-06-05T00:04:00Z"
+    });
+    const updateProject = vi.fn(
+      async (_projectId: string, request: ProjectMutationRequest) => ({
+        projectId: "prj_loaded",
+        name: request.name,
+        document: request.document as unknown as Record<string, unknown>,
+        createdAt: "2026-06-05T00:03:00Z",
+        updatedAt: "2026-06-05T00:05:00Z"
+      })
+    );
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          createProject,
+          getProject,
+          updateProject
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+    expect(await screen.findByText("Loaded checklist")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Loaded checklist project" }));
+    expect(await screen.findByText("Opened project prj_loaded")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save project" }));
+
+    await waitFor(() => {
+      expect(updateProject).toHaveBeenCalledWith(
+        "prj_loaded",
+        expect.objectContaining({
+          name: "Loaded checklist",
+          document: expect.objectContaining({
+            title: "Loaded checklist",
+            elements: expect.arrayContaining([
+              expect.objectContaining({ name: "Rectangle 1", type: "rect" })
+            ])
+          })
+        })
+      );
+    });
+    expect(createProject).not.toHaveBeenCalled();
+    expect(await screen.findByText("Saved project prj_loaded")).toBeInTheDocument();
   });
 });

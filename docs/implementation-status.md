@@ -38,7 +38,7 @@
 - `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
 - Disk-backed daemon project store with `/v1/projects` create/list/get/update/delete endpoints and hash-addressed project asset upload that persist under `data_dir` when configured.
 - Shared TypeScript schemas and renderer daemon client methods for project create/list/get/update/delete and hash-addressed project asset upload.
-- Renderer Projects panel can load daemon project summaries, save the current document as a daemon-backed project, and open saved daemon projects into the editor.
+- Renderer Projects panel can load daemon project summaries, save the current document as a daemon-backed project, open saved daemon projects into the editor, and update opened projects without creating duplicates.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
@@ -140,14 +140,14 @@
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
-- TDD red/green checks for the renderer Projects panel load/save/open workflow against the daemon project client.
-- Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects open UI changes, Projects panel renders Load/Save controls, and the browser console only shows the React DevTools hint.
+- TDD red/green checks for the renderer Projects panel load/save/open/update workflow against the daemon project client.
+- Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects open/update UI changes, Projects panel renders Load/Save controls, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
 - Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
-1. Complete project management coverage: update/delete project UI, daemon-backed image asset import, and migration away from single-document localStorage as the primary saved-project path.
+1. Complete project management coverage: delete project UI, daemon-backed image asset import, and migration away from single-document localStorage as the primary saved-project path.
 2. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
 3. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.
