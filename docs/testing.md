@@ -25,3 +25,9 @@ pnpm release-package-check
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
+
+## Dependency Maintenance
+
+Dependabot opens weekly update pull requests for the npm workspace, GitHub Actions,
+and the Python daemon/MCP packages. These updates must still pass the local gates
+above before merge.

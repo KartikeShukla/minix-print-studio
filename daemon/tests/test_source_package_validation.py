@@ -61,6 +61,7 @@ def test_source_package_check_requires_release_package_workflow_and_python_runne
 def test_source_package_check_requires_community_intake_templates() -> None:
     validator = _load_validator()
 
+    assert Path(".github/dependabot.yml") in validator.REQUIRED_SOURCE_PATHS
     assert Path(".github/PULL_REQUEST_TEMPLATE.md") in validator.REQUIRED_SOURCE_PATHS
     assert Path(".github/ISSUE_TEMPLATE/bug_report.yml") in validator.REQUIRED_SOURCE_PATHS
     assert Path(".github/ISSUE_TEMPLATE/feature_request.yml") in validator.REQUIRED_SOURCE_PATHS

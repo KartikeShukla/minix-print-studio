@@ -25,6 +25,7 @@ pnpm dev
 - Hardware tests must stay explicit and separate from CI.
 - Use the GitHub issue templates for bugs, feature requests, and hardware profile evidence so triage preserves reproduction steps, safety state, and redaction checks.
 - Use the pull request template and fill in the validation and safety checklist before review.
+- Dependabot tracks npm workspace, GitHub Actions, and Python package updates weekly. Treat those pull requests like normal code changes: review the diff, run the gates, and avoid merging updates that weaken printer safety or release packaging controls.
 
 ## Validation
 

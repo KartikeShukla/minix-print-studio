@@ -15,6 +15,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("pnpm-lock.yaml"),
     Path("pnpm-workspace.yaml"),
     Path("turbo.json"),
+    Path(".github/dependabot.yml"),
     Path(".github/PULL_REQUEST_TEMPLATE.md"),
     Path(".github/ISSUE_TEMPLATE/bug_report.yml"),
     Path(".github/ISSUE_TEMPLATE/feature_request.yml"),

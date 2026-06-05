@@ -77,6 +77,72 @@ def test_open_source_readiness_check_requires_community_intake_templates() -> No
     assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_FILES
 
 
+def test_open_source_readiness_check_requires_dependabot_config() -> None:
+    validator = _load_validator()
+
+    assert Path(".github/dependabot.yml") in validator.REQUIRED_FILES
+
+
+def test_open_source_readiness_check_validates_dependabot_config() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_dependabot_config_text(
+        """
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+"""
+    )
+
+    assert issues == [
+        "dependabot config missing github-actions updates for /",
+        "dependabot config missing pip updates for /daemon",
+        "dependabot config missing pip updates for /mcp",
+        "dependabot config must limit open pull requests",
+        "dependabot config must label update pull requests",
+    ]
+
+
+def test_open_source_readiness_matches_dependabot_ecosystem_directory_pairs() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_dependabot_config_text(
+        """
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/mcp"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+  - package-ecosystem: "pip"
+    directory: "/daemon"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+"""
+    )
+
+    assert issues == [
+        "dependabot config missing npm updates for /",
+        "dependabot config missing pip updates for /mcp",
+    ]
+
+
 def test_open_source_readiness_scans_issue_templates_for_private_paths(
     tmp_path: Path,
 ) -> None:
@@ -175,6 +241,10 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         _ci_workflow_text(),
         encoding="utf-8",
     )
+    (root / ".github" / "dependabot.yml").write_text(
+        _dependabot_config_text(),
+        encoding="utf-8",
+    )
     for relative_path in (
         Path("CONTRIBUTING.md"),
         Path("docs/release.md"),
@@ -199,4 +269,39 @@ jobs:
       - run: python3 scripts/validate_open_source_readiness.py
       - run: pnpm source-package-check
       - run: pnpm release-package-check
+"""
+
+
+def _dependabot_config_text() -> str:
+    return """
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+  - package-ecosystem: "pip"
+    directory: "/daemon"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+  - package-ecosystem: "pip"
+    directory: "/mcp"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
 """

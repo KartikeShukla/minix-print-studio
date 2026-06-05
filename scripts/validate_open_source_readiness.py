@@ -15,6 +15,7 @@ REQUIRED_FILES = (
     Path("package.json"),
     Path("pnpm-workspace.yaml"),
     Path("turbo.json"),
+    Path(".github/dependabot.yml"),
     Path(".github/workflows/ci.yml"),
     Path(".github/workflows/release-package.yml"),
     Path(".github/PULL_REQUEST_TEMPLATE.md"),
@@ -57,6 +58,7 @@ PRIVATE_PATH_MARKERS = (
 
 SHAREABLE_TEXT_GLOBS = (
     "*.md",
+    ".github/*.yml",
     ".github/*.md",
     ".github/workflows/*.yml",
     ".github/ISSUE_TEMPLATE/*.yml",
@@ -90,6 +92,13 @@ REQUIRED_GATE_DOCS = (
     Path("docs/testing.md"),
 )
 
+REQUIRED_DEPENDABOT_BLOCKS = (
+    ("npm", "/"),
+    ("github-actions", "/"),
+    ("pip", "/daemon"),
+    ("pip", "/mcp"),
+)
+
 
 def main() -> int:
     root = Path.cwd()
@@ -109,6 +118,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
+    issues.extend(_dependabot_config_issues(root))
     issues.extend(_missing_documented_gate_commands(root))
     issues.extend(validate_private_path_redaction(root=root, paths=_shareable_text_paths(root)))
     return issues
@@ -199,6 +209,50 @@ def validate_ci_workflow(text: str) -> list[str]:
     )
     issues.extend(_pnpm_setup_issues(text))
     return issues
+
+
+def validate_dependabot_config_text(text: str) -> list[str]:
+    issues: list[str] = []
+    update_blocks = _dependabot_update_blocks(text)
+    for ecosystem, directory in REQUIRED_DEPENDABOT_BLOCKS:
+        if not _dependabot_block_exists(update_blocks, ecosystem, directory):
+            issues.append(f"dependabot config missing {ecosystem} updates for {directory}")
+    if "open-pull-requests-limit:" not in text:
+        issues.append("dependabot config must limit open pull requests")
+    if "labels:" not in text or "dependencies" not in text:
+        issues.append("dependabot config must label update pull requests")
+    return issues
+
+
+def _dependabot_config_issues(root: Path) -> list[str]:
+    dependabot_config = root / ".github" / "dependabot.yml"
+    if not dependabot_config.is_file():
+        return ["missing required file: .github/dependabot.yml"]
+    return validate_dependabot_config_text(dependabot_config.read_text(encoding="utf-8"))
+
+
+def _dependabot_update_blocks(text: str) -> list[str]:
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for line in text.splitlines():
+        if line.strip().startswith("- package-ecosystem:"):
+            if current:
+                blocks.append(current)
+            current = [line]
+        elif current:
+            current.append(line)
+    if current:
+        blocks.append(current)
+    return ["\n".join(block) for block in blocks]
+
+
+def _dependabot_block_exists(blocks: list[str], ecosystem: str, directory: str) -> bool:
+    return any(
+        f'package-ecosystem: "{ecosystem}"' in block
+        and f'directory: "{directory}"' in block
+        and 'interval: "weekly"' in block
+        for block in blocks
+    )
 
 
 def _pnpm_setup_issues(text: str) -> list[str]:
