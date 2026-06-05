@@ -33,6 +33,7 @@
 - Community intake templates cover bug reports, feature requests, hardware profile evidence, and pull requests with safety, privacy, reproduction, and validation prompts.
 - Desktop package builds use tracked MiniX Print Studio icon assets instead of the default Electron icon, with a reproducible icon generator plus release/source package validators that require the macOS PNG and Windows ICO assets.
 - Release package workflow writes a deterministic `SHA256SUMS.txt` manifest for uploaded unsigned package artifacts, excludes electron-builder scratch files, and validators require the checksum script and workflow step.
+- Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
 - CodeQL workflow scans JavaScript/TypeScript and Python with the `security-extended` query suite on pull requests, pushes to `main`, weekly schedule, and manual dispatch.
 - CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, and open-source readiness validation rejects missing or `write-all` workflow permissions.
@@ -139,6 +140,7 @@
 - TDD red/green checks for explicit desktop package icon configuration and tracked icon assets in release/source package validation.
 - Unsigned macOS package smoke verified `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/icon.icns` and `CFBundleIconFile => icon.icns`, with no default Electron icon fallback warning.
 - TDD red/green checks for release checksum manifest generation, relative CLI paths, source-package inclusion, and release workflow checksum wiring.
+- TDD red/green checks for release workflow manual dispatch and platform-named artifact evidence uploads.
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions on CI and release package workflows.

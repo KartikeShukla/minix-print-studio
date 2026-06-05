@@ -55,6 +55,15 @@ RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS = (
     "!dist/release/.icon-*",
 )
 
+RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES = {
+    "minix-print-studio-macos-unsigned": (
+        "release package workflow missing macOS unsigned artifact name"
+    ),
+    "minix-print-studio-windows-unsigned": (
+        "release package workflow missing Windows unsigned artifact name"
+    ),
+}
+
 RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
     ("pnpm/action-setup@v4", "release package workflow missing pnpm setup"),
     ("actions/setup-node@v4", "release package workflow missing Node setup"),
@@ -176,6 +185,8 @@ def validate_builder_config_text(text: str) -> list[str]:
 
 def validate_release_package_workflow_text(text: str) -> list[str]:
     issues: list[str] = []
+    if "workflow_dispatch:" not in text:
+        issues.append("release package workflow must support manual workflow_dispatch")
     if "runs-on: macos-latest" not in text and "os: macos-latest" not in text:
         issues.append("release package workflow missing macOS runner")
     if "runs-on: windows-latest" not in text and "os: windows-latest" not in text:
@@ -184,6 +195,13 @@ def validate_release_package_workflow_text(text: str) -> list[str]:
         issue
         for snippet, issue in RELEASE_WORKFLOW_REQUIRED_SNIPPETS
         if snippet not in text
+    )
+    if "actions/upload-artifact@v4" not in text:
+        issues.append("release package workflow missing artifact upload step")
+    issues.extend(
+        issue
+        for artifact_name, issue in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES.items()
+        if artifact_name not in text
     )
     if any(snippet not in text for snippet in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS):
         issues.append("release package workflow must exclude electron-builder scratch artifacts")

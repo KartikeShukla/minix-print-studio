@@ -35,13 +35,16 @@ cross-compile, so sidecar builds must run on the same operating system as the
 package target.
 
 The release package workflow at `.github/workflows/release-package.yml` runs
-unsigned package smokes on native macOS and Windows runners. Use that workflow to
+unsigned package smokes on native macOS and Windows runners and supports manual
+`workflow_dispatch` runs for release evidence capture. Use that workflow to
 validate Windows sidecar binaries and package inclusion before making Windows
-release claims. The workflow also writes `dist/release/SHA256SUMS.txt` before
-uploading artifacts so downloaded unsigned packages can be checked against a
-deterministic SHA-256 manifest. Electron-builder scratch files such as
-`builder-debug.yml` and `.icon-*` conversion caches are excluded from both the
-checksum manifest and uploaded artifact.
+release claims. The uploaded evidence artifacts are named
+`minix-print-studio-macos-unsigned` and `minix-print-studio-windows-unsigned`.
+The workflow also writes `dist/release/SHA256SUMS.txt` before uploading artifacts
+so downloaded unsigned packages can be checked against a deterministic SHA-256
+manifest. Electron-builder scratch files such as `builder-debug.yml` and
+`.icon-*` conversion caches are excluded from both the checksum manifest and
+uploaded artifact.
 
 ## Packaging Targets
 

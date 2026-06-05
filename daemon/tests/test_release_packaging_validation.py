@@ -71,31 +71,52 @@ def test_release_packaging_check_requires_windows_package_workflow() -> None:
     validator = _load_validator()
 
     issues = validator.validate_release_package_workflow_text(
-        """
-name: Release Package
-
-jobs:
-  package:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - run: pnpm package:mac
-"""
+        _complete_release_workflow_text()
+        .replace("          - os: windows-latest\n", "")
+        .replace("      - run: pnpm package:win\n", "")
     )
 
     assert issues == [
         "release package workflow missing Windows runner",
-        "release package workflow missing Node setup",
-        "release package workflow missing Python setup",
-        "release package workflow missing command: pnpm install --frozen-lockfile",
-        "release package workflow missing command: "
-        "python -m pip install -e daemon[dev] -e mcp[dev]",
-        "release package workflow missing command: pnpm release-package-check",
         "release package workflow missing command: pnpm package:win",
-        "release package workflow missing command: "
-        "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
-        "release package workflow must exclude electron-builder scratch artifacts",
+    ]
+
+
+def test_release_packaging_check_requires_manual_release_package_dispatch() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text().replace("  workflow_dispatch:\n", "")
+    )
+
+    assert issues == ["release package workflow must support manual workflow_dispatch"]
+
+
+def test_release_packaging_check_requires_artifact_upload_step() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text().replace(
+            "      - uses: actions/upload-artifact@v4\n",
+            "",
+        )
+    )
+
+    assert issues == ["release package workflow missing artifact upload step"]
+
+
+def test_release_packaging_check_requires_platform_named_artifacts() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text()
+        .replace("minix-print-studio-macos-unsigned", "minix-print-studio-unsigned")
+        .replace("minix-print-studio-windows-unsigned", "minix-print-studio-unsigned")
+    )
+
+    assert issues == [
+        "release package workflow missing macOS unsigned artifact name",
+        "release package workflow missing Windows unsigned artifact name",
     ]
 
 
@@ -230,30 +251,16 @@ def test_release_packaging_check_requires_checksum_manifest_workflow_step() -> N
     validator = _load_validator()
 
     issues = validator.validate_release_package_workflow_text(
-        """
-jobs:
-  package:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-          - os: windows-latest
-    steps:
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-      - uses: actions/setup-python@v5
-      - run: pnpm install --frozen-lockfile
-      - run: python -m pip install -e daemon[dev] -e mcp[dev]
-      - run: pnpm release-package-check
-      - run: pnpm package:mac
-      - run: pnpm package:win
-"""
+        _complete_release_workflow_text().replace(
+            "      - run: node scripts/run_python.mjs scripts/write_release_checksums.py "
+            "dist/release\n",
+            "",
+        )
     )
 
     assert issues == [
         "release package workflow missing command: "
         "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
-        "release package workflow must exclude electron-builder scratch artifacts",
     ]
 
 
@@ -261,28 +268,10 @@ def test_release_packaging_check_requires_artifact_upload_exclusions() -> None:
     validator = _load_validator()
 
     issues = validator.validate_release_package_workflow_text(
-        """
-jobs:
-  package:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-          - os: windows-latest
-    steps:
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-      - uses: actions/setup-python@v5
-      - run: pnpm install --frozen-lockfile
-      - run: python -m pip install -e daemon[dev] -e mcp[dev]
-      - run: pnpm release-package-check
-      - run: pnpm package:mac
-      - run: pnpm package:win
-      - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
-      - uses: actions/upload-artifact@v4
-        with:
-          path: dist/release
-"""
+        _complete_release_workflow_text()
+        .replace("          path: |\n            dist/release\n", "          path: dist/release\n")
+        .replace("            !dist/release/builder-debug.yml\n", "")
+        .replace("            !dist/release/.icon-*\n", "")
     )
 
     assert issues == [
@@ -300,3 +289,39 @@ def _load_validator() -> object:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _complete_release_workflow_text() -> str:
+    return """
+name: Release Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: minix-print-studio-macos-unsigned
+          - os: windows-latest
+            artifact_name: minix-print-studio-windows-unsigned
+    steps:
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install -e daemon[dev] -e mcp[dev]
+      - run: pnpm release-package-check
+      - run: pnpm package:mac
+      - run: pnpm package:win
+      - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/release
+            !dist/release/builder-debug.yml
+            !dist/release/.icon-*
+"""
