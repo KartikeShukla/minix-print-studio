@@ -99,6 +99,7 @@ REQUIRED_WORKFLOW_PERMISSIONS = {
     ".github/workflows/codeql.yml": {"contents": "read", "security-events": "write"},
     ".github/workflows/release-package.yml": {"contents": "read"},
 }
+REQUIRED_WORKFLOW_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
 
 REQUIRED_DEPENDABOT_BLOCKS = (
     ("npm", "/"),
@@ -127,6 +128,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
     issues.extend(_workflow_permission_issues(root))
+    issues.extend(_workflow_node24_runtime_issues(root))
     issues.extend(_codeql_workflow_issues(root))
     issues.extend(_dependabot_config_issues(root))
     issues.extend(_missing_documented_gate_commands(root))
@@ -225,6 +227,7 @@ def validate_ci_workflow(text: str) -> list[str]:
             required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/ci.yml"],
         )
     )
+    issues.extend(validate_workflow_node24_runtime_text(label="CI workflow", text=text))
     return issues
 
 
@@ -244,6 +247,12 @@ def validate_workflow_permissions_text(
     return issues
 
 
+def validate_workflow_node24_runtime_text(*, label: str, text: str) -> list[str]:
+    if REQUIRED_WORKFLOW_NODE24_RUNTIME in text:
+        return []
+    return [f"{label} must opt into the Node 24 JavaScript action runtime"]
+
+
 def _workflow_permission_issues(root: Path) -> list[str]:
     issues: list[str] = []
     for relative_path, required_permissions in REQUIRED_WORKFLOW_PERMISSIONS.items():
@@ -260,6 +269,26 @@ def _workflow_permission_issues(root: Path) -> list[str]:
                 label=workflow_path.name.removesuffix(".yml").replace("-", " ") + " workflow",
                 text=workflow_path.read_text(encoding="utf-8"),
                 required_permissions=required_permissions,
+            )
+        )
+    return issues
+
+
+def _workflow_node24_runtime_issues(root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path in REQUIRED_WORKFLOW_PERMISSIONS:
+        workflow_path = root / relative_path
+        if not workflow_path.is_file():
+            continue
+        if relative_path in {
+            ".github/workflows/ci.yml",
+            ".github/workflows/codeql.yml",
+        }:
+            continue
+        issues.extend(
+            validate_workflow_node24_runtime_text(
+                label=workflow_path.name.removesuffix(".yml").replace("-", " ") + " workflow",
+                text=workflow_path.read_text(encoding="utf-8"),
             )
         )
     return issues
@@ -296,6 +325,7 @@ def validate_codeql_workflow_text(text: str) -> list[str]:
             required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/codeql.yml"],
         )
     )
+    issues.extend(validate_workflow_node24_runtime_text(label="CodeQL workflow", text=text))
     if "javascript-typescript" not in text:
         issues.append("CodeQL workflow missing JavaScript/TypeScript analysis")
     if "python" not in text:

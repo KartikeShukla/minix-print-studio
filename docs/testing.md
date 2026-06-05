@@ -39,6 +39,7 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 
 This validates the successful workflow metadata, macOS and Windows unsigned package
 artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
+The current release evidence baseline is Release Package workflow run `27013383603`.
 
 ## Dependency Maintenance
 
@@ -54,4 +55,6 @@ keeps the workflow present, configured for the `security-extended` query suite,
 and limited to `contents: read` plus `security-events: write` so GitHub can
 receive scan results. CI and release package workflows must keep explicit
 read-only `contents` permissions unless a future release step documents and
-validates a narrower write requirement.
+validates a narrower write requirement. Required workflows also opt into the
+Node 24 JavaScript action runtime so GitHub Actions runtime migrations are
+exercised before they become the default.

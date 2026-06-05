@@ -54,6 +54,7 @@ RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS = (
     "!dist/release/builder-debug.yml",
     "!dist/release/.icon-*",
 )
+RELEASE_WORKFLOW_REQUIRED_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
 
 RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES = {
     "minix-print-studio-macos-unsigned": (
@@ -187,6 +188,10 @@ def validate_release_package_workflow_text(text: str) -> list[str]:
     issues: list[str] = []
     if "workflow_dispatch:" not in text:
         issues.append("release package workflow must support manual workflow_dispatch")
+    if RELEASE_WORKFLOW_REQUIRED_NODE24_RUNTIME not in text:
+        issues.append(
+            "release package workflow must opt into the Node 24 JavaScript action runtime"
+        )
     if "runs-on: macos-latest" not in text and "os: macos-latest" not in text:
         issues.append("release package workflow missing macOS runner")
     if "runs-on: windows-latest" not in text and "os: windows-latest" not in text:

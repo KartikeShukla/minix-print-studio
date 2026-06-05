@@ -102,6 +102,8 @@ on:
     branches: [main]
   schedule:
     - cron: "21 3 * * 1"
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
     steps:
@@ -137,6 +139,8 @@ name: CodeQL
 permissions:
   contents: read
   security-events: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
     steps:
@@ -260,6 +264,8 @@ def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> 
         """
 permissions:
   contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   python:
     steps:
@@ -282,6 +288,8 @@ def test_open_source_readiness_check_requires_ci_workflow_permissions() -> None:
 name: CI
 on:
   pull_request:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   node:
     steps:
@@ -313,6 +321,26 @@ jobs:
     assert issues == [
         "release package workflow must not use write-all permissions",
         "release package workflow must declare contents: read permissions",
+    ]
+
+
+def test_open_source_readiness_check_requires_node24_actions_runtime_opt_in() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_workflow_node24_runtime_text(
+        label="CI workflow",
+        text="""
+permissions:
+  contents: read
+jobs:
+  node:
+    steps:
+      - uses: actions/checkout@v4
+""",
+    )
+
+    assert issues == [
+        "CI workflow must opt into the Node 24 JavaScript action runtime",
     ]
 
 
@@ -397,6 +425,9 @@ def _gate_doc_text(commands: tuple[str, ...]) -> str:
 
 def _ci_workflow_text() -> str:
     return """
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 jobs:
@@ -411,6 +442,9 @@ jobs:
 
 def _release_package_workflow_text() -> str:
     return """
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 jobs:
@@ -432,6 +466,8 @@ on:
 permissions:
   contents: read
   security-events: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
     steps:

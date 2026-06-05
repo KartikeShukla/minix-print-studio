@@ -279,6 +279,21 @@ def test_release_packaging_check_requires_artifact_upload_exclusions() -> None:
     ]
 
 
+def test_release_packaging_check_requires_node24_actions_runtime_opt_in() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text().replace(
+            "env:\n  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true\n\n",
+            "",
+        )
+    )
+
+    assert issues == [
+        "release package workflow must opt into the Node 24 JavaScript action runtime",
+    ]
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "release_packaging_validation",
@@ -297,6 +312,9 @@ name: Release Package
 
 on:
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   package:
