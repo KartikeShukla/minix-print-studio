@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 from collections.abc import Mapping
@@ -338,6 +339,77 @@ def test_hardware_test_cli_plans_tiny_visual_card_preflight_from_stage_a_artifac
     }
 
 
+def test_hardware_test_cli_writes_shareable_evidence_summary_without_private_artifact_data(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(
+        artifact_path,
+        commands_log="/Users/example/private-token 10 ff 10 00 01",
+        notifications_log="S1_LYiN48D_GY raw-notification",
+    )
+    stdout = io.StringIO()
+
+    exit_code = run(["evidence-summary", str(artifact_path)], stdout=stdout)
+
+    assert exit_code == 0
+    result = json.loads(stdout.getvalue())
+    encoded = json.dumps(result, sort_keys=True)
+    device_fingerprint = hashlib.sha256(b"mock-minix-0194").hexdigest()[:16]
+    assert result == {
+        "status": "shareable_stage_a_evidence_ready",
+        "shareable": True,
+        "artifactStatus": "valid_stage_a_artifact",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "nextRequiredStage": "protocol_sanity_test",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": f"sha256:{device_fingerprint}",
+        },
+        "redaction": {
+            "artifactPathIncluded": False,
+            "localPathsIncluded": False,
+            "rawCommandLogIncluded": False,
+            "rawNotificationLogIncluded": False,
+            "commandPayloadHexIncluded": False,
+            "rasterBytesIncluded": False,
+            "bearerTokensIncluded": False,
+        },
+        "certification": {
+            "stageAReadOnlyVerified": True,
+            "printingLocked": True,
+            "certificationComplete": False,
+            "requiresStageBProtocolSanity": True,
+            "requiresTinyVisualCard": True,
+            "requiresLongPrintReliability": True,
+        },
+        "preflights": {
+            "protocolSanity": {
+                "status": "protocol_sanity_preflight_ready",
+                "stage": "protocol_sanity_test",
+                "commandCount": 3,
+                "sendsRaster": False,
+                "unlocksPrinting": False,
+            },
+            "tinyVisualCard": {
+                "status": "tiny_visual_card_preflight_ready",
+                "stage": "tiny_visual_test_card",
+                "displayText": "MINIX TEST 7K4P",
+                "heightDots": 160,
+                "rawBytesIncluded": False,
+                "contentSha256": result["preflights"]["tinyVisualCard"]["contentSha256"],
+            },
+        },
+    }
+    assert len(result["preflights"]["tinyVisualCard"]["contentSha256"]) == 64
+    assert str(artifact_path) not in encoded
+    assert "/Users/example" not in encoded
+    assert "private-token" not in encoded
+    assert "mock-minix-0194" not in encoded
+    assert "10 ff 10 00 01" not in encoded
+    assert "S1_LYiN48D_GY" not in encoded
+
+
 def test_hardware_test_cli_rejects_protocol_sanity_preflight_for_unsafe_artifact(
     tmp_path: Path,
 ) -> None:
@@ -388,6 +460,8 @@ def _write_stage_a_artifact(
     artifact_path: Path,
     *,
     transfer_manifest: dict[str, object] | None = None,
+    commands_log: str = "",
+    notifications_log: str = "",
 ) -> None:
     manifest = transfer_manifest or {
         "stage": "read_only_verification",
@@ -420,8 +494,8 @@ def _write_stage_a_artifact(
         archive.writestr("ble-discovery.json", "{}")
         archive.writestr("model-response.bin", b"S1_LYiN48D_GY")
         archive.writestr("firmware-response.bin", b"V1.9.11")
-        archive.writestr("notifications.log", "")
-        archive.writestr("commands.log", "")
+        archive.writestr("notifications.log", notifications_log)
+        archive.writestr("commands.log", commands_log)
         archive.writestr("print-transfer-manifest.json", json.dumps(manifest))
         archive.writestr("band-manifest.json", json.dumps({"bands": []}))
         archive.writestr("finalizer-result.json", json.dumps({"status": "not_applicable"}))

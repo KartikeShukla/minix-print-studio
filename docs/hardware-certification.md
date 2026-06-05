@@ -59,6 +59,7 @@ scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir .
 scripts/hardware-test.sh inspect-artifact ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh protocol-sanity-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh tiny-visual-card-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
+scripts/hardware-test.sh evidence-summary ./hardware-artifacts/hardware-test-<timestamp>.zip
 ```
 
 The wrapper uses `.venv/bin/python` when available and accepts
@@ -74,6 +75,11 @@ artifact and emits deterministic Stage C card metadata for `MINIX TEST 7K4P`,
 including width, height, raster byte counts, and a SHA-256 digest. It does not
 include printable raster bytes and does not replace the required physical Stage B
 pass or user confirmation.
+`evidence-summary` builds a maintainer-shareable summary from the same offline
+checks. It includes the profile id, next required stage, redacted device
+fingerprint, preflight counts, tiny-card digest, and explicit redaction flags,
+but omits the artifact path, raw logs, command hex payloads, raster bytes, bearer
+tokens, and the raw device id.
 
 The Stage A archive contains:
 
@@ -148,6 +154,19 @@ When the tiny card is eventually printed, the operator must confirm the text is
 readable, left/right edge markers are visible, output is not mirrored or upside
 down, and feed completes without stall, overheat warning, disconnect, or fatal
 error.
+
+## Shareable Evidence Summary
+
+Use the offline evidence summary when asking maintainers to review Stage A
+evidence before sharing a full artifact. The summary is not certification; it is
+only a redacted checklist that confirms the Stage A artifact passed read-only
+safety checks and records the deterministic Stage B/C preflight metadata.
+
+The Electron Printer panel shows the same summary after `Inspect Stage A
+artifact`. A summary is suitable for maintainer review only when it reports
+`shareable: true`, `device.idRedacted: true`, and redaction flags showing local
+paths, raw logs, command hex payloads, bearer tokens, and raster bytes are not
+included.
 
 ## Long-Print Test Fixture
 

@@ -872,6 +872,52 @@ describe("MiniX Print Studio shell", () => {
           unlocksPrinting: false
         }
       },
+      evidenceSummary: {
+        status: "shareable_stage_a_evidence_ready",
+        shareable: true,
+        artifactStatus: "valid_stage_a_artifact",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        nextRequiredStage: "protocol_sanity_test",
+        device: {
+          idRedacted: true,
+          fingerprint: "sha256:3d90f3ac7a07147e"
+        },
+        redaction: {
+          artifactPathIncluded: false,
+          localPathsIncluded: false,
+          rawCommandLogIncluded: false,
+          rawNotificationLogIncluded: false,
+          commandPayloadHexIncluded: false,
+          rasterBytesIncluded: false,
+          bearerTokensIncluded: false
+        },
+        certification: {
+          stageAReadOnlyVerified: true,
+          printingLocked: true,
+          certificationComplete: false,
+          requiresStageBProtocolSanity: true,
+          requiresTinyVisualCard: true,
+          requiresLongPrintReliability: true
+        },
+        preflights: {
+          protocolSanity: {
+            status: "protocol_sanity_preflight_ready",
+            stage: "protocol_sanity_test",
+            commandCount: 3,
+            sendsRaster: false,
+            unlocksPrinting: false
+          },
+          tinyVisualCard: {
+            status: "tiny_visual_card_preflight_ready",
+            stage: "tiny_visual_test_card",
+            displayText: "MINIX TEST 7K4P",
+            heightDots: 160,
+            rawBytesIncluded: false,
+            contentSha256:
+              "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+          }
+        }
+      },
       visualCardPreflight: {
         status: "tiny_visual_card_preflight_ready",
         stage: "tiny_visual_test_card",
@@ -948,6 +994,11 @@ describe("MiniX Print Studio shell", () => {
     expect(
       screen.getByText("Text MINIX TEST 7K4P is readable.")
     ).toBeInTheDocument();
+    expect(screen.getByText("Shareable evidence summary ready")).toBeInTheDocument();
+    expect(screen.getByText("sha256:3d90f3ac7a07147e")).toBeInTheDocument();
+    expect(screen.getByText("3 commands planned")).toBeInTheDocument();
+    expect(screen.getByText("Raw bytes omitted")).toBeInTheDocument();
+    expect(screen.getByText("Local paths omitted")).toBeInTheDocument();
     expect(screen.getByText("Printing remains locked")).toBeInTheDocument();
   });
 

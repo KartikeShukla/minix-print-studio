@@ -108,6 +108,58 @@ describe("hardware artifact inspection bridge", () => {
             exitCode: 0
           };
         }
+        if (args.includes("evidence-summary")) {
+          return {
+            stdout: JSON.stringify({
+              status: "shareable_stage_a_evidence_ready",
+              shareable: true,
+              artifactStatus: "valid_stage_a_artifact",
+              profileId: "seznik-minix-s1-lyin48d-gy",
+              nextRequiredStage: "protocol_sanity_test",
+              device: {
+                idRedacted: true,
+                fingerprint: "sha256:3d90f3ac7a07147e"
+              },
+              redaction: {
+                artifactPathIncluded: false,
+                localPathsIncluded: false,
+                rawCommandLogIncluded: false,
+                rawNotificationLogIncluded: false,
+                commandPayloadHexIncluded: false,
+                rasterBytesIncluded: false,
+                bearerTokensIncluded: false
+              },
+              certification: {
+                stageAReadOnlyVerified: true,
+                printingLocked: true,
+                certificationComplete: false,
+                requiresStageBProtocolSanity: true,
+                requiresTinyVisualCard: true,
+                requiresLongPrintReliability: true
+              },
+              preflights: {
+                protocolSanity: {
+                  status: "protocol_sanity_preflight_ready",
+                  stage: "protocol_sanity_test",
+                  commandCount: 3,
+                  sendsRaster: false,
+                  unlocksPrinting: false
+                },
+                tinyVisualCard: {
+                  status: "tiny_visual_card_preflight_ready",
+                  stage: "tiny_visual_test_card",
+                  displayText: "MINIX TEST 7K4P",
+                  heightDots: 160,
+                  rawBytesIncluded: false,
+                  contentSha256:
+                    "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+                }
+              }
+            }),
+            stderr: "",
+            exitCode: 0
+          };
+        }
         return {
           stdout: JSON.stringify({
             status: "tiny_visual_card_preflight_ready",
@@ -164,6 +216,19 @@ describe("hardware artifact inspection bridge", () => {
           printCommandsSent: false,
           rasterBytesIncluded: false
         }),
+        evidenceSummary: expect.objectContaining({
+          status: "shareable_stage_a_evidence_ready",
+          shareable: true,
+          device: {
+            idRedacted: true,
+            fingerprint: "sha256:3d90f3ac7a07147e"
+          },
+          redaction: expect.objectContaining({
+            artifactPathIncluded: false,
+            commandPayloadHexIncluded: false,
+            rasterBytesIncluded: false
+          })
+        }),
         visualCardPreflight: expect.objectContaining({
           status: "tiny_visual_card_preflight_ready",
           displayText: "MINIX TEST 7K4P",
@@ -198,6 +263,16 @@ describe("hardware artifact inspection bridge", () => {
           "-m",
           "minixd.hardware_test_cli",
           "tiny-visual-card-preflight",
+          "/tmp/hardware-test-stage-a.zip"
+        ],
+        cwd: "/repo/minix"
+      },
+      {
+        command: "/repo/minix/.venv/bin/python",
+        args: [
+          "-m",
+          "minixd.hardware_test_cli",
+          "evidence-summary",
           "/tmp/hardware-test-stage-a.zip"
         ],
         cwd: "/repo/minix"

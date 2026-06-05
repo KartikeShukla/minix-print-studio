@@ -31,6 +31,9 @@ pnpm release-package-check
 - Offline certification-preflight tests cover Stage B protocol command metadata
   and Stage C tiny-card metadata without sending BLE writes or including printable
   raster bytes.
+- Offline evidence-summary tests cover maintainer-shareable Stage A summaries
+  with hashed device fingerprints and explicit omission of artifact paths, raw
+  logs, command hex payloads, bearer tokens, and raster bytes.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.

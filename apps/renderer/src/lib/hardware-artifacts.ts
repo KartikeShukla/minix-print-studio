@@ -64,11 +64,58 @@ export type HardwareVisualCardPreflight = {
   };
 };
 
+export type HardwareEvidenceSummary = {
+  status: string;
+  shareable: boolean;
+  artifactStatus: string;
+  profileId: string;
+  nextRequiredStage: string;
+  device: {
+    idRedacted: boolean;
+    fingerprint: string;
+  };
+  redaction: {
+    artifactPathIncluded: boolean;
+    localPathsIncluded: boolean;
+    rawCommandLogIncluded: boolean;
+    rawNotificationLogIncluded: boolean;
+    commandPayloadHexIncluded: boolean;
+    rasterBytesIncluded: boolean;
+    bearerTokensIncluded: boolean;
+  };
+  certification: {
+    stageAReadOnlyVerified: boolean;
+    printingLocked: boolean;
+    certificationComplete: boolean;
+    requiresStageBProtocolSanity: boolean;
+    requiresTinyVisualCard: boolean;
+    requiresLongPrintReliability: boolean;
+  };
+  preflights: {
+    protocolSanity: {
+      status: string;
+      stage: string;
+      commandCount: number;
+      sendsRaster: boolean;
+      unlocksPrinting: boolean;
+    };
+    tinyVisualCard: {
+      status: string;
+      stage: string;
+      displayText: string;
+      heightDots: number;
+      rawBytesIncluded: boolean;
+      contentSha256: string;
+    };
+  };
+};
+
 export type HardwareArtifactInspectionResult = {
   artifactPath: string;
   inspection: HardwareArtifactInspectionSummary;
   preflight: HardwareProtocolPreflight | null;
   visualCardPreflight: HardwareVisualCardPreflight | null;
+  evidenceSummary: HardwareEvidenceSummary | null;
 };
 
 export type HardwareHostReadiness = {

@@ -137,7 +137,8 @@
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
 - `minix-hardware-test tiny-visual-card-preflight` validates a Stage A artifact and emits deterministic Stage C tiny-card metadata for `MINIX TEST 7K4P`, including dimensions, raster byte counts, and a digest without including printable bytes or contacting BLE.
-- Electron artifact inspection now shows both the Stage B protocol sanity preflight and Stage C tiny visual card preflight while keeping printing locked.
+- `minix-hardware-test evidence-summary` emits a redacted maintainer-shareable Stage A summary with a hashed device fingerprint, redaction flags, protocol preflight counts, and tiny-card digest without artifact paths, raw logs, command payload hex, bearer tokens, raster bytes, or the raw device id.
+- Electron artifact inspection now shows the Stage B protocol sanity preflight, Stage C tiny visual card preflight, and redacted shareable evidence summary while keeping printing locked.
 
 ## Current Verification
 
@@ -197,6 +198,7 @@
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
 - TDD red/green checks for the Electron artifact-inspection bridge and renderer Stage B preflight summary from an exported Stage A artifact.
 - TDD red/green checks for Stage C tiny visual card preflight planning, unsafe artifact rejection, Electron bridge propagation, and renderer checklist display.
+- TDD red/green checks for redacted Stage A evidence summary generation, Electron bridge propagation, and renderer summary display.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for release packaging scaffold validation, including package scripts, runtime-state exclusions, disabled publishing, and absent signing identity.
@@ -217,6 +219,7 @@
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
 - `scripts/hardware-test.sh host-readiness`
+- `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
 - Non-mock Stage A scan attempt on 2026-06-05 against a separate daemon on `127.0.0.1:39282` returned `Bluetooth unavailable: Bluetooth is unsupported`; `system_profiler SPBluetoothDataType` reported no visible controller, so no physical printer validation was possible from this execution context even with the printer powered on.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 

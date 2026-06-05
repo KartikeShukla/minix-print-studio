@@ -26,6 +26,7 @@ python3 scripts/validate_open_source_readiness.py
 Hardware gates are separate from CI and require the physical printer:
 
 - Stage A read-only verification artifact exported and inspected.
+- Stage A evidence summary generated and reviewed before sharing full artifacts.
 - Stage B protocol sanity preflight reviewed before physical run.
 - Tiny visual test card confirmed by the user.
 - Long-print reliability test completed before stable support claims.

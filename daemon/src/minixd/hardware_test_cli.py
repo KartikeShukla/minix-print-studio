@@ -217,6 +217,16 @@ def run(
             )
             stdout.write("\n")
             return 0
+        if args.command == "evidence-summary":
+            stdout.write(
+                json.dumps(
+                    build_shareable_evidence_summary(Path(args.artifact_path)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            stdout.write("\n")
+            return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
@@ -281,6 +291,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Plan the Stage C tiny visual card metadata from a Stage A artifact.",
     )
     visual_card_parser.add_argument(
+        "artifact_path",
+        help="Path to a Stage A hardware-test ZIP.",
+    )
+
+    evidence_summary_parser = subparsers.add_parser(
+        "evidence-summary",
+        help="Build a redacted, shareable Stage A evidence summary.",
+    )
+    evidence_summary_parser.add_argument(
         "artifact_path",
         help="Path to a Stage A hardware-test ZIP.",
     )
@@ -585,6 +604,135 @@ def plan_tiny_visual_card_preflight(artifact_path: Path) -> dict[str, object]:
     }
 
 
+def build_shareable_evidence_summary(artifact_path: Path) -> dict[str, object]:
+    stage_a_summary = inspect_stage_a_artifact(artifact_path)
+    protocol_preflight = plan_protocol_sanity_preflight(artifact_path)
+    visual_card_preflight = plan_tiny_visual_card_preflight(artifact_path)
+    device_id = _required_json_string(
+        stage_a_summary,
+        "deviceId",
+        "print-transfer-manifest.json",
+    )
+
+    return {
+        "status": "shareable_stage_a_evidence_ready",
+        "shareable": True,
+        "artifactStatus": _required_json_string(
+            stage_a_summary,
+            "status",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": _required_json_string(
+            stage_a_summary,
+            "profileId",
+            "print-transfer-manifest.json",
+        ),
+        "nextRequiredStage": _required_json_string(
+            stage_a_summary,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        ),
+        "device": {
+            "idRedacted": True,
+            "fingerprint": f"sha256:{hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:16]}",
+        },
+        "redaction": {
+            "artifactPathIncluded": False,
+            "localPathsIncluded": False,
+            "rawCommandLogIncluded": False,
+            "rawNotificationLogIncluded": False,
+            "commandPayloadHexIncluded": False,
+            "rasterBytesIncluded": False,
+            "bearerTokensIncluded": False,
+        },
+        "certification": {
+            "stageAReadOnlyVerified": True,
+            "printingLocked": True,
+            "certificationComplete": False,
+            "requiresStageBProtocolSanity": True,
+            "requiresTinyVisualCard": True,
+            "requiresLongPrintReliability": True,
+        },
+        "preflights": {
+            "protocolSanity": {
+                "status": _required_json_string(
+                    protocol_preflight,
+                    "status",
+                    "protocol-sanity-preflight",
+                ),
+                "stage": _required_json_string(
+                    protocol_preflight,
+                    "stage",
+                    "protocol-sanity-preflight",
+                ),
+                "commandCount": _json_list_length(
+                    protocol_preflight,
+                    "commands",
+                    "protocol-sanity-preflight",
+                ),
+                "sendsRaster": _required_json_bool(
+                    _required_json_object(
+                        protocol_preflight,
+                        "safety",
+                        "protocol-sanity-preflight",
+                    ),
+                    "sendsRaster",
+                    "protocol-sanity-preflight.safety",
+                ),
+                "unlocksPrinting": _required_json_bool(
+                    _required_json_object(
+                        protocol_preflight,
+                        "safety",
+                        "protocol-sanity-preflight",
+                    ),
+                    "unlocksPrinting",
+                    "protocol-sanity-preflight.safety",
+                ),
+            },
+            "tinyVisualCard": {
+                "status": _required_json_string(
+                    visual_card_preflight,
+                    "status",
+                    "tiny-visual-card-preflight",
+                ),
+                "stage": _required_json_string(
+                    visual_card_preflight,
+                    "stage",
+                    "tiny-visual-card-preflight",
+                ),
+                "displayText": _required_json_string(
+                    visual_card_preflight,
+                    "displayText",
+                    "tiny-visual-card-preflight",
+                ),
+                "heightDots": _required_json_int(
+                    visual_card_preflight,
+                    "heightDots",
+                    "tiny-visual-card-preflight",
+                ),
+                "rawBytesIncluded": _required_json_bool(
+                    _required_json_object(
+                        visual_card_preflight,
+                        "plannedRaster",
+                        "tiny-visual-card-preflight",
+                    ),
+                    "rawBytesIncluded",
+                    "tiny-visual-card-preflight.plannedRaster",
+                ),
+                "contentSha256": _required_json_string(
+                    _required_json_object(
+                        visual_card_preflight,
+                        "plannedRaster",
+                        "tiny-visual-card-preflight",
+                    ),
+                    "contentSha256",
+                    "tiny-visual-card-preflight.plannedRaster",
+                ),
+            },
+        },
+    }
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
     artifact_files = set(archive.namelist())
     for filename in STAGE_A_ARTIFACT_REQUIRED_FILES:
@@ -675,6 +823,28 @@ def _required_json_int(
     if not isinstance(field_value, int):
         raise HardwareTestCliError(f"artifact missing required integer: {filename}.{field}")
     return field_value
+
+
+def _required_json_bool(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> bool:
+    field_value = value.get(field)
+    if not isinstance(field_value, bool):
+        raise HardwareTestCliError(f"artifact missing required boolean: {filename}.{field}")
+    return field_value
+
+
+def _json_list_length(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> int:
+    field_value = value.get(field)
+    if not isinstance(field_value, list):
+        raise HardwareTestCliError(f"artifact missing required list: {filename}.{field}")
+    return len(field_value)
 
 
 def _protocol_command(index: int, name: str, payload: bytes) -> dict[str, object]:

@@ -3500,6 +3500,7 @@ function HardwarePreflightStatus({
   const preflight = workflow.status === "ready" ? workflow.result.preflight : null;
   const visualCardPreflight =
     workflow.status === "ready" ? workflow.result.visualCardPreflight : null;
+  const evidenceSummary = workflow.status === "ready" ? workflow.result.evidenceSummary : null;
 
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
@@ -3553,6 +3554,34 @@ function HardwarePreflightStatus({
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+          {evidenceSummary ? (
+            <div className="border-t border-warning/20 pt-3">
+              <div className="font-medium text-warning">Shareable evidence summary ready</div>
+              <div className="mt-2 grid grid-cols-[112px_minmax(0,1fr)] gap-x-2 gap-y-1">
+                <span className="text-muted-foreground">Fingerprint</span>
+                <span className="break-words font-mono text-xs">
+                  {evidenceSummary.device.fingerprint}
+                </span>
+                <span className="text-muted-foreground">Protocol</span>
+                <span>{evidenceSummary.preflights.protocolSanity.commandCount} commands planned</span>
+                <span className="text-muted-foreground">Tiny card</span>
+                <span>{evidenceSummary.preflights.tinyVisualCard.heightDots} dots summarized</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {!evidenceSummary.redaction.commandPayloadHexIncluded &&
+                !evidenceSummary.redaction.rasterBytesIncluded ? (
+                  <Badge variant="success">Raw bytes omitted</Badge>
+                ) : null}
+                {!evidenceSummary.redaction.localPathsIncluded &&
+                !evidenceSummary.redaction.artifactPathIncluded ? (
+                  <Badge variant="success">Local paths omitted</Badge>
+                ) : null}
+                {evidenceSummary.device.idRedacted ? (
+                  <Badge variant="success">Device id redacted</Badge>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <Badge variant="warning">Printing remains locked</Badge>

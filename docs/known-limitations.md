@@ -27,7 +27,8 @@ not yet a stable public installer.
 ## Product Surface
 
 - The mock print flow is implemented, but real printer transport remains certification-gated.
-- Hardware diagnostics artifacts must be reviewed and redacted before public sharing.
+- Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
+  use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.
 - The renderer build currently emits a Vite chunk-size warning.
 
