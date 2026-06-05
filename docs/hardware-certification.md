@@ -34,6 +34,16 @@ After read-only verification, use `Export read-only artifact` in the Printer pan
 The daemon runs a fresh `/v1/diagnostics/hardware-test` request for the selected
 device and returns a `hardware-test-<timestamp>.zip` artifact.
 
+For command-line validation against a running daemon:
+
+```bash
+scripts/hardware-test.sh scan
+scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir ./hardware-artifacts
+```
+
+The wrapper uses `.venv/bin/python` when available and accepts
+`MINIX_DAEMON_BASE_URL`, `MINIX_DAEMON_TOKEN`, and `MINIX_PYTHON` overrides.
+
 The Stage A archive contains:
 
 - `device.json`

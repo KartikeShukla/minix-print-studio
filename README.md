@@ -23,6 +23,13 @@ Python packages live in `daemon/` and `mcp/`.
 .venv/bin/python -m pip install -e daemon -e mcp
 ```
 
+Stage A hardware validation against a running daemon can be driven from the repo:
+
+```bash
+scripts/hardware-test.sh scan
+scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir ./hardware-artifacts
+```
+
 ## Status
 
 This repository is being built from the implementation plan in `docs/Initial Spec.md`.

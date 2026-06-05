@@ -27,6 +27,7 @@ dev = [
 
 [project.scripts]
 minixd = "minixd.__main__:main"
+minix-hardware-test = "minixd.hardware_test_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/minixd"]
