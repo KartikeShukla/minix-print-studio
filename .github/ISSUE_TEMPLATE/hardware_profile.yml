@@ -1,0 +1,54 @@
+name: Hardware Profile Evidence
+description: Submit redacted evidence for a printer profile or hardware certification stage.
+title: "[Hardware]: "
+labels: ["hardware", "profile", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stage A evidence must be read-only. Do not attach unredacted hardware artifacts, MAC addresses, private paths, bearer tokens, raw raster bytes, or print command payloads.
+  - type: input
+    id: profile_id
+    attributes:
+      label: Profile ID
+      description: Existing or proposed profile ID.
+      placeholder: seznik-minix-s1-lyin48d-gy
+    validations:
+      required: true
+  - type: textarea
+    id: device_identity
+    attributes:
+      label: Device Identity
+      description: Consumer-facing product name, model response, firmware, paper width, and paper types after redaction.
+    validations:
+      required: true
+  - type: dropdown
+    id: certification_stage
+    attributes:
+      label: Certification Stage
+      options:
+        - Stage A read-only verification
+        - Stage B protocol sanity preflight
+        - Stage B physical protocol sanity
+        - Tiny visual test card
+        - Long-print reliability
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence Summary
+      description: Summarize inspected artifacts, command output, and user-visible results without attaching sensitive data.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety And Redaction
+      options:
+        - label: Stage A evidence did not move paper or send raster bytes.
+          required: true
+        - label: Attached artifacts are redacted and do not contain private paths, tokens, MAC addresses, raw raster bytes, or print command payloads.
+          required: true
+        - label: I am not claiming trusted printing unless every required certification stage has passed.
+          required: true

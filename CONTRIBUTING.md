@@ -23,6 +23,8 @@ pnpm dev
 - Do not commit runtime state, logs, diagnostics exports, hardware artifacts, local tokens, or private file paths.
 - Keep BLE ownership inside the daemon. Electron, MCP, and CLI flows should call daemon APIs rather than opening direct BLE sessions.
 - Hardware tests must stay explicit and separate from CI.
+- Use the GitHub issue templates for bugs, feature requests, and hardware profile evidence so triage preserves reproduction steps, safety state, and redaction checks.
+- Use the pull request template and fill in the validation and safety checklist before review.
 
 ## Validation
 

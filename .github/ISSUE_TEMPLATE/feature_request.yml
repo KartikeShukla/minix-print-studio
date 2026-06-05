@@ -1,0 +1,49 @@
+name: Feature Request
+description: Propose a focused product, workflow, safety, or integration improvement.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep requests scoped to MiniX Print Studio's local-first, safety-gated printer workflow.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user workflow is blocked or inefficient today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the behavior, UI, API, or documentation change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Canvas/editor
+        - Printer setup
+        - Print safety
+        - Packaging/release
+        - MCP/agent integration
+        - Documentation
+        - Contributor workflow
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety And Privacy Impact
+      description: Note whether the change touches BLE, printing, agent tools, diagnostics, tokens, or user files.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Optional simpler approaches or tradeoffs.

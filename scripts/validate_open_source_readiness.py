@@ -17,6 +17,10 @@ REQUIRED_FILES = (
     Path("turbo.json"),
     Path(".github/workflows/ci.yml"),
     Path(".github/workflows/release-package.yml"),
+    Path(".github/PULL_REQUEST_TEMPLATE.md"),
+    Path(".github/ISSUE_TEMPLATE/bug_report.yml"),
+    Path(".github/ISSUE_TEMPLATE/feature_request.yml"),
+    Path(".github/ISSUE_TEMPLATE/hardware_profile.yml"),
 )
 
 REQUIRED_DOCS = (
@@ -53,7 +57,9 @@ PRIVATE_PATH_MARKERS = (
 
 SHAREABLE_TEXT_GLOBS = (
     "*.md",
+    ".github/*.md",
     ".github/workflows/*.yml",
+    ".github/ISSUE_TEMPLATE/*.yml",
     "docs/*.md",
     "profiles/**/*.json",
     "scripts/*.sh",

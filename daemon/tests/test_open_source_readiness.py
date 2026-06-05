@@ -68,6 +68,26 @@ def test_open_source_readiness_check_requires_release_notes_template() -> None:
     assert Path("docs/release-notes-template.md") in validator.REQUIRED_DOCS
 
 
+def test_open_source_readiness_check_requires_community_intake_templates() -> None:
+    validator = _load_validator()
+
+    assert Path(".github/PULL_REQUEST_TEMPLATE.md") in validator.REQUIRED_FILES
+    assert Path(".github/ISSUE_TEMPLATE/bug_report.yml") in validator.REQUIRED_FILES
+    assert Path(".github/ISSUE_TEMPLATE/feature_request.yml") in validator.REQUIRED_FILES
+    assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_FILES
+
+
+def test_open_source_readiness_scans_issue_templates_for_private_paths(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    issue_template = tmp_path / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
+    issue_template.parent.mkdir(parents=True)
+    issue_template.write_text("description: /Users/kartike/private\n", encoding="utf-8")
+
+    assert issue_template.relative_to(tmp_path) in validator._shareable_text_paths(tmp_path)
+
+
 def test_open_source_readiness_check_requires_source_package_script() -> None:
     validator = _load_validator()
 

@@ -58,6 +58,15 @@ def test_source_package_check_requires_release_package_workflow_and_python_runne
     assert Path("scripts/run_python.mjs") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_community_intake_templates() -> None:
+    validator = _load_validator()
+
+    assert Path(".github/PULL_REQUEST_TEMPLATE.md") in validator.REQUIRED_SOURCE_PATHS
+    assert Path(".github/ISSUE_TEMPLATE/bug_report.yml") in validator.REQUIRED_SOURCE_PATHS
+    assert Path(".github/ISSUE_TEMPLATE/feature_request.yml") in validator.REQUIRED_SOURCE_PATHS
+    assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

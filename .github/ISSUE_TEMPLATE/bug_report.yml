@@ -1,0 +1,59 @@
+name: Bug Report
+description: Report a reproducible app, daemon, packaging, or integration bug.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach bearer tokens, runtime files, unredacted diagnostics, raw raster bytes, or private file paths.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Renderer/editor
+        - Daemon/API
+        - Printer setup
+        - Packaging/install
+        - MCP/agent integration
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction Steps
+      description: List the smallest sequence that reproduces the issue.
+      placeholder: |
+        1. Start the app...
+        2. Click...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, app version or commit, install type, and printer profile if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation Tried
+      description: Commands, logs, screenshots, or diagnostics reviewed after redaction.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety Check
+      options:
+        - label: I did not include tokens, private paths, raw raster bytes, or unredacted diagnostics.
+          required: true

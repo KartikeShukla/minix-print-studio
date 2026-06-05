@@ -30,6 +30,7 @@
 - Electron package commands build target-specific sidecars before packaging and include them as `resources/sidecars`; cross-platform sidecar builds are rejected because PyInstaller does not cross-compile.
 - Release package workflow defines unsigned macOS and Windows package smokes on native GitHub Actions runners so Windows PyInstaller sidecar validation can run on Windows instead of a cross-compile path.
 - Root Python-backed pnpm scripts use a cross-platform Node launcher that prefers `MINIX_PYTHON`, the repo virtualenv, then platform Python commands.
+- Community intake templates cover bug reports, feature requests, hardware profile evidence, and pull requests with safety, privacy, reproduction, and validation prompts.
 
 ### Daemon Core Slice
 
@@ -166,6 +167,7 @@
 - TDD red/green checks for PyInstaller sidecar build planning, repo-virtualenv selection, package resource inclusion, and cross-platform target rejection.
 - TDD red/green checks for documented non-hardware gate consistency across contributor, release, and testing docs.
 - TDD red/green checks requiring the release notes template in both open-source readiness and tracked source-package validation.
+- TDD red/green checks requiring community issue and pull request templates in open-source readiness and tracked source-package validation.
 - Unsigned macOS package smoke via `pnpm package:mac`; electron-builder produced `dist/release/mac-arm64` with bundled sidecars and skipped code signing because `identity` is `null`.
 - Earlier unsigned Windows directory package scaffold smoke via `pnpm package:win` produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled before sidecar binaries were added to the package contract. Windows sidecar package validation now requires a Windows runner.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
