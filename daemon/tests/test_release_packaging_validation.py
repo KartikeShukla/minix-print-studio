@@ -93,6 +93,9 @@ jobs:
         "python -m pip install -e daemon[dev] -e mcp[dev]",
         "release package workflow missing command: pnpm release-package-check",
         "release package workflow missing command: pnpm package:win",
+        "release package workflow missing command: "
+        "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
+        "release package workflow must exclude electron-builder scratch artifacts",
     ]
 
 
@@ -220,6 +223,70 @@ publish: null
     assert issues == [
         "electron-builder config must set mac icon: build/icon.png",
         "electron-builder config must set Windows icon: build/icon.ico",
+    ]
+
+
+def test_release_packaging_check_requires_checksum_manifest_workflow_step() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        """
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+          - os: windows-latest
+    steps:
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install -e daemon[dev] -e mcp[dev]
+      - run: pnpm release-package-check
+      - run: pnpm package:mac
+      - run: pnpm package:win
+"""
+    )
+
+    assert issues == [
+        "release package workflow missing command: "
+        "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
+        "release package workflow must exclude electron-builder scratch artifacts",
+    ]
+
+
+def test_release_packaging_check_requires_artifact_upload_exclusions() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        """
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+          - os: windows-latest
+    steps:
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install -e daemon[dev] -e mcp[dev]
+      - run: pnpm release-package-check
+      - run: pnpm package:mac
+      - run: pnpm package:win
+      - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          path: dist/release
+"""
+    )
+
+    assert issues == [
+        "release package workflow must exclude electron-builder scratch artifacts",
     ]
 
 

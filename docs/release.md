@@ -16,6 +16,7 @@ pnpm open-source-check
 pnpm source-package-check
 pnpm release-package-check
 pnpm build:sidecars --target-platform <platform>
+node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
 .venv/bin/python -m ruff check daemon mcp
 .venv/bin/python -m mypy daemon/src mcp/src
 .venv/bin/python -m pytest daemon/tests mcp/tests
@@ -36,7 +37,11 @@ package target.
 The release package workflow at `.github/workflows/release-package.yml` runs
 unsigned package smokes on native macOS and Windows runners. Use that workflow to
 validate Windows sidecar binaries and package inclusion before making Windows
-release claims.
+release claims. The workflow also writes `dist/release/SHA256SUMS.txt` before
+uploading artifacts so downloaded unsigned packages can be checked against a
+deterministic SHA-256 manifest. Electron-builder scratch files such as
+`builder-debug.yml` and `.icon-*` conversion caches are excluded from both the
+checksum manifest and uploaded artifact.
 
 ## Packaging Targets
 
@@ -47,6 +52,9 @@ release claims.
 - Daemon and MCP sidecars: built with PyInstaller into `dist/sidecars` and
   included in the packaged app as `resources/sidecars`; the daemon sidecar
   bundles the public printer profile data it needs at startup.
+- Checksums: generated with
+  `node scripts/run_python.mjs scripts/write_release_checksums.py dist/release`
+  and included beside the uploaded release artifacts as `SHA256SUMS.txt`.
 
 Do not publish installers that embed local runtime state, bearer tokens, diagnostic
 artifacts, or private file paths.

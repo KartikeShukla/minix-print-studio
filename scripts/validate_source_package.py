@@ -33,6 +33,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("scripts/run_python.mjs"),
     Path("scripts/build_sidecars.py"),
     Path("scripts/generate_desktop_icons.py"),
+    Path("scripts/write_release_checksums.py"),
 )
 
 FORBIDDEN_SOURCE_PREFIXES = (

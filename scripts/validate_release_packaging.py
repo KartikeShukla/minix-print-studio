@@ -50,6 +50,10 @@ PRIVATE_PATH_MARKERS = (
     "/home/",
     "C:\\Users\\",
 )
+RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS = (
+    "!dist/release/builder-debug.yml",
+    "!dist/release/.icon-*",
+)
 
 RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
     ("pnpm/action-setup@v4", "release package workflow missing pnpm setup"),
@@ -70,6 +74,11 @@ RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
     ),
     ("pnpm package:mac", "release package workflow missing command: pnpm package:mac"),
     ("pnpm package:win", "release package workflow missing command: pnpm package:win"),
+    (
+        "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
+        "release package workflow missing command: "
+        "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
+    ),
 )
 
 
@@ -176,6 +185,8 @@ def validate_release_package_workflow_text(text: str) -> list[str]:
         for snippet, issue in RELEASE_WORKFLOW_REQUIRED_SNIPPETS
         if snippet not in text
     )
+    if any(snippet not in text for snippet in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS):
+        issues.append("release package workflow must exclude electron-builder scratch artifacts")
     return issues
 
 

@@ -76,6 +76,12 @@ def test_source_package_check_requires_desktop_package_icons() -> None:
     assert Path("scripts/generate_desktop_icons.py") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_release_checksum_script() -> None:
+    validator = _load_validator()
+
+    assert Path("scripts/write_release_checksums.py") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

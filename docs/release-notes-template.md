@@ -49,3 +49,4 @@ and evidence-backed.
 - Non-hardware gates run:
 - Hardware gates run:
 - Manual smoke checks:
+- SHA-256 checksum manifest:
