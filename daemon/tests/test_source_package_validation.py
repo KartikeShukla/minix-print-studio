@@ -39,6 +39,12 @@ def test_source_package_check_rejects_runtime_state_entries() -> None:
     ]
 
 
+def test_source_package_check_requires_release_notes_template() -> None:
+    validator = _load_validator()
+
+    assert Path("docs/release-notes-template.md") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

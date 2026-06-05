@@ -17,6 +17,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("turbo.json"),
     Path("docs/architecture.md"),
     Path("docs/release.md"),
+    Path("docs/release-notes-template.md"),
     Path("docs/support-matrix.md"),
     Path("docs/known-limitations.md"),
     Path("apps/desktop/electron-builder.yml"),

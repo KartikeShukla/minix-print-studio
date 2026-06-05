@@ -22,6 +22,7 @@
 - Source package validator that checks the tracked release source set for required public files and forbidden runtime/build/cache paths.
 - Release packaging scaffold with electron-builder config, root package commands for unsigned local macOS/Windows packages, ignored in-repo Electron build caches for restricted environments, and a validator that keeps publishing/signing disabled until release credentials exist.
 - Documentation gate consistency validation that keeps `CONTRIBUTING.md`, `docs/release.md`, and `docs/testing.md` aligned with the current non-hardware release checks.
+- Public release notes template covering supported profiles, limitations, install/upgrade/uninstall notes, diagnostics redaction, hardware evidence, and validation checks.
 
 ### Daemon Core Slice
 
@@ -148,6 +149,7 @@
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for release packaging scaffold validation, including package scripts, runtime-state exclusions, disabled publishing, and absent signing identity.
 - TDD red/green checks for documented non-hardware gate consistency across contributor, release, and testing docs.
+- TDD red/green checks requiring the release notes template in both open-source readiness and tracked source-package validation.
 - Unsigned macOS package smoke via `pnpm package:mac`; electron-builder produced `dist/release/mac-arm64` and skipped code signing because `identity` is `null`.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.

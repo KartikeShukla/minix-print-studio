@@ -40,6 +40,9 @@ artifacts, or private file paths.
 
 ## Release Notes
 
+Use [release-notes-template.md](release-notes-template.md) as the starting point
+for every public release note.
+
 Release notes should include:
 
 - Supported printer profiles and certification stage.

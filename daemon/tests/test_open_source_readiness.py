@@ -62,6 +62,12 @@ def test_open_source_readiness_check_requires_public_support_docs() -> None:
     assert Path("docs/known-limitations.md") in validator.REQUIRED_DOCS
 
 
+def test_open_source_readiness_check_requires_release_notes_template() -> None:
+    validator = _load_validator()
+
+    assert Path("docs/release-notes-template.md") in validator.REQUIRED_DOCS
+
+
 def test_open_source_readiness_check_requires_source_package_script() -> None:
     validator = _load_validator()
 
