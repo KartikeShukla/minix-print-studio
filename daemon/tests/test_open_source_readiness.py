@@ -116,6 +116,7 @@ jobs:
     )
 
     assert issues == [
+        "CodeQL workflow must declare actions: read permissions",
         "CodeQL workflow must declare contents: read permissions",
         "CodeQL workflow must declare security-events: write permissions",
     ]
@@ -126,7 +127,7 @@ def test_open_source_readiness_check_tracks_codeql_workflow_permissions() -> Non
 
     assert (
         ".github/workflows/codeql.yml",
-        {"contents": "read", "security-events": "write"},
+        {"actions": "read", "contents": "read", "security-events": "write"},
     ) in validator.REQUIRED_WORKFLOW_PERMISSIONS.items()
 
 
@@ -137,6 +138,7 @@ def test_open_source_readiness_check_validates_codeql_workflow() -> None:
         """
 name: CodeQL
 permissions:
+  actions: read
   contents: read
   security-events: write
 env:
@@ -464,6 +466,7 @@ on:
   schedule:
     - cron: "21 3 * * 1"
 permissions:
+  actions: read
   contents: read
   security-events: write
 env:

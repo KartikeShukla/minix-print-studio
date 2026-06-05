@@ -52,8 +52,9 @@ above before merge.
 CodeQL runs in GitHub Actions for JavaScript/TypeScript and Python on pull
 requests, pushes to `main`, weekly schedule, and manual dispatch. Local validation
 keeps the workflow present, configured for the `security-extended` query suite,
-and limited to `contents: read` plus `security-events: write` so GitHub can
-receive scan results. CI and release package workflows must keep explicit
+and limited to `actions: read`, `contents: read`, and `security-events: write`
+so GitHub can read workflow-run metadata and receive scan results. CI and
+release package workflows must keep explicit
 read-only `contents` permissions unless a future release step documents and
 validates a narrower write requirement. Required workflows also opt into the
 Node 24 JavaScript action runtime so GitHub Actions runtime migrations are

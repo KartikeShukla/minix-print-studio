@@ -96,7 +96,11 @@ REQUIRED_GATE_DOCS = (
 
 REQUIRED_WORKFLOW_PERMISSIONS = {
     ".github/workflows/ci.yml": {"contents": "read"},
-    ".github/workflows/codeql.yml": {"contents": "read", "security-events": "write"},
+    ".github/workflows/codeql.yml": {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write",
+    },
     ".github/workflows/release-package.yml": {"contents": "read"},
 }
 REQUIRED_WORKFLOW_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
