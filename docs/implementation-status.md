@@ -19,6 +19,7 @@
 - Open-source readiness validator for required public docs, ignored runtime state, CI wiring, and private-path redaction.
 - Contributor governance docs for contribution flow, conduct expectations, validation gates, and hardware-artifact redaction.
 - Public support matrix and known limitations docs that distinguish mock/development support from hardware-certified support.
+- Source package validator that checks the tracked release source set for required public files and forbidden runtime/build/cache paths.
 
 ### Daemon Core Slice
 
@@ -106,6 +107,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm open-source-check`
+- `pnpm source-package-check`
 - `.venv/bin/python -m ruff check daemon mcp`
 - `.venv/bin/python -m mypy daemon/src mcp/src`
 - `.venv/bin/python -m pytest daemon/tests mcp/tests`
@@ -132,6 +134,7 @@
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
 - TDD red/green checks for open-source readiness validation and private path rejection.
+- TDD red/green checks for source package validation and forbidden tracked path rejection.
 - `scripts/hardware-test.sh --help`
 - Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.

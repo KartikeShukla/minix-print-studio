@@ -49,6 +49,18 @@ def test_open_source_readiness_check_requires_public_support_docs() -> None:
     assert Path("docs/known-limitations.md") in validator.REQUIRED_DOCS
 
 
+def test_open_source_readiness_check_requires_source_package_script() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_package_scripts(
+        {
+            "open-source-check": "python3 scripts/validate_open_source_readiness.py",
+        }
+    )
+
+    assert issues == ["package.json missing source-package-check script"]
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location("open_source_readiness", READINESS_SCRIPT)
     assert spec is not None

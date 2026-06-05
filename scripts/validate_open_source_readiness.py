@@ -57,6 +57,11 @@ SHAREABLE_TEXT_GLOBS = (
     "scripts/*.sh",
 )
 
+REQUIRED_PACKAGE_SCRIPTS = {
+    "open-source-check": "python3 scripts/validate_open_source_readiness.py",
+    "source-package-check": "python3 scripts/validate_source_package.py",
+}
+
 
 def main() -> int:
     root = Path.cwd()
@@ -119,9 +124,15 @@ def _missing_package_scripts(root: Path) -> list[str]:
     scripts = payload.get("scripts")
     if not isinstance(scripts, dict):
         return ["package.json missing scripts object"]
-    if scripts.get("open-source-check") != "python3 scripts/validate_open_source_readiness.py":
-        return ["package.json missing open-source-check script"]
-    return []
+    return validate_package_scripts(scripts)
+
+
+def validate_package_scripts(scripts: dict[str, object]) -> list[str]:
+    issues: list[str] = []
+    for script_name, command in REQUIRED_PACKAGE_SCRIPTS.items():
+        if scripts.get(script_name) != command:
+            issues.append(f"package.json missing {script_name} script")
+    return issues
 
 
 def _missing_ci_commands(root: Path) -> list[str]:
@@ -129,10 +140,13 @@ def _missing_ci_commands(root: Path) -> list[str]:
     if not workflow.is_file():
         return ["missing required file: .github/workflows/ci.yml"]
     text = workflow.read_text(encoding="utf-8")
-    command = "python3 scripts/validate_open_source_readiness.py"
-    if command not in text:
-        return [f"CI missing command: {command}"]
-    return []
+    required_commands = (
+        "python3 scripts/validate_open_source_readiness.py",
+        "pnpm source-package-check",
+    )
+    return [
+        f"CI missing command: {command}" for command in required_commands if command not in text
+    ]
 
 
 def _shareable_text_paths(root: Path) -> list[Path]:

@@ -18,8 +18,9 @@
     "test:node": "turbo run test --filter='./apps/*' --filter='./packages/*'",
     "test:python": "pytest daemon/tests mcp/tests",
     "open-source-check": "python3 scripts/validate_open_source_readiness.py",
+    "source-package-check": "python3 scripts/validate_source_package.py",
     "format": "prettier --check .",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test"
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm open-source-check && pnpm source-package-check"
   },
   "devDependencies": {
     "prettier": "^3.5.3",

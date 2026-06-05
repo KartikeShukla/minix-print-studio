@@ -9,6 +9,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm open-source-check
+pnpm source-package-check
 pytest daemon/tests mcp/tests
 ```
 
