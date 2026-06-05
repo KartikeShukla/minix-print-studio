@@ -89,12 +89,53 @@ def test_open_source_readiness_check_requires_codeql_workflow() -> None:
     assert Path(".github/workflows/codeql.yml") in validator.REQUIRED_FILES
 
 
+def test_open_source_readiness_check_requires_codeql_workflow_permissions() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_codeql_workflow_text(
+        """
+name: CodeQL
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "21 3 * * 1"
+jobs:
+  analyze:
+    steps:
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript, python
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4
+"""
+    )
+
+    assert issues == [
+        "CodeQL workflow must declare contents: read permissions",
+        "CodeQL workflow must declare security-events: write permissions",
+    ]
+
+
+def test_open_source_readiness_check_tracks_codeql_workflow_permissions() -> None:
+    validator = _load_validator()
+
+    assert (
+        ".github/workflows/codeql.yml",
+        {"contents": "read", "security-events": "write"},
+    ) in validator.REQUIRED_WORKFLOW_PERMISSIONS.items()
+
+
 def test_open_source_readiness_check_validates_codeql_workflow() -> None:
     validator = _load_validator()
 
     issues = validator.validate_codeql_workflow_text(
         """
 name: CodeQL
+permissions:
+  contents: read
+  security-events: write
 jobs:
   analyze:
     steps:
@@ -387,6 +428,9 @@ on:
     branches: [main]
   schedule:
     - cron: "21 3 * * 1"
+permissions:
+  contents: read
+  security-events: write
 jobs:
   analyze:
     steps:

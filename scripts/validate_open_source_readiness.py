@@ -95,6 +95,7 @@ REQUIRED_GATE_DOCS = (
 
 REQUIRED_WORKFLOW_PERMISSIONS = {
     ".github/workflows/ci.yml": {"contents": "read"},
+    ".github/workflows/codeql.yml": {"contents": "read", "security-events": "write"},
     ".github/workflows/release-package.yml": {"contents": "read"},
 }
 
@@ -248,7 +249,10 @@ def _workflow_permission_issues(root: Path) -> list[str]:
         workflow_path = root / relative_path
         if not workflow_path.is_file():
             continue
-        if relative_path == ".github/workflows/ci.yml":
+        if relative_path in {
+            ".github/workflows/ci.yml",
+            ".github/workflows/codeql.yml",
+        }:
             continue
         issues.extend(
             validate_workflow_permissions_text(
@@ -284,6 +288,13 @@ def _top_level_workflow_permissions(text: str) -> dict[str, str]:
 
 def validate_codeql_workflow_text(text: str) -> list[str]:
     issues: list[str] = []
+    issues.extend(
+        validate_workflow_permissions_text(
+            label="CodeQL workflow",
+            text=text,
+            required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/codeql.yml"],
+        )
+    )
     if "javascript-typescript" not in text:
         issues.append("CodeQL workflow missing JavaScript/TypeScript analysis")
     if "python" not in text:
