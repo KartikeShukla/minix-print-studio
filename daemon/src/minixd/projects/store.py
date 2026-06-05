@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
 from copy import deepcopy
 from dataclasses import dataclass
@@ -48,6 +49,35 @@ class ProjectStore:
 
     def get(self, project_id: str) -> ProjectRecord | None:
         return self._records.get(project_id)
+
+    def update(
+        self,
+        project_id: str,
+        *,
+        name: str,
+        document: dict[str, Any],
+    ) -> ProjectRecord | None:
+        existing = self._records.get(project_id)
+        if existing is None:
+            return None
+        record = ProjectRecord(
+            project_id=existing.project_id,
+            name=name,
+            document=deepcopy(document),
+            created_at=existing.created_at,
+            updated_at=_now(),
+        )
+        self._records[record.project_id] = record
+        self._persist(record)
+        return record
+
+    def delete(self, project_id: str) -> bool:
+        if project_id not in self._records:
+            return False
+        del self._records[project_id]
+        if self._root is not None:
+            shutil.rmtree(self._root / project_id, ignore_errors=True)
+        return True
 
     def _load_existing(self) -> None:
         if self._root is None:

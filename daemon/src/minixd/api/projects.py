@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from minixd.projects.store import ProjectRecord, ProjectStore
@@ -32,6 +32,24 @@ def create_projects_router(*, project_store: ProjectStore) -> APIRouter:
         if record is None:
             raise HTTPException(status_code=404, detail="project not found")
         return _serialize_project(record)
+
+    @router.put("/{project_id}")
+    def update_project(project_id: str, request: CreateProjectRequest) -> dict[str, object]:
+        record = project_store.update(
+            project_id,
+            name=request.name,
+            document=request.document,
+        )
+        if record is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        return _serialize_project(record)
+
+    @router.delete("/{project_id}", status_code=204)
+    def delete_project(project_id: str) -> Response:
+        deleted = project_store.delete(project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="project not found")
+        return Response(status_code=204)
 
     return router
 
