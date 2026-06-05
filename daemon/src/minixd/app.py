@@ -11,6 +11,7 @@ from minixd import __version__
 from minixd.api.diagnostics import create_diagnostics_router
 from minixd.api.jobs import create_jobs_router
 from minixd.api.printers import create_printers_router
+from minixd.api.projects import create_projects_router
 from minixd.api.render import create_render_router
 from minixd.ble.bleak_adapter import BleakBleAdapter
 from minixd.ble.discovery import (
@@ -22,6 +23,7 @@ from minixd.ble.discovery import (
 )
 from minixd.ble.profile_probe import ProfileReadOnlyProbe
 from minixd.printing.queue import PrintQueue
+from minixd.projects.store import ProjectStore
 from minixd.render.preview_store import PreviewStore
 
 PROFILE_REGISTRY_VERSION = "2026.06.04"
@@ -44,6 +46,7 @@ def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
     )
     profiles_data = load_profiles()
     preview_store = PreviewStore()
+    project_store = ProjectStore((data_dir / "projects") if data_dir is not None else None)
     print_queue = PrintQueue(
         profiles=profiles_data,
         preview_store=preview_store,
@@ -55,6 +58,7 @@ def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
         adapter=_create_ble_adapter(profiles=profiles_data, mock=mock),
     )
     app.include_router(create_render_router(preview_store=preview_store))
+    app.include_router(create_projects_router(project_store=project_store))
     app.include_router(create_printers_router(discovery_service=discovery_service))
     app.include_router(
         create_jobs_router(

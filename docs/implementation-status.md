@@ -36,6 +36,7 @@
 - `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
 - In-memory mock print queue that consumes preview-bound jobs and reports `completed_unverified` with user-check actions.
 - `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
+- Disk-backed daemon project store with `/v1/projects` create/list/get endpoints that persist `project.json` records across daemon restarts when `data_dir` is configured.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
@@ -135,11 +136,13 @@
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
+- TDD red/green checks for daemon project create/list/get persistence across app restarts.
 - `scripts/hardware-test.sh --help`
 - Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
-1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
-2. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.
+1. Complete project management coverage: update/delete project endpoints, project asset upload, renderer daemon client methods, and Projects UI that replaces single-document localStorage as the primary saved-project path.
+2. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
+3. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.

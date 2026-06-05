@@ -6,7 +6,7 @@ MiniX Print Studio is split into explicit process and package boundaries.
 
 - Electron main process owns app lifecycle, menus, tray state, secure preload IPC, and daemon supervision.
 - React renderer owns the visual workspace, onboarding, settings, integrations, and diagnostics UI.
-- Python daemon owns BLE, printer profiles, canonical rendering, safety, preview binding, print planning, print jobs, and diagnostics.
+- Python daemon owns BLE, printer profiles, canonical rendering, safety, preview binding, print planning, print jobs, project persistence, and diagnostics.
 - MCP stdio shim exposes semantic local tools and calls the daemon over localhost.
 
 ## Package Boundaries
