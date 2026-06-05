@@ -59,3 +59,8 @@ read-only `contents` permissions unless a future release step documents and
 validates a narrower write requirement. Required workflows also opt into the
 Node 24 JavaScript action runtime so GitHub Actions runtime migrations are
 exercised before they become the default.
+
+While the repository remains private, the CodeQL job skips by default because code
+scanning is not enabled on this private repo. Set repository variable
+`MINIX_ENABLE_PRIVATE_CODEQL=true` after enabling private code scanning, or make
+the repository public, to run CodeQL.

@@ -39,7 +39,7 @@
 - Manual Release Package workflow run `27013383603` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py`.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
 - CodeQL workflow scans JavaScript/TypeScript and Python with the `security-extended` query suite on pull requests, pushes to `main`, weekly schedule, and manual dispatch.
-- CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, opt into GitHub's Node 24 JavaScript action runtime, and open-source readiness validation rejects missing or `write-all` workflow permissions. CodeQL includes `actions: read` for workflow-run metadata plus `security-events: write` for scan uploads.
+- CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, opt into GitHub's Node 24 JavaScript action runtime, and open-source readiness validation rejects missing or `write-all` workflow permissions. CodeQL includes `actions: read` for workflow-run metadata plus `security-events: write` for scan uploads, and skips while the repository is private unless `MINIX_ENABLE_PRIVATE_CODEQL=true`.
 
 ### Daemon Core Slice
 

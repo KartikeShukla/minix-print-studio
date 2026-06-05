@@ -104,6 +104,10 @@ REQUIRED_WORKFLOW_PERMISSIONS = {
     ".github/workflows/release-package.yml": {"contents": "read"},
 }
 REQUIRED_WORKFLOW_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
+REQUIRED_CODEQL_PRIVATE_REPO_GUARD = (
+    "if: ${{ !github.event.repository.private || "
+    "vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}"
+)
 
 REQUIRED_DEPENDABOT_BLOCKS = (
     ("npm", "/"),
@@ -346,6 +350,11 @@ def validate_codeql_workflow_text(text: str) -> list[str]:
         issues.append("CodeQL workflow must use github/codeql-action/analyze@v4")
     if "security-extended" not in text:
         issues.append("CodeQL workflow must use the security-extended query suite")
+    if REQUIRED_CODEQL_PRIVATE_REPO_GUARD not in text:
+        issues.append(
+            "CodeQL workflow must skip private repositories unless "
+            "MINIX_ENABLE_PRIVATE_CODEQL is true"
+        )
     return issues
 
 

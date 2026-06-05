@@ -106,6 +106,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: github/codeql-action/init@v4
         with:
@@ -145,6 +146,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v4
@@ -160,6 +162,23 @@ jobs:
         "CodeQL workflow must run on pushes to main",
         "CodeQL workflow must run on a weekly schedule",
         "CodeQL workflow must use the security-extended query suite",
+    ]
+
+
+def test_open_source_readiness_check_requires_codeql_private_repo_guard() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_codeql_workflow_text(
+        _codeql_workflow_text().replace(
+            "    if: ${{ !github.event.repository.private || "
+            "vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}\n",
+            "",
+        )
+    )
+
+    assert issues == [
+        "CodeQL workflow must skip private repositories unless "
+        "MINIX_ENABLE_PRIVATE_CODEQL is true",
     ]
 
 
@@ -473,6 +492,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: github/codeql-action/init@v4
         with:
