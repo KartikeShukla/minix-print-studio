@@ -28,6 +28,17 @@ pnpm release-package-check
   support action without requiring hardware.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
 
+## Release Evidence Gate
+
+After a manual Release Package workflow run, download the uploaded artifacts and run:
+
+```bash
+node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidence
+```
+
+This validates the successful workflow metadata, macOS and Windows unsigned package
+artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
+
 ## Dependency Maintenance
 
 Dependabot opens weekly update pull requests for the npm workspace, GitHub Actions,

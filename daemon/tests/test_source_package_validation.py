@@ -85,6 +85,12 @@ def test_source_package_check_requires_release_checksum_script() -> None:
     assert Path("scripts/write_release_checksums.py") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_release_evidence_validator() -> None:
+    validator = _load_validator()
+
+    assert Path("scripts/validate_release_evidence.py") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

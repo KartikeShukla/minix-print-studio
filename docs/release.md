@@ -46,6 +46,23 @@ manifest. Electron-builder scratch files such as `builder-debug.yml` and
 `.icon-*` conversion caches are excluded from both the checksum manifest and
 uploaded artifact.
 
+## Release Evidence Capture
+
+After pushing this branch to a GitHub remote, trigger the release package workflow
+and download the uploaded artifacts into a local evidence directory:
+
+```bash
+gh workflow run release-package.yml --ref <branch>
+gh run view <run-id> --json name,event,conclusion,headBranch > release-evidence/workflow-run.json
+gh run download <run-id> --dir release-evidence
+node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidence
+```
+
+The evidence validator requires a successful manual `Release Package` run,
+platform-named macOS and Windows unsigned artifact directories, matching
+`SHA256SUMS.txt` manifests, bundled daemon/MCP sidecars, and no runtime state,
+diagnostics, hardware artifacts, or electron-builder scratch files.
+
 ## Packaging Targets
 
 - macOS: unsigned local Electron package via `pnpm package:mac`; signed release
