@@ -94,6 +94,7 @@
 - Non-mock BLE scan now maps host Bluetooth-unavailable failures to a structured `503` response, and the renderer daemon client preserves daemon `detail` text so the UI can show actionable setup errors.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
+- `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
 
 ## Current Verification
 
@@ -125,11 +126,12 @@
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.
 - TDD red/green checks for the Stage A hardware-test CLI scan/export flow and daemon error-detail preservation.
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
+- TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
 - `scripts/hardware-test.sh --help`
 - Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
-1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer and inspect the exported hardware-test artifact from that run.
-2. After Stage A is confirmed on hardware, implement the protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.
+1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
+2. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.

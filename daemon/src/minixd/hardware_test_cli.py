@@ -12,6 +12,12 @@ from pathlib import Path
 from typing import TextIO, cast
 from zipfile import BadZipFile, ZipFile
 
+from minixd.protocol.aiyin import (
+    build_set_density_command,
+    build_set_paper_mode_command,
+    build_wake_command,
+)
+
 
 @dataclass(frozen=True)
 class HttpResponse:
@@ -156,6 +162,16 @@ def run(
             )
             stdout.write("\n")
             return 0
+        if args.command == "protocol-sanity-preflight":
+            stdout.write(
+                json.dumps(
+                    plan_protocol_sanity_preflight(Path(args.artifact_path)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            stdout.write("\n")
+            return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
@@ -204,6 +220,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Inspect a Stage A hardware-test ZIP artifact without contacting the daemon.",
     )
     inspect_parser.add_argument("artifact_path", help="Path to a Stage A hardware-test ZIP.")
+
+    preflight_parser = subparsers.add_parser(
+        "protocol-sanity-preflight",
+        help="Plan the Stage B protocol sanity command sequence from a Stage A artifact.",
+    )
+    preflight_parser.add_argument("artifact_path", help="Path to a Stage A hardware-test ZIP.")
     return parser
 
 
@@ -239,6 +261,80 @@ def inspect_stage_a_artifact(artifact_path: Path) -> dict[str, object]:
             "nextRequiredStage",
             "print-transfer-manifest.json",
         ),
+    }
+
+
+def plan_protocol_sanity_preflight(artifact_path: Path) -> dict[str, object]:
+    stage_a_summary = inspect_stage_a_artifact(artifact_path)
+    next_required_stage = _required_json_string(
+        stage_a_summary,
+        "nextRequiredStage",
+        "print-transfer-manifest.json",
+    )
+    if next_required_stage != "protocol_sanity_test":
+        raise HardwareTestCliError("artifact is not ready for protocol sanity test")
+
+    try:
+        with ZipFile(artifact_path) as archive:
+            profile = _read_zip_json_object(archive, "profile.json")
+    except BadZipFile as exc:
+        raise HardwareTestCliError("artifact is not a ZIP file") from exc
+
+    profile_id = _required_json_string(profile, "id", "profile.json")
+    artifact_profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    if profile_id != artifact_profile_id:
+        raise HardwareTestCliError("artifact profile does not match transfer manifest")
+
+    print_config = _required_json_object(profile, "print", "profile.json")
+    ble_config = _required_json_object(profile, "ble", "profile.json")
+    density = _required_json_string(print_config, "defaultDensity", "profile.json.print")
+    paper_mode = _required_json_string(print_config, "defaultPaperMode", "profile.json.print")
+    write_characteristic = _required_json_string(
+        ble_config,
+        "writeCharUuid",
+        "profile.json.ble",
+    )
+    notify_characteristics = _required_json_string_list(
+        ble_config,
+        "notifyCharUuids",
+        "profile.json.ble",
+    )
+
+    try:
+        command_plan = [
+            _protocol_command(0, "wake", build_wake_command()),
+            _protocol_command(1, "set_density", build_set_density_command(density)),
+            _protocol_command(2, "set_paper_mode", build_set_paper_mode_command(paper_mode)),
+        ]
+    except ValueError as exc:
+        raise HardwareTestCliError(str(exc)) from exc
+
+    return {
+        "status": "protocol_sanity_preflight_ready",
+        "stage": "protocol_sanity_test",
+        "deviceId": _required_json_string(
+            stage_a_summary,
+            "deviceId",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": profile_id,
+        "writeCharacteristic": write_characteristic,
+        "notifyCharacteristics": notify_characteristics,
+        "density": density,
+        "paperMode": paper_mode,
+        "printCommandsSent": False,
+        "rasterBytesIncluded": False,
+        "commands": command_plan,
+        "safety": {
+            "requiresPhysicalPrinter": True,
+            "requiresUserConfirmation": True,
+            "sendsRaster": False,
+            "unlocksPrinting": False,
+        },
     }
 
 
@@ -282,6 +378,43 @@ def _required_json_string(
     if not isinstance(field_value, str) or not field_value:
         raise HardwareTestCliError(f"artifact missing required field: {filename}.{field}")
     return field_value
+
+
+def _required_json_object(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> dict[str, object]:
+    field_value = value.get(field)
+    if not isinstance(field_value, dict):
+        raise HardwareTestCliError(f"artifact missing required object: {filename}.{field}")
+    return cast(dict[str, object], field_value)
+
+
+def _required_json_string_list(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> list[str]:
+    field_value = value.get(field)
+    if not isinstance(field_value, list) or not all(
+        isinstance(item, str) for item in field_value
+    ):
+        raise HardwareTestCliError(f"artifact missing required string list: {filename}.{field}")
+    return list(field_value)
+
+
+def _protocol_command(index: int, name: str, payload: bytes) -> dict[str, object]:
+    return {
+        "index": index,
+        "name": name,
+        "payloadBytes": len(payload),
+        "hex": _hex(payload),
+    }
+
+
+def _hex(payload: bytes) -> str:
+    return " ".join(f"{byte:02x}" for byte in payload)
 
 
 def urllib_transport(

@@ -40,6 +40,7 @@ For command-line validation against a running daemon:
 scripts/hardware-test.sh scan
 scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir ./hardware-artifacts
 scripts/hardware-test.sh inspect-artifact ./hardware-artifacts/hardware-test-<timestamp>.zip
+scripts/hardware-test.sh protocol-sanity-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
 ```
 
 The wrapper uses `.venv/bin/python` when available and accepts
@@ -47,6 +48,9 @@ The wrapper uses `.venv/bin/python` when available and accepts
 `inspect-artifact` runs offline, checks the required archive files, and rejects
 artifacts that sent print commands, included raster bytes, unlocked printing, or
 marked certification complete.
+`protocol-sanity-preflight` also runs offline. It validates the Stage A artifact
+and prints the exact Stage B wake, density, and paper-mode command bytes from the
+captured profile snapshot, without sending anything over BLE.
 
 The Stage A archive contains:
 
@@ -89,3 +93,16 @@ locked until later stages pass on physical hardware:
 4. Optional paper mode tests.
 
 Do not mark a profile as trusted from read-only verification alone.
+
+## Stage B Preflight
+
+Before a physical protocol sanity run, review the offline preflight output:
+
+- Confirm `stage` is `protocol_sanity_test`.
+- Confirm `printCommandsSent` is `false`.
+- Confirm `rasterBytesIncluded` is `false`.
+- Confirm the command list contains only `wake`, `set_density`, and
+  `set_paper_mode`.
+
+The preflight output is not a certification result. It is the deterministic
+command plan for the next physical test.

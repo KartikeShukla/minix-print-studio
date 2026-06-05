@@ -171,6 +171,79 @@ def test_hardware_test_cli_rejects_artifact_that_sent_print_commands(tmp_path: P
     assert stderr.getvalue().strip() == "artifact is not read-only safe"
 
 
+def test_hardware_test_cli_plans_protocol_sanity_preflight_from_stage_a_artifact(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(artifact_path)
+    stdout = io.StringIO()
+
+    exit_code = run(["protocol-sanity-preflight", str(artifact_path)], stdout=stdout)
+
+    assert exit_code == 0
+    assert json.loads(stdout.getvalue()) == {
+        "status": "protocol_sanity_preflight_ready",
+        "stage": "protocol_sanity_test",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "writeCharacteristic": "0000ff02-0000-1000-8000-00805f9b34fb",
+        "notifyCharacteristics": ["0000ff01-0000-1000-8000-00805f9b34fb"],
+        "density": "medium",
+        "paperMode": "continuous",
+        "printCommandsSent": False,
+        "rasterBytesIncluded": False,
+        "commands": [
+            {
+                "index": 0,
+                "name": "wake",
+                "payloadBytes": 12,
+                "hex": "00 00 00 00 00 00 00 00 00 00 00 00",
+            },
+            {
+                "index": 1,
+                "name": "set_density",
+                "payloadBytes": 5,
+                "hex": "10 ff 10 00 01",
+            },
+            {
+                "index": 2,
+                "name": "set_paper_mode",
+                "payloadBytes": 4,
+                "hex": "10 ff 84 02",
+            },
+        ],
+        "safety": {
+            "requiresPhysicalPrinter": True,
+            "requiresUserConfirmation": True,
+            "sendsRaster": False,
+            "unlocksPrinting": False,
+        },
+    }
+
+
+def test_hardware_test_cli_rejects_protocol_sanity_preflight_for_unsafe_artifact(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    _write_stage_a_artifact(
+        artifact_path,
+        transfer_manifest={
+            "stage": "read_only_verification",
+            "deviceId": "mock-minix-0194",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "nextRequiredStage": "protocol_sanity_test",
+            "printCommandsSent": True,
+            "rasterBytesIncluded": False,
+        },
+    )
+    stderr = io.StringIO()
+
+    exit_code = run(["protocol-sanity-preflight", str(artifact_path)], stderr=stderr)
+
+    assert exit_code == 2
+    assert stderr.getvalue().strip() == "artifact is not read-only safe"
+
+
 def _write_stage_a_artifact(
     artifact_path: Path,
     *,
@@ -186,7 +259,22 @@ def _write_stage_a_artifact(
     }
     with ZipFile(artifact_path, "w", ZIP_DEFLATED) as archive:
         archive.writestr("device.json", json.dumps({"deviceId": "mock-minix-0194"}))
-        archive.writestr("profile.json", json.dumps({"id": "seznik-minix-s1-lyin48d-gy"}))
+        archive.writestr(
+            "profile.json",
+            json.dumps(
+                {
+                    "id": "seznik-minix-s1-lyin48d-gy",
+                    "ble": {
+                        "writeCharUuid": "0000ff02-0000-1000-8000-00805f9b34fb",
+                        "notifyCharUuids": ["0000ff01-0000-1000-8000-00805f9b34fb"],
+                    },
+                    "print": {
+                        "defaultDensity": "medium",
+                        "defaultPaperMode": "continuous",
+                    },
+                }
+            ),
+        )
         archive.writestr("ble-discovery.json", "{}")
         archive.writestr("model-response.bin", b"S1_LYiN48D_GY")
         archive.writestr("firmware-response.bin", b"V1.9.11")
