@@ -1136,6 +1136,9 @@ describe("MiniX Print Studio shell", () => {
       });
     });
     expect(await screen.findByText("Saved project prj_new")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
+      { activeProjectId: "prj_new" }
+    );
   });
 
   it("opens a saved daemon project into the editor", async () => {
@@ -1193,6 +1196,64 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Loaded checklist - continuous paper")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
       loadedDocument
+    );
+    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
+      { activeProjectId: "prj_loaded" }
+    );
+  });
+
+  it("restores the last opened daemon project before using the local document cache", async () => {
+    const staleLocalDocument = createDefaultDocument({
+      title: "Stale local draft",
+      now: new Date("2026-06-05T00:02:30.000Z")
+    });
+    const daemonDocument = createDefaultDocument({
+      title: "Daemon session",
+      now: new Date("2026-06-05T00:02:31.000Z")
+    });
+    const getProject = vi.fn().mockResolvedValue({
+      projectId: "prj_session",
+      name: "Daemon session",
+      document: daemonDocument,
+      createdAt: "2026-06-05T00:02:31Z",
+      updatedAt: "2026-06-05T00:02:31Z"
+    });
+    localStorage.setItem(
+      "minix.printStudio.currentDocument.v1",
+      JSON.stringify(staleLocalDocument)
+    );
+    localStorage.setItem(
+      "minix.printStudio.projectSession.v1",
+      JSON.stringify({ activeProjectId: "prj_session" })
+    );
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          getProject
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(getProject).toHaveBeenCalledWith("prj_session");
+    });
+    expect(await screen.findByText("Opened project prj_session")).toBeInTheDocument();
+    expect(screen.getByText("Daemon session - continuous paper")).toBeInTheDocument();
+    expect(screen.queryByText("Stale local draft - continuous paper")).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
+      daemonDocument
     );
   });
 
@@ -1282,6 +1343,9 @@ describe("MiniX Print Studio shell", () => {
     });
     expect(createProject).not.toHaveBeenCalled();
     expect(await screen.findByText("Saved project prj_loaded")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
+      { activeProjectId: "prj_loaded" }
+    );
   });
 
   it("confirms and deletes a saved daemon project from the project list", async () => {
@@ -1329,6 +1393,67 @@ describe("MiniX Print Studio shell", () => {
     });
     expect(await screen.findByText("Deleted project prj_delete")).toBeInTheDocument();
     expect(screen.queryByText("Delete checklist")).not.toBeInTheDocument();
+
+    confirm.mockRestore();
+  });
+
+  it("clears the remembered daemon project session after deleting the opened project", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const openedDocument = createDefaultDocument({
+      title: "Session cleanup",
+      now: new Date("2026-06-05T00:06:30.000Z")
+    });
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_cleanup",
+          name: "Session cleanup",
+          documentId: openedDocument.id,
+          updatedAt: "2026-06-05T00:06:30Z"
+        }
+      ]
+    });
+    const getProject = vi.fn().mockResolvedValue({
+      projectId: "prj_cleanup",
+      name: "Session cleanup",
+      document: openedDocument,
+      createdAt: "2026-06-05T00:06:30Z",
+      updatedAt: "2026-06-05T00:06:30Z"
+    });
+    const deleteProject = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          getProject,
+          deleteProject
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+    expect(await screen.findByText("Session cleanup")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Session cleanup project" }));
+    expect(await screen.findByText("Opened project prj_cleanup")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Session cleanup project" }));
+
+    await waitFor(() => {
+      expect(deleteProject).toHaveBeenCalledWith("prj_cleanup");
+    });
+    expect(localStorage.getItem("minix.printStudio.projectSession.v1")).toBeNull();
 
     confirm.mockRestore();
   });

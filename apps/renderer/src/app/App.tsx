@@ -89,7 +89,13 @@ import {
   type AgentIntegrationTargetId
 } from "@/lib/agent-integrations";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
-import { loadStoredDocument, saveStoredDocument } from "@/lib/document-storage";
+import {
+  clearStoredProjectSession,
+  loadStoredDocument,
+  loadStoredProjectSession,
+  saveStoredDocument,
+  saveStoredProjectSession
+} from "@/lib/document-storage";
 import {
   loadStoredJobHistory,
   prependStoredPrintJob,
@@ -379,6 +385,65 @@ export function App({
     setPreviewWorkflow({ status: "idle" });
     setPrintWorkflow({ status: "idle" });
   }, []);
+
+  const applyOpenedProject = useCallback(
+    (project: ProjectResponse) => {
+      const loadedDocument = printDocumentSchema.parse(project.document);
+      setEditingTextElementId(null);
+      setEditorState({
+        document: loadedDocument,
+        past: [],
+        future: [],
+        selectedElementId: null
+      });
+      setActiveProjectId(project.projectId);
+      saveStoredProjectSession(project.projectId);
+      invalidatePreview();
+      setProjectWorkflow((current) => ({
+        status: "opened",
+        projects: upsertProjectSummary(current.projects, projectSummaryFromResponse(project)),
+        openedProjectId: project.projectId
+      }));
+    },
+    [invalidatePreview]
+  );
+
+  useEffect(() => {
+    const session = loadStoredProjectSession();
+    if (!session || !client.getProject) {
+      return;
+    }
+
+    let cancelled = false;
+    setProjectWorkflow((current) => ({
+      status: "opening",
+      projects: current.projects,
+      projectId: session.activeProjectId
+    }));
+
+    client
+      .getProject(session.activeProjectId)
+      .then((project) => {
+        if (!cancelled) {
+          applyOpenedProject(project);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        clearStoredProjectSession();
+        setProjectWorkflow((current) => ({
+          status: "error",
+          projects: current.projects,
+          message: error instanceof Error ? error.message : "Project restore failed"
+        }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyOpenedProject, client]);
 
   const commitDocument = useCallback(
     (commit: DocumentCommit) => {
@@ -748,6 +813,7 @@ export function App({
         const savedProject = await client.updateProject(activeProjectId, request);
         const summary = projectSummaryFromResponse(savedProject);
         setActiveProjectId(savedProject.projectId);
+        saveStoredProjectSession(savedProject.projectId);
         setProjectWorkflow((current) => ({
           status: "saved",
           projects: upsertProjectSummary(current.projects, summary),
@@ -776,6 +842,7 @@ export function App({
       const savedProject = await client.createProject(request);
       const summary = projectSummaryFromResponse(savedProject);
       setActiveProjectId(savedProject.projectId);
+      saveStoredProjectSession(savedProject.projectId);
       setProjectWorkflow((current) => ({
         status: "saved",
         projects: upsertProjectSummary(current.projects, summary),
@@ -807,21 +874,7 @@ export function App({
       }));
       try {
         const project = await client.getProject(projectId);
-        const loadedDocument = printDocumentSchema.parse(project.document);
-        setEditingTextElementId(null);
-        setEditorState({
-          document: loadedDocument,
-          past: [],
-          future: [],
-          selectedElementId: null
-        });
-        setActiveProjectId(project.projectId);
-        invalidatePreview();
-        setProjectWorkflow((current) => ({
-          status: "opened",
-          projects: upsertProjectSummary(current.projects, projectSummaryFromResponse(project)),
-          openedProjectId: project.projectId
-        }));
+        applyOpenedProject(project);
       } catch (error: unknown) {
         setProjectWorkflow((current) => ({
           status: "error",
@@ -830,7 +883,7 @@ export function App({
         }));
       }
     },
-    [client, invalidatePreview]
+    [applyOpenedProject, client]
   );
 
   const deleteProject = useCallback(
@@ -856,6 +909,7 @@ export function App({
         await client.deleteProject(project.projectId);
         if (activeProjectId === project.projectId) {
           setActiveProjectId(null);
+          clearStoredProjectSession();
         }
         setProjectWorkflow((current) => ({
           status: "deleted",
