@@ -8,6 +8,7 @@ Development follows TDD for behavior code.
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm open-source-check
 pytest daemon/tests mcp/tests
 ```
 

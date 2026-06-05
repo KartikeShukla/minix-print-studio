@@ -34,3 +34,4 @@ jobs:
       - run: ruff check daemon mcp
       - run: mypy daemon/src mcp/src
       - run: pytest daemon/tests mcp/tests
+      - run: python3 scripts/validate_open_source_readiness.py

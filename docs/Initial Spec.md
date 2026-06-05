@@ -420,7 +420,7 @@ The daemon binds only to `127.0.0.1` on a random available port. The port and au
   "version": 1,
   "pid": 12345,
   "baseUrl": "http://127.0.0.1:39281",
-  "tokenFile": "/Users/user/Library/Application Support/MiniX Print Studio/runtime/token",
+  "tokenFile": "<user-data>/MiniX Print Studio/runtime/token",
   "startedAt": "2026-06-04T10:00:00Z"
 }
 ```
