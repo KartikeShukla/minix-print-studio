@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Bluetooth,
   Boxes,
+  CheckCircle2,
   CircleAlert,
   Copy,
   Download,
@@ -28,6 +29,7 @@ import {
   Type,
   Undo2,
   Wifi,
+  X,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
@@ -98,6 +100,10 @@ import {
   saveStoredDocument,
   saveStoredProjectSession
 } from "@/lib/document-storage";
+import {
+  loadSetupChecklistDismissed,
+  saveSetupChecklistDismissed
+} from "@/lib/setup-checklist";
 import {
   desktopHardwareArtifactInspector,
   type HardwareArtifactInspectionResult,
@@ -382,6 +388,9 @@ export function App({
   const [agentIntegrationMutation, setAgentIntegrationMutation] =
     useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
+  const [setupChecklistDismissed, setSetupChecklistDismissed] = useState(() =>
+    loadSetupChecklistDismissed()
+  );
   const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
   const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
@@ -1153,6 +1162,11 @@ export function App({
     }
   }, [supportBundleWorkflow, supportExporter]);
 
+  const dismissSetupChecklist = useCallback(() => {
+    saveSetupChecklistDismissed(true);
+    setSetupChecklistDismissed(true);
+  }, []);
+
   const selectUpdateChannel = useCallback(
     async (channel: UpdateChannel) => {
       const currentState =
@@ -1528,6 +1542,17 @@ export function App({
           </section>
 
           <aside className="min-h-0 overflow-auto border-l border-border bg-card">
+            {!setupChecklistDismissed ? (
+              <SetupChecklistPanel
+                health={health}
+                printerWorkflow={printerWorkflow}
+                hardwareArtifactWorkflow={hardwareArtifactWorkflow}
+                hardwarePreflightWorkflow={hardwarePreflightWorkflow}
+                agentIntegrationWorkflow={agentIntegrationWorkflow}
+                onDismiss={dismissSetupChecklist}
+              />
+            ) : null}
+
             <ProjectsPanel
               workflow={projectWorkflow}
               canLoad={Boolean(client.listProjects)}
@@ -1914,6 +1939,74 @@ function RecentJobsPanel({
                 {job.bandsSent}/{job.totalBands} bands
               </span>
             </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SetupChecklistPanel({
+  health,
+  printerWorkflow,
+  hardwareArtifactWorkflow,
+  hardwarePreflightWorkflow,
+  agentIntegrationWorkflow,
+  onDismiss
+}: {
+  health: HealthResponse | null;
+  printerWorkflow: PrinterWorkflow;
+  hardwareArtifactWorkflow: HardwareArtifactWorkflow;
+  hardwarePreflightWorkflow: HardwarePreflightWorkflow;
+  agentIntegrationWorkflow: AgentIntegrationWorkflow;
+  onDismiss: () => void;
+}) {
+  const items = [
+    {
+      label: "Daemon",
+      ready: health?.ok === true
+    },
+    {
+      label: "Printer verification",
+      ready: printerWorkflow.status === "verified"
+    },
+    {
+      label: "Stage A artifact",
+      ready:
+        hardwareArtifactWorkflow.status === "exported" ||
+        hardwarePreflightWorkflow.status === "ready"
+    },
+    {
+      label: "Agent integrations",
+      ready: agentIntegrationWorkflow.status === "ready"
+    }
+  ];
+
+  return (
+    <section className="border-b border-border p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="text-sm font-semibold">Setup</h2>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Dismiss setup checklist"
+          title="Dismiss setup checklist"
+          onClick={onDismiss}
+        >
+          <X className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="space-y-2 text-sm">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">{item.label}</span>
+            <Badge variant={item.ready ? "success" : "muted"}>
+              {item.ready ? "Ready" : "Pending"}
+            </Badge>
           </div>
         ))}
       </div>

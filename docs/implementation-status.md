@@ -59,6 +59,7 @@
 - Renderer Projects panel can load daemon project summaries, save the current document as a daemon-backed project, open saved daemon projects into the editor, update opened projects without creating duplicates, and delete projects after confirmation.
 - Renderer image import uploads PNG/JPEG/WebP files to the opened daemon project's hash-addressed asset store, keeps the embedded data URL for local rendering, and persists daemon asset metadata on the document.
 - Renderer startup restores the last active daemon project session before falling back to the single-document localStorage cache, and clears that remembered session when the opened project is deleted.
+- Renderer shows a dismissible first-run Setup checklist that summarizes daemon, printer verification, Stage A artifact, and Agent Integration readiness without unlocking printing, and persists dismissal in localStorage.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
@@ -201,6 +202,7 @@
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
 - TDD red/green checks for renderer daemon-project session persistence, startup restore before local document cache fallback, and active-project session cleanup on delete.
+- TDD red/green checks for first-run Setup checklist visibility, local dismissal persistence, and storage corruption fallback.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects/session/image-asset changes, the Image import button and Projects panel render, and the browser console only shows the React DevTools hint.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`

@@ -41,6 +41,59 @@ describe("MiniX Print Studio shell", () => {
     });
   });
 
+  it("shows a dismissible first-run setup checklist", async () => {
+    const { unmount } = render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    expect(await screen.findByText("Setup")).toBeInTheDocument();
+    expect(screen.getByText("Daemon")).toBeInTheDocument();
+    expect(screen.getByText("Printer verification")).toBeInTheDocument();
+    expect(screen.getByText("Agent integrations")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss setup checklist" }));
+
+    expect(screen.queryByText("Setup")).not.toBeInTheDocument();
+    expect(localStorage.getItem("minix.printStudio.setupChecklist.v1")).toBe(
+      JSON.stringify({ dismissed: true })
+    );
+
+    unmount();
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    expect(screen.queryByText("Setup")).not.toBeInTheDocument();
+  });
+
   it("shows update channel status and allows selecting the beta channel", async () => {
     const setChannel = vi.fn().mockResolvedValue({
       channel: "beta",

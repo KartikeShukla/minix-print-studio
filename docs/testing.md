@@ -26,6 +26,7 @@ pnpm release-package-check
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
+- Renderer setup tests cover the first-run checklist and local dismissal persistence.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
 
 ## Release Evidence Gate

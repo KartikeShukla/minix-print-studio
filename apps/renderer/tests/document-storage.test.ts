@@ -9,6 +9,11 @@ import {
   saveStoredProjectSession,
   STORAGE_KEY
 } from "../src/lib/document-storage";
+import {
+  loadSetupChecklistDismissed,
+  saveSetupChecklistDismissed,
+  SETUP_CHECKLIST_STORAGE_KEY
+} from "../src/lib/setup-checklist";
 
 describe("document storage", () => {
   it("round-trips a valid document through localStorage", () => {
@@ -50,5 +55,21 @@ describe("document storage", () => {
     clearStoredProjectSession();
 
     expect(localStorage.getItem(PROJECT_SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it("round-trips setup checklist dismissal", () => {
+    localStorage.clear();
+
+    expect(loadSetupChecklistDismissed()).toBe(false);
+
+    saveSetupChecklistDismissed(true);
+
+    expect(JSON.parse(localStorage.getItem(SETUP_CHECKLIST_STORAGE_KEY) ?? "{}")).toEqual({
+      dismissed: true
+    });
+    expect(loadSetupChecklistDismissed()).toBe(true);
+
+    localStorage.setItem(SETUP_CHECKLIST_STORAGE_KEY, "{");
+    expect(loadSetupChecklistDismissed()).toBe(false);
   });
 });
