@@ -103,7 +103,10 @@ def test_release_packaging_check_requires_sidecar_resources() -> None:
         """
 files:
   - out/**
+mac:
+  icon: build/icon.png
 win:
+  icon: build/icon.ico
   signAndEditExecutable: false
 publish: null
 """
@@ -129,8 +132,10 @@ extraResources:
   - from: ../../dist/sidecars
     to: sidecars
 mac:
+  icon: build/icon.png
   identity: Developer ID Application: Example Person
 win:
+  icon: build/icon.ico
   signAndEditExecutable: false
 publish:
   provider: github
@@ -156,7 +161,10 @@ files:
 extraResources:
   - from: ../../dist/sidecars
     to: sidecars
+mac:
+  icon: build/icon.png
 win:
+  icon: build/icon.ico
   signAndEditExecutable: false
 publish: null
 """
@@ -178,12 +186,40 @@ win:
 extraResources:
   - from: ../../dist/sidecars
     to: sidecars
+mac:
+  icon: build/icon.png
+win:
+  icon: build/icon.ico
 publish: null
 """
     )
 
     assert issues == [
         "electron-builder config must disable Windows executable resource editing",
+    ]
+
+
+def test_release_packaging_check_requires_explicit_package_icons() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_builder_config_text(
+        """
+files:
+  - out/**
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
+mac:
+  identity: null
+win:
+  signAndEditExecutable: false
+publish: null
+"""
+    )
+
+    assert issues == [
+        "electron-builder config must set mac icon: build/icon.png",
+        "electron-builder config must set Windows icon: build/icon.ico",
     ]
 
 

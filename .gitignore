@@ -7,6 +7,10 @@ node_modules/
 .pnpm-store/
 dist/
 build/
+!apps/desktop/build/
+!apps/desktop/build/icon-source.svg
+!apps/desktop/build/icon.png
+!apps/desktop/build/icon.ico
 out/
 coverage/
 .turbo/

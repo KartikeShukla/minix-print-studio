@@ -25,10 +25,14 @@ REQUIRED_SOURCE_PATHS = (
     Path("docs/release-notes-template.md"),
     Path("docs/support-matrix.md"),
     Path("docs/known-limitations.md"),
+    Path("apps/desktop/build/icon-source.svg"),
+    Path("apps/desktop/build/icon.png"),
+    Path("apps/desktop/build/icon.ico"),
     Path("apps/desktop/electron-builder.yml"),
     Path("scripts/validate_release_packaging.py"),
     Path("scripts/run_python.mjs"),
     Path("scripts/build_sidecars.py"),
+    Path("scripts/generate_desktop_icons.py"),
 )
 
 FORBIDDEN_SOURCE_PREFIXES = (

@@ -67,6 +67,15 @@ def test_source_package_check_requires_community_intake_templates() -> None:
     assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_desktop_package_icons() -> None:
+    validator = _load_validator()
+
+    assert Path("apps/desktop/build/icon-source.svg") in validator.REQUIRED_SOURCE_PATHS
+    assert Path("apps/desktop/build/icon.png") in validator.REQUIRED_SOURCE_PATHS
+    assert Path("apps/desktop/build/icon.ico") in validator.REQUIRED_SOURCE_PATHS
+    assert Path("scripts/generate_desktop_icons.py") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

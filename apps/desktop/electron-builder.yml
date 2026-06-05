@@ -9,15 +9,15 @@ directories:
 files:
   - out/**
   - package.json
-  - '!**/*.map'
-  - '!**/.env'
-  - '!**/.env.*'
-  - '!runtime/**'
-  - '!logs/**'
-  - '!diagnostics/**'
-  - '!previews/**'
-  - '!jobs/**'
-  - '!hardware-artifacts/**'
+  - "!**/*.map"
+  - "!**/.env"
+  - "!**/.env.*"
+  - "!runtime/**"
+  - "!logs/**"
+  - "!diagnostics/**"
+  - "!previews/**"
+  - "!jobs/**"
+  - "!hardware-artifacts/**"
 
 extraResources:
   - from: ../../dist/sidecars
@@ -30,6 +30,7 @@ extraMetadata:
   main: out/main/index.js
 
 mac:
+  icon: build/icon.png
   target:
     - target: dir
       arch:
@@ -39,6 +40,7 @@ mac:
   identity: null
 
 win:
+  icon: build/icon.ico
   signAndEditExecutable: false
   target:
     - target: dir

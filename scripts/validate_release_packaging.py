@@ -20,6 +20,11 @@ DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
 RELEASE_PACKAGE_WORKFLOW_PATH = Path(".github/workflows/release-package.yml")
+REQUIRED_PACKAGE_ICON_PATHS = (
+    Path("apps/desktop/build/icon-source.svg"),
+    Path("apps/desktop/build/icon.png"),
+    Path("apps/desktop/build/icon.ico"),
+)
 BUILDER_REQUIRED_SNIPPETS = (
     "appId: org.minix.printstudio",
     "productName: MiniX Print Studio",
@@ -27,6 +32,8 @@ BUILDER_REQUIRED_SNIPPETS = (
     "from: ../../dist/sidecars",
     "to: sidecars",
     "main: out/main/index.js",
+    "icon: build/icon.png",
+    "icon: build/icon.ico",
     "signAndEditExecutable: false",
     "publish: null",
 )
@@ -103,6 +110,9 @@ def validate_repository(root: Path) -> list[str]:
     for snippet in BUILDER_REQUIRED_SNIPPETS:
         if snippet not in text:
             issues.append(f"electron-builder config missing required setting: {snippet}")
+    for icon_path in REQUIRED_PACKAGE_ICON_PATHS:
+        if not (root / icon_path).is_file():
+            issues.append(f"missing required package icon asset: {icon_path.as_posix()}")
 
     release_workflow = root / RELEASE_PACKAGE_WORKFLOW_PATH
     if not release_workflow.is_file():
@@ -144,6 +154,10 @@ def validate_builder_config_text(text: str) -> list[str]:
         issues.append("electron-builder config must include sidecar binaries")
     if not _windows_resource_editing_disabled(text):
         issues.append("electron-builder config must disable Windows executable resource editing")
+    if not _mac_icon_configured(text):
+        issues.append("electron-builder config must set mac icon: build/icon.png")
+    if not _windows_icon_configured(text):
+        issues.append("electron-builder config must set Windows icon: build/icon.ico")
     for marker in PRIVATE_PATH_MARKERS:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
@@ -208,6 +222,14 @@ def _windows_resource_editing_disabled(text: str) -> bool:
         if line.strip() == "signAndEditExecutable: false":
             return True
     return False
+
+
+def _mac_icon_configured(text: str) -> bool:
+    return "icon: build/icon.png" in text
+
+
+def _windows_icon_configured(text: str) -> bool:
+    return "icon: build/icon.ico" in text
 
 
 def _sidecar_resources_included(text: str) -> bool:
