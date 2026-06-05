@@ -93,6 +93,11 @@ REQUIRED_GATE_DOCS = (
     Path("docs/testing.md"),
 )
 
+REQUIRED_WORKFLOW_PERMISSIONS = {
+    ".github/workflows/ci.yml": {"contents": "read"},
+    ".github/workflows/release-package.yml": {"contents": "read"},
+}
+
 REQUIRED_DEPENDABOT_BLOCKS = (
     ("npm", "/"),
     ("github-actions", "/"),
@@ -119,6 +124,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
+    issues.extend(_workflow_permission_issues(root))
     issues.extend(_codeql_workflow_issues(root))
     issues.extend(_dependabot_config_issues(root))
     issues.extend(_missing_documented_gate_commands(root))
@@ -210,7 +216,70 @@ def validate_ci_workflow(text: str) -> list[str]:
         f"CI missing command: {command}" for command in required_commands if command not in text
     )
     issues.extend(_pnpm_setup_issues(text))
+    issues.extend(
+        validate_workflow_permissions_text(
+            label="CI workflow",
+            text=text,
+            required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/ci.yml"],
+        )
+    )
     return issues
+
+
+def validate_workflow_permissions_text(
+    *,
+    label: str,
+    text: str,
+    required_permissions: dict[str, str],
+) -> list[str]:
+    issues: list[str] = []
+    if _workflow_uses_write_all_permissions(text):
+        issues.append(f"{label} must not use write-all permissions")
+    permissions = _top_level_workflow_permissions(text)
+    for scope, access in required_permissions.items():
+        if permissions.get(scope) != access:
+            issues.append(f"{label} must declare {scope}: {access} permissions")
+    return issues
+
+
+def _workflow_permission_issues(root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path, required_permissions in REQUIRED_WORKFLOW_PERMISSIONS.items():
+        workflow_path = root / relative_path
+        if not workflow_path.is_file():
+            continue
+        if relative_path == ".github/workflows/ci.yml":
+            continue
+        issues.extend(
+            validate_workflow_permissions_text(
+                label=workflow_path.name.removesuffix(".yml").replace("-", " ") + " workflow",
+                text=workflow_path.read_text(encoding="utf-8"),
+                required_permissions=required_permissions,
+            )
+        )
+    return issues
+
+
+def _workflow_uses_write_all_permissions(text: str) -> bool:
+    return any(line.strip() == "permissions: write-all" for line in text.splitlines())
+
+
+def _top_level_workflow_permissions(text: str) -> dict[str, str]:
+    permissions: dict[str, str] = {}
+    in_permissions = False
+    for line in text.splitlines():
+        if line.startswith("permissions:"):
+            in_permissions = True
+            continue
+        if in_permissions:
+            if line and not line.startswith("  "):
+                break
+            stripped = line.strip()
+            if not stripped or ":" not in stripped:
+                continue
+            key, value = stripped.split(":", 1)
+            permissions[key.strip()] = value.strip()
+    return permissions
 
 
 def validate_codeql_workflow_text(text: str) -> list[str]:

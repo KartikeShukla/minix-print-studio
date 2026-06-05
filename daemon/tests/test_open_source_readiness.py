@@ -216,6 +216,8 @@ def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> 
 
     issues = validator.validate_ci_workflow(
         """
+permissions:
+  contents: read
 jobs:
   python:
     steps:
@@ -228,6 +230,57 @@ jobs:
         "CI missing command: pnpm release-package-check",
         "CI command requires pnpm setup before use: pnpm source-package-check",
     ]
+
+
+def test_open_source_readiness_check_requires_ci_workflow_permissions() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_ci_workflow(
+        """
+name: CI
+on:
+  pull_request:
+jobs:
+  node:
+    steps:
+      - uses: pnpm/action-setup@v4
+      - run: python3 scripts/validate_open_source_readiness.py
+      - run: pnpm source-package-check
+      - run: pnpm release-package-check
+"""
+    )
+
+    assert issues == ["CI workflow must declare contents: read permissions"]
+
+
+def test_open_source_readiness_check_rejects_write_all_workflow_permissions() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_workflow_permissions_text(
+        label="release package workflow",
+        text="""
+permissions: write-all
+jobs:
+  package:
+    steps:
+      - run: pnpm release-package-check
+""",
+        required_permissions={"contents": "read"},
+    )
+
+    assert issues == [
+        "release package workflow must not use write-all permissions",
+        "release package workflow must declare contents: read permissions",
+    ]
+
+
+def test_open_source_readiness_check_requires_release_workflow_permissions() -> None:
+    validator = _load_validator()
+
+    assert (
+        ".github/workflows/release-package.yml",
+        {"contents": "read"},
+    ) in validator.REQUIRED_WORKFLOW_PERMISSIONS.items()
 
 
 def test_open_source_readiness_check_requires_documented_non_hardware_gates(
@@ -277,6 +330,10 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         _codeql_workflow_text(),
         encoding="utf-8",
     )
+    (root / ".github" / "workflows" / "release-package.yml").write_text(
+        _release_package_workflow_text(),
+        encoding="utf-8",
+    )
     (root / ".github" / "dependabot.yml").write_text(
         _dependabot_config_text(),
         encoding="utf-8",
@@ -298,12 +355,25 @@ def _gate_doc_text(commands: tuple[str, ...]) -> str:
 
 def _ci_workflow_text() -> str:
     return """
+permissions:
+  contents: read
 jobs:
   web:
     steps:
       - uses: pnpm/action-setup@v4
       - run: python3 scripts/validate_open_source_readiness.py
       - run: pnpm source-package-check
+      - run: pnpm release-package-check
+"""
+
+
+def _release_package_workflow_text() -> str:
+    return """
+permissions:
+  contents: read
+jobs:
+  package:
+    steps:
       - run: pnpm release-package-check
 """
 

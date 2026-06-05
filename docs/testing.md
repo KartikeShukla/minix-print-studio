@@ -37,3 +37,6 @@ above before merge.
 CodeQL runs in GitHub Actions for JavaScript/TypeScript and Python on pull
 requests, pushes to `main`, weekly schedule, and manual dispatch. Local validation
 keeps the workflow present and configured for the `security-extended` query suite.
+CI and release package workflows must keep explicit read-only `contents`
+permissions unless a future release step documents and validates a narrower
+write requirement.
