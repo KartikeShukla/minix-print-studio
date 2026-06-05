@@ -17,6 +17,7 @@ import { inspectHardwareArtifact } from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
+import { exportSupportBundle } from "./supportBundle";
 
 let mainWindow: BrowserWindow | null = null;
 const runtime = createDaemonRuntime({ mock: true });
@@ -116,6 +117,13 @@ ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentInteg
     sidecarMode: app.isPackaged ? "bundled" : "source"
   });
 });
+ipcMain.handle("support:export-bundle", () =>
+  exportSupportBundle({
+    userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion(),
+    platform: process.platform
+  })
+);
 ipcMain.handle("hardware-artifacts:inspect", async () => {
   const options: OpenDialogOptions = {
     title: "Inspect Stage A artifact",

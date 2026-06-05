@@ -7,6 +7,7 @@ import type {
   AgentIntegrationTargetId
 } from "@/lib/agent-integrations";
 import type { HardwareArtifactInspectionResult } from "@/lib/hardware-artifacts";
+import type { SupportBundleExportResult } from "@/lib/support-bundle";
 import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
@@ -87,6 +88,7 @@ declare global {
       exportAgentIntegrationBundle?: (
         targetId: AgentIntegrationTargetId
       ) => Promise<AgentIntegrationExportResult>;
+      exportSupportBundle?: () => Promise<SupportBundleExportResult>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
     };
   }

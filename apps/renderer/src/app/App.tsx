@@ -104,6 +104,11 @@ import {
   type HardwareArtifactInspector
 } from "@/lib/hardware-artifacts";
 import {
+  desktopSupportBundleExporter,
+  type SupportBundleExporter,
+  type SupportBundleExportResult
+} from "@/lib/support-bundle";
+import {
   loadStoredJobHistory,
   prependStoredPrintJob,
   saveStoredJobHistory,
@@ -140,6 +145,7 @@ export type AppProps = {
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
+  supportBundleExporter?: SupportBundleExporter;
 };
 
 const tools = [
@@ -172,6 +178,12 @@ type DiagnosticsWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "exported"; bundle: DiagnosticsExportResponse }
+  | { status: "error"; message: string };
+
+type SupportBundleWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "exported"; bundle: SupportBundleExportResult }
   | { status: "error"; message: string };
 
 type HardwareArtifactWorkflow =
@@ -277,7 +289,8 @@ export function App({
   daemonClient,
   agentIntegrationProvider,
   agentIntegrationInstaller,
-  hardwareArtifactInspector
+  hardwareArtifactInspector,
+  supportBundleExporter
 }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const integrationProvider = useMemo(
@@ -291,6 +304,10 @@ export function App({
   const artifactInspector = useMemo(
     () => hardwareArtifactInspector ?? desktopHardwareArtifactInspector,
     [hardwareArtifactInspector]
+  );
+  const supportExporter = useMemo(
+    () => supportBundleExporter ?? desktopSupportBundleExporter,
+    [supportBundleExporter]
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
@@ -313,6 +330,9 @@ export function App({
   });
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
+    status: "idle"
+  });
+  const [supportBundleWorkflow, setSupportBundleWorkflow] = useState<SupportBundleWorkflow>({
     status: "idle"
   });
   const [hardwareArtifactWorkflow, setHardwareArtifactWorkflow] =
@@ -1038,6 +1058,19 @@ export function App({
     }
   }, [client]);
 
+  const runSupportBundleExport = useCallback(async () => {
+    setSupportBundleWorkflow({ status: "running" });
+    try {
+      const bundle = await supportExporter.exportBundle();
+      setSupportBundleWorkflow({ status: "exported", bundle });
+    } catch (error: unknown) {
+      setSupportBundleWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Support bundle export failed"
+      });
+    }
+  }, [supportExporter]);
+
   const runHardwareArtifactExport = useCallback(
     async (deviceId: string) => {
       if (!client.exportHardwareTest) {
@@ -1476,6 +1509,11 @@ export function App({
               onExport={exportAgentIntegrationTarget}
             />
 
+            <SupportBundlePanel
+              workflow={supportBundleWorkflow}
+              onExport={runSupportBundleExport}
+            />
+
             <RecentJobsPanel
               jobs={jobHistory}
               workflow={diagnosticsWorkflow}
@@ -1762,6 +1800,49 @@ function RecentJobsPanel({
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function SupportBundlePanel({
+  workflow,
+  onExport
+}: {
+  workflow: SupportBundleWorkflow;
+  onExport: () => void;
+}) {
+  return (
+    <section className="border-t border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <FileSearch className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Support</h2>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={onExport}
+        disabled={workflow.status === "running"}
+      >
+        <FileText className="size-4" aria-hidden="true" />
+        {workflow.status === "running" ? "Exporting support bundle" : "Export support bundle"}
+      </Button>
+      {workflow.status === "exported" ? (
+        <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          <div className="font-medium">Support bundle exported</div>
+          <div className="text-xs">
+            {formatSupportBundleEntryCount(workflow.bundle.entries.length)}
+          </div>
+          <div className="mt-1 break-all text-xs text-muted-foreground">
+            {getPathFileName(workflow.bundle.targetPath)}
+          </div>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -3307,6 +3388,14 @@ function formatBandCount(totalBands: number): string {
 
 function formatDiagnosticsJobCount(totalJobs: number): string {
   return `${totalJobs} ${totalJobs === 1 ? "job" : "jobs"} in bundle`;
+}
+
+function formatSupportBundleEntryCount(totalEntries: number): string {
+  return `${totalEntries} ${totalEntries === 1 ? "file" : "files"} in bundle`;
+}
+
+function getPathFileName(filePath: string): string {
+  return filePath.split(/[\\/]/).at(-1) ?? filePath;
 }
 
 function downloadBlob(blob: Blob, filename: string): void {

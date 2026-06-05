@@ -24,6 +24,8 @@ pnpm release-package-check
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
+- Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
+  support action without requiring hardware.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
 
 ## Dependency Maintenance

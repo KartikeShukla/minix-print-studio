@@ -278,6 +278,45 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText(/minix-print-studio-claude-desktop\.mcpb/)).toBeInTheDocument();
   });
 
+  it("exports a redacted desktop support bundle from the sidebar", async () => {
+    const exportBundle = vi.fn().mockResolvedValue({
+      targetPath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/support/minix-print-studio-support-2026-06-05T00-03-00-000Z.zip",
+      createdAt: "2026-06-05T00:03:00.000Z",
+      entries: ["support.json", "logs/main.log", "crash-reports/last-crash.json", "README.md"]
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        supportBundleExporter={{ exportBundle }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export support bundle" }));
+
+    await waitFor(() => {
+      expect(exportBundle).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("Support bundle exported")).toBeInTheDocument();
+    expect(screen.getByText("4 files in bundle")).toBeInTheDocument();
+    expect(
+      screen.getByText(/minix-print-studio-support-2026-06-05T00-03-00-000Z\.zip/)
+    ).toBeInTheDocument();
+  });
+
   it("requests a daemon preview and print plan before enabling print", async () => {
     const createDocumentPreview = vi.fn().mockResolvedValue({
       previewId: "prev_ready",

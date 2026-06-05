@@ -34,3 +34,9 @@ server management command and verify the server list from the client.
 
 Diagnostics exports are designed to be shareable after review. They should omit bearer
 tokens, approval tokens, raw raster bytes, and private file paths.
+
+## Support Bundle
+
+Use the desktop Support panel to export a support bundle when reporting crashes or
+startup issues. The bundle includes redacted desktop logs and crash metadata, excludes
+runtime token files, and should still be reviewed before sharing publicly.

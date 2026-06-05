@@ -100,6 +100,8 @@
 - Renderer completed print jobs persist to a localStorage-backed Recent Jobs list with job id, status, completion level, and band progress.
 - Daemon `/v1/diagnostics/export` returns a redacted diagnostics bundle with daemon/version context, profile snapshot, job metadata, segment metadata without raw raster bytes, mock timing summaries, and completion decision explanation.
 - Renderer daemon client and Recent Jobs panel can request the redacted diagnostics export and show the exported bundle job count.
+- Electron support bundle export writes a redacted desktop ZIP under app user data with `support.json`, desktop logs, crash metadata, and a README while excluding runtime token files.
+- Electron preload exposes the support bundle export through IPC, and the renderer Support panel can export the bundle and show the generated file name plus entry count.
 - Electron writes daemon runtime handoff files under user data: `runtime/runtime.json` contains base URL, PID, start time, mock flag, and token-file path while `runtime/token` stores the bearer token separately.
 - MCP integration config generators can include `MINIX_DAEMON_RUNTIME_FILE` for Codex, Claude Desktop/Code, OpenCode, and generic stdio configs without embedding bearer tokens.
 - MCP stdio shim resolves daemon base URL and token from the Electron runtime handoff file, rejects inline tokens in runtime JSON, and keeps the existing explicit environment fallback for development.
@@ -160,6 +162,7 @@
 - Playwright smoke against `http://127.0.0.1:5174/`: add rectangle, drag the selected layer's bottom-right transformer handle, verify localStorage geometry changes from `320 x 72` to `358 x 81`.
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
 - TDD red/green checks for deterministic long-print marker generation in the shared document model and renderer toolbar insertion with persisted Undo history.
+- TDD red/green checks for redacted desktop support bundle ZIP contents and the renderer Support panel export action.
 - TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
 - TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
 - TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.
