@@ -15,6 +15,7 @@ pnpm build
 pnpm open-source-check
 pnpm source-package-check
 pnpm release-package-check
+pnpm build:sidecars --target-platform <platform>
 .venv/bin/python -m ruff check daemon mcp
 .venv/bin/python -m mypy daemon/src mcp/src
 .venv/bin/python -m pytest daemon/tests mcp/tests
@@ -28,15 +29,19 @@ Hardware gates are separate from CI and require the physical printer:
 - Tiny visual test card confirmed by the user.
 - Long-print reliability test completed before stable support claims.
 
+Use `darwin` on macOS and `win32` on Windows. PyInstaller does not
+cross-compile, so sidecar builds must run on the same operating system as the
+package target.
+
 ## Packaging Targets
 
-- macOS: unsigned local Electron package scaffold via `pnpm package:mac`; signed
-  release build and notarization before stable release.
-- Windows: unsigned local Electron package scaffold via `pnpm package:win`; signed
-  installer before stable release.
-- Daemon and MCP sidecars: packaged app path resolution targets
-  `resources/sidecars`; PyInstaller sidecar binary production is still required
-  before publishing installers.
+- macOS: unsigned local Electron package via `pnpm package:mac`; signed release
+  build and notarization before stable release.
+- Windows: unsigned local Electron package via `pnpm package:win` on a Windows
+  runner; signed installer before stable release.
+- Daemon and MCP sidecars: built with PyInstaller into `dist/sidecars` and
+  included in the packaged app as `resources/sidecars`; the daemon sidecar
+  bundles the public printer profile data it needs at startup.
 
 Do not publish installers that embed local runtime state, bearer tokens, diagnostic
 artifacts, or private file paths.

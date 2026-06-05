@@ -1,5 +1,8 @@
+import json
+
 from fastapi.testclient import TestClient
 
+import minixd.app as app_module
 from minixd.app import _create_ble_adapter, create_app, load_profiles
 from minixd.ble.bleak_adapter import BleakBleAdapter
 from minixd.ble.profile_probe import ProfileReadOnlyProbe
@@ -27,6 +30,22 @@ def test_profile_endpoint_returns_official_seznik_profile() -> None:
     assert response.status_code == 200
     assert response.json()["profiles"][0]["id"] == "seznik-minix-s1-lyin48d-gy"
     assert response.json()["profiles"][0]["print"]["widthDots"] == 384
+
+
+def test_load_profiles_reads_bundled_pyinstaller_profile(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    bundled_profile = tmp_path / "profiles" / "seznik-minix-s1-lyin48d-gy" / "profile.json"
+    bundled_profile.parent.mkdir(parents=True)
+    bundled_profile.write_text(
+        json.dumps({"id": "bundled-profile", "print": {"widthDots": 384}}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("MINIX_PROFILE_ROOT", raising=False)
+    monkeypatch.setattr(app_module.sys, "_MEIPASS", str(tmp_path), raising=False)
+
+    assert app_module.load_profiles()[0]["id"] == "bundled-profile"
 
 
 def test_local_renderer_origin_can_call_daemon_with_authorization_header() -> None:

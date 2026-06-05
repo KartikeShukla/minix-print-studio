@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "package:mac": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
-    "package:win": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
+    "package:mac": "pnpm build && pnpm --workspace-root build:sidecars --target-platform darwin && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
+    "package:win": "pnpm build && pnpm --workspace-root build:sidecars --target-platform win32 && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"

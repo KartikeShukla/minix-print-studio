@@ -20,6 +20,7 @@
     "open-source-check": "python3 scripts/validate_open_source_readiness.py",
     "source-package-check": "python3 scripts/validate_source_package.py",
     "release-package-check": "python3 scripts/validate_release_packaging.py",
+    "build:sidecars": "python3 scripts/build_sidecars.py",
     "package:mac": "pnpm --filter @minix/desktop package:mac",
     "package:win": "pnpm --filter @minix/desktop package:win",
     "format": "prettier --check .",

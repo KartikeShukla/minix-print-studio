@@ -1,6 +1,7 @@
 import contextlib
 import http.server
 import json
+import os
 import sys
 import threading
 from pathlib import Path
@@ -59,6 +60,34 @@ async def test_mcp_stdio_process_smoke_uses_real_server(tmp_path: Path) -> None:
     assert response.structuredContent is not None
     assert response.structuredContent["status"] == "ok"
     assert response.structuredContent["daemon"]["mock"] is True
+
+
+@pytest.mark.anyio
+async def test_mcp_stdio_packaged_binary_smoke(tmp_path: Path) -> None:
+    binary = os.environ.get("MINIX_MCP_BINARY_SMOKE")
+    if not binary:
+        pytest.skip("set MINIX_MCP_BINARY_SMOKE to a built minix-mcp binary")
+
+    token = "token_stdio_binary"
+    binary_path = Path(binary).resolve()
+    assert binary_path.is_file()
+
+    with mock_daemon(token) as base_url:
+        runtime_file = write_runtime_handoff(tmp_path, base_url, token)
+        result = await run_mcp_stdio_smoke(
+            command=str(binary_path),
+            env=stdio_env(runtime_file, include_pythonpath=False),
+        )
+
+    assert result == {
+        "status": "ok",
+        "daemon": {
+            "ok": True,
+            "version": "0.1.0",
+            "profileRegistryVersion": "2026.06.04",
+            "mock": True,
+        },
+    }
 
 
 def write_runtime_handoff(tmp_path: Path, base_url: str, token: str) -> Path:
@@ -125,8 +154,10 @@ class MockDaemonHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
-def stdio_env(runtime_file: Path) -> dict[str, str]:
-    return {
+def stdio_env(runtime_file: Path, *, include_pythonpath: bool = True) -> dict[str, str]:
+    env = {
         "MINIX_DAEMON_RUNTIME_FILE": str(runtime_file),
-        "PYTHONPATH": str(Path(__file__).parents[1] / "src"),
     }
+    if include_pythonpath:
+        env["PYTHONPATH"] = str(Path(__file__).parents[1] / "src")
+    return env

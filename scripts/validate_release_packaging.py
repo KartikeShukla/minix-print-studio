@@ -8,13 +8,14 @@ from pathlib import Path
 
 ROOT_REQUIRED_PACKAGE_SCRIPTS = {
     "release-package-check": "python3 scripts/validate_release_packaging.py",
+    "build:sidecars": "python3 scripts/build_sidecars.py",
     "package:mac": "pnpm --filter @minix/desktop package:mac",
     "package:win": "pnpm --filter @minix/desktop package:win",
 }
 
 DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
-    "package:mac": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
-    "package:win": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
+    "package:mac": "pnpm build && pnpm --workspace-root build:sidecars --target-platform darwin && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
+    "package:win": "pnpm build && pnpm --workspace-root build:sidecars --target-platform win32 && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
@@ -22,6 +23,8 @@ BUILDER_REQUIRED_SNIPPETS = (
     "appId: org.minix.printstudio",
     "productName: MiniX Print Studio",
     "output: ../../dist/release",
+    "from: ../../dist/sidecars",
+    "to: sidecars",
     "main: out/main/index.js",
     "signAndEditExecutable: false",
     "publish: null",
@@ -105,6 +108,8 @@ def validate_builder_config_text(text: str) -> list[str]:
         issues.append("electron-builder config must not contain a signing identity")
     if _publishing_enabled(text):
         issues.append("electron-builder config must keep publishing disabled")
+    if not _sidecar_resources_included(text):
+        issues.append("electron-builder config must include sidecar binaries")
     if not _windows_resource_editing_disabled(text):
         issues.append("electron-builder config must disable Windows executable resource editing")
     for marker in PRIVATE_PATH_MARKERS:
@@ -157,6 +162,10 @@ def _windows_resource_editing_disabled(text: str) -> bool:
         if line.strip() == "signAndEditExecutable: false":
             return True
     return False
+
+
+def _sidecar_resources_included(text: str) -> bool:
+    return "from: ../../dist/sidecars" in text and "to: sidecars" in text
 
 
 if __name__ == "__main__":

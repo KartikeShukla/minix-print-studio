@@ -22,6 +22,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("docs/known-limitations.md"),
     Path("apps/desktop/electron-builder.yml"),
     Path("scripts/validate_release_packaging.py"),
+    Path("scripts/build_sidecars.py"),
 )
 
 FORBIDDEN_SOURCE_PREFIXES = (

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -27,12 +29,25 @@ from minixd.projects.store import ProjectStore
 from minixd.render.preview_store import PreviewStore
 
 PROFILE_REGISTRY_VERSION = "2026.06.04"
+PROFILE_ID = "seznik-minix-s1-lyin48d-gy"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-PROFILE_PATH = PROJECT_ROOT / "profiles" / "seznik-minix-s1-lyin48d-gy" / "profile.json"
 
 
 def load_profiles() -> list[dict[str, Any]]:
-    return [json.loads(PROFILE_PATH.read_text(encoding="utf-8"))]
+    profile_path = _profile_root() / PROFILE_ID / "profile.json"
+    return [json.loads(profile_path.read_text(encoding="utf-8"))]
+
+
+def _profile_root() -> Path:
+    configured_root = os.environ.get("MINIX_PROFILE_ROOT")
+    if configured_root:
+        return Path(configured_root)
+
+    bundled_root = getattr(sys, "_MEIPASS", None)
+    if bundled_root:
+        return Path(bundled_root) / "profiles"
+
+    return PROJECT_ROOT / "profiles"
 
 
 def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:

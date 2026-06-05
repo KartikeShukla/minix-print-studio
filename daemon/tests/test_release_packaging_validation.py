@@ -32,6 +32,7 @@ def test_release_packaging_check_requires_packaging_scripts() -> None:
 
     assert issues == [
         "package.json missing release-package-check script",
+        "package.json missing build:sidecars script",
         "package.json missing package:mac script",
         "package.json missing package:win script",
         "apps/desktop/package.json missing package:mac script",
@@ -58,6 +59,22 @@ def test_release_packaging_check_requires_windows_x64_package_command() -> None:
     assert issues == ["apps/desktop/package.json missing package:win script"]
 
 
+def test_release_packaging_check_requires_sidecar_resources() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_builder_config_text(
+        """
+files:
+  - out/**
+win:
+  signAndEditExecutable: false
+publish: null
+"""
+    )
+
+    assert issues == ["electron-builder config must include sidecar binaries"]
+
+
 def test_release_packaging_check_rejects_runtime_state_and_signing_identity() -> None:
     validator = _load_validator()
 
@@ -71,6 +88,9 @@ files:
   - out/**
   - runtime/**
   - logs/**
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
 mac:
   identity: Developer ID Application: Example Person
 win:
@@ -96,6 +116,9 @@ def test_release_packaging_check_rejects_hardware_artifact_inclusion() -> None:
 files:
   - out/**
   - hardware-artifacts/**
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
 win:
   signAndEditExecutable: false
 publish: null
@@ -115,6 +138,9 @@ win:
     - target: dir
       arch:
         - x64
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
 publish: null
 """
     )

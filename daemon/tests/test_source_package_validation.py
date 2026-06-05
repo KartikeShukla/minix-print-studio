@@ -45,6 +45,12 @@ def test_source_package_check_requires_release_notes_template() -> None:
     assert Path("docs/release-notes-template.md") in validator.REQUIRED_SOURCE_PATHS
 
 
+def test_source_package_check_requires_sidecar_build_script() -> None:
+    validator = _load_validator()
+
+    assert Path("scripts/build_sidecars.py") in validator.REQUIRED_SOURCE_PATHS
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "source_package_validation",

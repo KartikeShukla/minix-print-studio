@@ -19,6 +19,13 @@ files:
   - '!jobs/**'
   - '!hardware-artifacts/**'
 
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
+    filter:
+      - minixd*
+      - minix-mcp*
+
 extraMetadata:
   main: out/main/index.js
 

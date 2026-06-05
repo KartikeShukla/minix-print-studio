@@ -15,8 +15,10 @@ not yet a stable public installer.
 
 ## Packaging
 
-- Daemon and MCP sidecar path resolution is implemented for packaged mode, but
-  PyInstaller sidecar binary production and package inclusion are not complete.
+- Daemon and MCP sidecar binary production and package inclusion are implemented
+  for target-host builds.
+- Windows sidecar package validation must run on a Windows runner because
+  PyInstaller does not cross-compile.
 - macOS signing and notarization are not configured.
 - Windows installer packaging and signing are not implemented.
 - Linux is not a supported first release target.
