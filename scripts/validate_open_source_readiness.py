@@ -63,6 +63,25 @@ REQUIRED_PACKAGE_SCRIPTS = {
     "release-package-check": "python3 scripts/validate_release_packaging.py",
 }
 
+REQUIRED_NON_HARDWARE_GATE_COMMANDS = (
+    "pnpm lint",
+    "pnpm typecheck",
+    "pnpm test",
+    "pnpm build",
+    "pnpm open-source-check",
+    "pnpm source-package-check",
+    "pnpm release-package-check",
+    ".venv/bin/python -m ruff check daemon mcp",
+    ".venv/bin/python -m mypy daemon/src mcp/src",
+    ".venv/bin/python -m pytest daemon/tests mcp/tests",
+)
+
+REQUIRED_GATE_DOCS = (
+    Path("CONTRIBUTING.md"),
+    Path("docs/release.md"),
+    Path("docs/testing.md"),
+)
+
 
 def main() -> int:
     root = Path.cwd()
@@ -82,6 +101,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_missing_package_scripts(root))
     issues.extend(_missing_ci_commands(root))
+    issues.extend(_missing_documented_gate_commands(root))
     issues.extend(validate_private_path_redaction(root=root, paths=_shareable_text_paths(root)))
     return issues
 
@@ -142,6 +162,21 @@ def _missing_ci_commands(root: Path) -> list[str]:
         return ["missing required file: .github/workflows/ci.yml"]
     text = workflow.read_text(encoding="utf-8")
     return validate_ci_workflow(text)
+
+
+def _missing_documented_gate_commands(root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path in REQUIRED_GATE_DOCS:
+        path = root / relative_path
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for command in REQUIRED_NON_HARDWARE_GATE_COMMANDS:
+            if command not in text:
+                issues.append(
+                    f"{relative_path.as_posix()} missing documented gate command: {command}"
+                )
+    return issues
 
 
 def validate_ci_workflow(text: str) -> list[str]:

@@ -8,9 +8,13 @@ Development follows TDD for behavior code.
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm build
 pnpm open-source-check
 pnpm source-package-check
-pytest daemon/tests mcp/tests
+pnpm release-package-check
+.venv/bin/python -m ruff check daemon mcp
+.venv/bin/python -m mypy daemon/src mcp/src
+.venv/bin/python -m pytest daemon/tests mcp/tests
 ```
 
 ## Test Layers

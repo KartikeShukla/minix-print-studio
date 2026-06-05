@@ -34,7 +34,9 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm open-source-check
-.venv/bin/python -m ruff check daemon mcp scripts
+pnpm source-package-check
+pnpm release-package-check
+.venv/bin/python -m ruff check daemon mcp
 .venv/bin/python -m mypy daemon/src mcp/src
 .venv/bin/python -m pytest daemon/tests mcp/tests
 ```
