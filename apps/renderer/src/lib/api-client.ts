@@ -12,6 +12,7 @@ import type {
   BetaFeedbackDraftRequest,
   SupportBundleExportResult
 } from "@/lib/support-bundle";
+import type { UpdateChannel, UpdateChannelState } from "@/lib/update-channel";
 import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
@@ -94,6 +95,8 @@ declare global {
       ) => Promise<AgentIntegrationExportResult>;
       exportSupportBundle?: () => Promise<SupportBundleExportResult>;
       createBetaFeedbackDraft?: (request?: BetaFeedbackDraftRequest) => Promise<BetaFeedbackDraft>;
+      getUpdateChannelState?: () => Promise<UpdateChannelState>;
+      setUpdateChannel?: (channel: UpdateChannel) => Promise<UpdateChannelState>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
     };
   }

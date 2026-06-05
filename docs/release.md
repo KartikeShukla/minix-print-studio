@@ -62,6 +62,12 @@ uploaded artifact.
 Do not publish installers that embed local runtime state, bearer tokens, diagnostic
 artifacts, or private file paths.
 
+## Update Channels
+
+The desktop app exposes stable and beta update-channel selection so testers can
+state which release lane they are using. Auto-updates remain disabled for unsigned
+builds until signed release publishing is configured and validated.
+
 ## Release Notes
 
 Use [release-notes-template.md](release-notes-template.md) as the starting point

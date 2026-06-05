@@ -3,6 +3,7 @@ import { createDefaultDocument } from "@minix/design-model";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app/App";
 import type { ProjectMutationRequest } from "../src/lib/api-client";
+import type { UpdateChannelProvider } from "../src/lib/update-channel";
 
 describe("MiniX Print Studio shell", () => {
   afterEach(() => {
@@ -38,6 +39,62 @@ describe("MiniX Print Studio shell", () => {
     await waitFor(() => {
       expect(screen.getByText("Mock daemon online")).toBeInTheDocument();
     });
+  });
+
+  it("shows update channel status and allows selecting the beta channel", async () => {
+    const setChannel = vi.fn().mockResolvedValue({
+      channel: "beta",
+      availableChannels: ["stable", "beta"],
+      updatedAt: "2026-06-05T00:11:00.000Z",
+      appVersion: "0.1.0",
+      autoUpdate: {
+        enabled: false,
+        reason: "Auto-updates are disabled until signed release publishing is configured."
+      }
+    });
+    const updateChannelProvider: UpdateChannelProvider = {
+      getState: async () => ({
+        channel: "stable",
+        availableChannels: ["stable", "beta"],
+        updatedAt: "2026-06-05T00:10:00.000Z",
+        appVersion: "0.1.0",
+        autoUpdate: {
+          enabled: false,
+          reason: "Auto-updates are disabled until signed release publishing is configured."
+        }
+      }),
+      setChannel
+    };
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        updateChannelProvider={updateChannelProvider}
+      />
+    );
+
+    expect(await screen.findByText("Updates")).toBeInTheDocument();
+    expect(screen.getByText("Stable")).toBeInTheDocument();
+    expect(screen.getByText(/Auto-updates are disabled/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Use beta update channel" }));
+
+    await waitFor(() => {
+      expect(setChannel).toHaveBeenCalledWith("beta");
+    });
+    expect(await screen.findByText("Beta channel selected")).toBeInTheDocument();
   });
 
   it("shows copyable agent integration config previews without exposing daemon tokens", async () => {

@@ -19,6 +19,7 @@ import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
 import { exportSupportBundle } from "./supportBundle";
+import { getUpdateChannelState, setUpdateChannel } from "./updateChannel";
 
 let mainWindow: BrowserWindow | null = null;
 const runtime = createDaemonRuntime({ mock: true });
@@ -130,6 +131,19 @@ ipcMain.handle("support:create-feedback-draft", (_event, request?: { supportBund
     appVersion: app.getVersion(),
     platform: process.platform,
     supportBundlePath: request?.supportBundlePath ?? null
+  })
+);
+ipcMain.handle("updates:get-state", () =>
+  getUpdateChannelState({
+    userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion()
+  })
+);
+ipcMain.handle("updates:set-channel", (_event, channel: string) =>
+  setUpdateChannel({
+    userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion(),
+    channel
   })
 );
 ipcMain.handle("hardware-artifacts:inspect", async () => {

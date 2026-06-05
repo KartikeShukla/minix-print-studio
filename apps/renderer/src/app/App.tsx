@@ -109,6 +109,12 @@ import {
   type SupportBundleExportResult
 } from "@/lib/support-bundle";
 import {
+  desktopUpdateChannelProvider,
+  type UpdateChannel,
+  type UpdateChannelProvider,
+  type UpdateChannelState
+} from "@/lib/update-channel";
+import {
   loadStoredJobHistory,
   prependStoredPrintJob,
   saveStoredJobHistory,
@@ -146,6 +152,7 @@ export type AppProps = {
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
   supportBundleExporter?: SupportBundleExporter;
+  updateChannelProvider?: UpdateChannelProvider;
 };
 
 const tools = [
@@ -190,6 +197,13 @@ type BetaFeedbackWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "copied" }
+  | { status: "error"; message: string };
+
+type UpdateChannelWorkflow =
+  | { status: "loading" }
+  | { status: "unavailable" }
+  | { status: "ready"; state: UpdateChannelState }
+  | { status: "running"; state: UpdateChannelState; nextChannel: UpdateChannel }
   | { status: "error"; message: string };
 
 type HardwareArtifactWorkflow =
@@ -296,7 +310,8 @@ export function App({
   agentIntegrationProvider,
   agentIntegrationInstaller,
   hardwareArtifactInspector,
-  supportBundleExporter
+  supportBundleExporter,
+  updateChannelProvider
 }: AppProps) {
   const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
   const integrationProvider = useMemo(
@@ -314,6 +329,10 @@ export function App({
   const supportExporter = useMemo(
     () => supportBundleExporter ?? desktopSupportBundleExporter,
     [supportBundleExporter]
+  );
+  const updateProvider = useMemo(
+    () => updateChannelProvider ?? desktopUpdateChannelProvider,
+    [updateChannelProvider]
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
@@ -343,6 +362,9 @@ export function App({
   });
   const [betaFeedbackWorkflow, setBetaFeedbackWorkflow] = useState<BetaFeedbackWorkflow>({
     status: "idle"
+  });
+  const [updateChannelWorkflow, setUpdateChannelWorkflow] = useState<UpdateChannelWorkflow>({
+    status: "loading"
   });
   const [hardwareArtifactWorkflow, setHardwareArtifactWorkflow] =
     useState<HardwareArtifactWorkflow>({
@@ -420,6 +442,32 @@ export function App({
       cancelled = true;
     };
   }, [integrationProvider]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setUpdateChannelWorkflow({ status: "loading" });
+    updateProvider
+      .getState()
+      .then((state) => {
+        if (cancelled) {
+          return;
+        }
+        setUpdateChannelWorkflow(state ? { status: "ready", state } : { status: "unavailable" });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setUpdateChannelWorkflow({
+            status: "error",
+            message: error instanceof Error ? error.message : "Update channel unavailable"
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [updateProvider]);
 
   useEffect(() => {
     if (
@@ -1105,6 +1153,34 @@ export function App({
     }
   }, [supportBundleWorkflow, supportExporter]);
 
+  const selectUpdateChannel = useCallback(
+    async (channel: UpdateChannel) => {
+      const currentState =
+        updateChannelWorkflow.status === "ready" || updateChannelWorkflow.status === "running"
+          ? updateChannelWorkflow.state
+          : null;
+      if (!currentState) {
+        return;
+      }
+
+      setUpdateChannelWorkflow({
+        status: "running",
+        state: currentState,
+        nextChannel: channel
+      });
+      try {
+        const state = await updateProvider.setChannel(channel);
+        setUpdateChannelWorkflow({ status: "ready", state });
+      } catch (error: unknown) {
+        setUpdateChannelWorkflow({
+          status: "error",
+          message: error instanceof Error ? error.message : "Update channel selection failed"
+        });
+      }
+    },
+    [updateChannelWorkflow, updateProvider]
+  );
+
   const runHardwareArtifactExport = useCallback(
     async (deviceId: string) => {
       if (!client.exportHardwareTest) {
@@ -1531,6 +1607,11 @@ export function App({
               )}
             </section>
 
+            <UpdateChannelPanel
+              workflow={updateChannelWorkflow}
+              onSelectChannel={selectUpdateChannel}
+            />
+
             <AgentIntegrationsPanel
               workflow={agentIntegrationWorkflow}
               copiedTargetId={copiedIntegrationId}
@@ -1904,6 +1985,90 @@ function SupportBundlePanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function UpdateChannelPanel({
+  workflow,
+  onSelectChannel
+}: {
+  workflow: UpdateChannelWorkflow;
+  onSelectChannel: (channel: UpdateChannel) => void;
+}) {
+  return (
+    <section className="border-t border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Download className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Updates</h2>
+      </div>
+
+      {workflow.status === "loading" ? (
+        <p className="text-sm leading-6 text-muted-foreground">Loading update channel.</p>
+      ) : workflow.status === "unavailable" ? (
+        <p className="text-sm leading-6 text-muted-foreground">
+          Open the desktop app to manage update channels.
+        </p>
+      ) : workflow.status === "error" ? (
+        <p className="text-sm leading-6 text-destructive">{workflow.message}</p>
+      ) : (
+        <UpdateChannelControls workflow={workflow} onSelectChannel={onSelectChannel} />
+      )}
+    </section>
+  );
+}
+
+function UpdateChannelControls({
+  workflow,
+  onSelectChannel
+}: {
+  workflow: Extract<UpdateChannelWorkflow, { status: "ready" | "running" }>;
+  onSelectChannel: (channel: UpdateChannel) => void;
+}) {
+  const state = workflow.state;
+  const isRunning = workflow.status === "running";
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">Channel</span>
+        <Badge>{formatUpdateChannel(state.channel)}</Badge>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">Version</span>
+        <span>{state.appVersion}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">Auto-update</span>
+        <Badge variant={state.autoUpdate.enabled ? "success" : "warning"}>
+          {state.autoUpdate.enabled ? "Enabled" : "Disabled"}
+        </Badge>
+      </div>
+      <p className="leading-6 text-muted-foreground">{state.autoUpdate.reason}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {state.availableChannels.map((channel) => (
+          <Button
+            key={channel}
+            type="button"
+            variant={state.channel === channel ? "default" : "outline"}
+            size="sm"
+            aria-label={`Use ${channel} update channel`}
+            onClick={() => onSelectChannel(channel)}
+            disabled={isRunning || state.channel === channel}
+          >
+            {formatUpdateChannel(channel)} channel
+          </Button>
+        ))}
+      </div>
+      {isRunning ? (
+        <p className="text-sm leading-6 text-muted-foreground">
+          Selecting {formatUpdateChannel(workflow.nextChannel).toLowerCase()} channel.
+        </p>
+      ) : (
+        <div className="rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          {formatUpdateChannel(state.channel)} channel selected
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3452,6 +3617,10 @@ function formatDiagnosticsJobCount(totalJobs: number): string {
 
 function formatSupportBundleEntryCount(totalEntries: number): string {
   return `${totalEntries} ${totalEntries === 1 ? "file" : "files"} in bundle`;
+}
+
+function formatUpdateChannel(channel: UpdateChannel): string {
+  return channel === "beta" ? "Beta" : "Stable";
 }
 
 function getPathFileName(filePath: string): string {

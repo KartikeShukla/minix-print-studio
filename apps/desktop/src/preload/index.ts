@@ -15,5 +15,7 @@ contextBridge.exposeInMainWorld("minix", {
   exportSupportBundle: () => ipcRenderer.invoke("support:export-bundle"),
   createBetaFeedbackDraft: (request?: { supportBundlePath?: string }) =>
     ipcRenderer.invoke("support:create-feedback-draft", request),
+  getUpdateChannelState: () => ipcRenderer.invoke("updates:get-state"),
+  setUpdateChannel: (channel: string) => ipcRenderer.invoke("updates:set-channel", channel),
   inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect")
 });
