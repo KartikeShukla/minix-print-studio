@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import os
+import platform
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -29,6 +31,7 @@ class HttpResponse:
 
 
 type HttpTransport = Callable[[str, str, bytes | None, Mapping[str, str], float], HttpResponse]
+type HostBluetoothProbe = Callable[[], dict[str, object]]
 
 
 class HardwareTestCliError(RuntimeError):
@@ -154,6 +157,7 @@ def run(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
     transport: HttpTransport | None = None,
+    host_bluetooth_probe: HostBluetoothProbe | None = None,
 ) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -167,6 +171,13 @@ def run(
     try:
         if args.command == "scan":
             stdout.write(json.dumps(client.scan_printers(), indent=2, sort_keys=True))
+            stdout.write("\n")
+            return 0
+        if args.command == "host-readiness":
+            probe_result = (
+                host_bluetooth_probe or collect_host_bluetooth_readiness
+            )()
+            stdout.write(json.dumps(probe_result, indent=2, sort_keys=True))
             stdout.write("\n")
             return 0
         if args.command == "export-read-only":
@@ -237,6 +248,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("scan", help="Scan for visible printer candidates.")
+    subparsers.add_parser(
+        "host-readiness",
+        help="Check whether the host exposes a Bluetooth controller for Stage A.",
+    )
 
     export_parser = subparsers.add_parser(
         "export-read-only",
@@ -304,6 +319,113 @@ def inspect_stage_a_artifact(artifact_path: Path) -> dict[str, object]:
             "nextRequiredStage",
             "print-transfer-manifest.json",
         ),
+    }
+
+
+def collect_host_bluetooth_readiness() -> dict[str, object]:
+    host_platform = platform.system()
+    if host_platform == "Darwin":
+        try:
+            completed = subprocess.run(
+                ["system_profiler", "SPBluetoothDataType"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {
+                "status": "unknown",
+                "platform": host_platform,
+                "controllerVisible": None,
+                "canAttemptStageA": False,
+                "detail": f"Could not run macOS Bluetooth readiness probe: {exc}",
+                "checks": [
+                    {
+                        "name": "system_profiler SPBluetoothDataType",
+                        "status": "unknown",
+                        "evidence": type(exc).__name__,
+                    }
+                ],
+            }
+        return parse_macos_bluetooth_readiness(
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            exit_code=completed.returncode,
+        )
+
+    return {
+        "status": "unsupported_platform",
+        "platform": host_platform,
+        "controllerVisible": None,
+        "canAttemptStageA": False,
+        "detail": "Bluetooth host-readiness probing is currently implemented for macOS only.",
+        "checks": [
+            {
+                "name": "platform",
+                "status": "unsupported_platform",
+                "evidence": host_platform or "unknown",
+            }
+        ],
+    }
+
+
+def parse_macos_bluetooth_readiness(
+    *,
+    stdout: str,
+    stderr: str,
+    exit_code: int,
+) -> dict[str, object]:
+    combined = f"{stdout}\n{stderr}"
+    if "controllerInfo == nil" in combined or _macos_bluetooth_report_is_empty(stdout):
+        return {
+            "status": "not_visible",
+            "platform": "Darwin",
+            "controllerVisible": False,
+            "canAttemptStageA": False,
+            "detail": "macOS did not report a Bluetooth controller to this process.",
+            "checks": [
+                {
+                    "name": "system_profiler SPBluetoothDataType",
+                    "status": "not_visible",
+                    "evidence": (
+                        "controllerInfo == nil"
+                        if "controllerInfo == nil" in combined
+                        else "empty Bluetooth report"
+                    ),
+                }
+            ],
+        }
+
+    if exit_code == 0 and _macos_bluetooth_report_has_controller(stdout):
+        return {
+            "status": "ready_to_scan",
+            "platform": "Darwin",
+            "controllerVisible": True,
+            "canAttemptStageA": True,
+            "detail": "macOS reports a Bluetooth controller to this process.",
+            "checks": [
+                {
+                    "name": "system_profiler SPBluetoothDataType",
+                    "status": "ready_to_scan",
+                    "evidence": "Bluetooth controller fields present",
+                }
+            ],
+        }
+
+    return {
+        "status": "unknown",
+        "platform": "Darwin",
+        "controllerVisible": None,
+        "canAttemptStageA": False,
+        "detail": "macOS Bluetooth readiness could not be determined from system_profiler.",
+        "checks": [
+            {
+                "name": "system_profiler SPBluetoothDataType",
+                "status": "unknown",
+                "evidence": f"exit_code={exit_code}",
+            }
+        ],
     }
 
 
@@ -492,6 +614,21 @@ def _validate_read_only_safety(
         or safety_report.get("certificationComplete") is not False
     ):
         raise HardwareTestCliError("artifact is not read-only safe")
+
+
+def _macos_bluetooth_report_is_empty(stdout: str) -> bool:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    return lines == ["Bluetooth:"]
+
+
+def _macos_bluetooth_report_has_controller(stdout: str) -> bool:
+    report = stdout.lower()
+    return (
+        "bluetooth controller:" in report
+        or "address:" in report
+        or "state: on" in report
+        or "bluetooth low energy supported: yes" in report
+    )
 
 
 def _required_json_string(

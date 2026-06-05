@@ -4,7 +4,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from minixd.hardware_test_cli import HttpResponse, run
+from minixd.hardware_test_cli import (
+    HttpResponse,
+    parse_macos_bluetooth_readiness,
+    run,
+)
 
 
 def test_hardware_test_cli_scans_printers_with_auth_header() -> None:
@@ -132,6 +136,71 @@ def test_hardware_test_cli_preserves_daemon_error_detail() -> None:
 
     assert exit_code == 2
     assert stderr.getvalue().strip() == "Bluetooth unavailable: Bluetooth is unsupported"
+
+
+def test_hardware_test_cli_reports_host_bluetooth_readiness() -> None:
+    stdout = io.StringIO()
+
+    exit_code = run(
+        ["host-readiness"],
+        stdout=stdout,
+        host_bluetooth_probe=lambda: {
+            "status": "not_visible",
+            "platform": "Darwin",
+            "controllerVisible": False,
+            "canAttemptStageA": False,
+            "detail": "macOS did not report a Bluetooth controller to this process.",
+            "checks": [
+                {
+                    "name": "system_profiler SPBluetoothDataType",
+                    "status": "not_visible",
+                    "evidence": "controllerInfo == nil",
+                }
+            ],
+        },
+    )
+
+    assert exit_code == 0
+    assert json.loads(stdout.getvalue()) == {
+        "status": "not_visible",
+        "platform": "Darwin",
+        "controllerVisible": False,
+        "canAttemptStageA": False,
+        "detail": "macOS did not report a Bluetooth controller to this process.",
+        "checks": [
+            {
+                "name": "system_profiler SPBluetoothDataType",
+                "status": "not_visible",
+                "evidence": "controllerInfo == nil",
+            }
+        ],
+    }
+
+
+def test_macos_bluetooth_readiness_reports_no_visible_controller() -> None:
+    result = parse_macos_bluetooth_readiness(
+        stdout="Bluetooth:\n\n",
+        stderr=(
+            "2026-06-05 18:41:52.062 system_profiler[61351:11054831] "
+            "SPBluetoothReporter getBluetoothControllerDict controllerInfo == nil\n"
+        ),
+        exit_code=0,
+    )
+
+    assert result == {
+        "status": "not_visible",
+        "platform": "Darwin",
+        "controllerVisible": False,
+        "canAttemptStageA": False,
+        "detail": "macOS did not report a Bluetooth controller to this process.",
+        "checks": [
+            {
+                "name": "system_profiler SPBluetoothDataType",
+                "status": "not_visible",
+                "evidence": "controllerInfo == nil",
+            }
+        ],
+    }
 
 
 def test_hardware_test_cli_inspects_valid_stage_a_artifact(tmp_path: Path) -> None:

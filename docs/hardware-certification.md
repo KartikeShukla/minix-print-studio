@@ -7,6 +7,7 @@ verified without being safe to print.
 
 Stage A checks identity and BLE shape only:
 
+- Check host Bluetooth readiness.
 - Scan for the printer.
 - Connect to the selected device.
 - Discover services and characteristics.
@@ -27,6 +28,17 @@ hardware error such as:
 
 Resolve Bluetooth availability, OS permission, or host adapter setup before treating
 Stage A as attempted.
+
+Before scanning, run:
+
+```bash
+scripts/hardware-test.sh host-readiness
+```
+
+On macOS, this checks whether `system_profiler SPBluetoothDataType` exposes a
+Bluetooth controller to the current process. A `not_visible` result means Stage A
+cannot start from that host context yet; fix Bluetooth hardware visibility,
+permissions, or sandbox/access constraints before retrying `scan`.
 
 ## Exporting The Stage A Artifact
 
