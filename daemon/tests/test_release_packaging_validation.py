@@ -67,6 +67,25 @@ def test_release_packaging_check_requires_windows_x64_package_command() -> None:
     assert issues == ["apps/desktop/package.json missing package:win script"]
 
 
+def test_release_packaging_check_requires_desktop_integration_configs_source_alias() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_desktop_tsconfig_text(
+        """
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {}
+  }
+}
+"""
+    )
+
+    assert issues == [
+        "apps/desktop/tsconfig.json must map @minix/integration-configs to source",
+    ]
+
+
 def test_release_packaging_check_requires_windows_package_workflow() -> None:
     validator = _load_validator()
 

@@ -19,6 +19,7 @@ DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
+DESKTOP_TSCONFIG_PATH = Path("apps/desktop/tsconfig.json")
 RELEASE_PACKAGE_WORKFLOW_PATH = Path(".github/workflows/release-package.yml")
 REQUIRED_PACKAGE_ICON_PATHS = (
     Path("apps/desktop/build/icon-source.svg"),
@@ -133,6 +134,12 @@ def validate_repository(root: Path) -> list[str]:
         if not (root / icon_path).is_file():
             issues.append(f"missing required package icon asset: {icon_path.as_posix()}")
 
+    desktop_tsconfig = root / DESKTOP_TSCONFIG_PATH
+    if not desktop_tsconfig.is_file():
+        issues.append(f"missing required file: {DESKTOP_TSCONFIG_PATH.as_posix()}")
+    else:
+        issues.extend(validate_desktop_tsconfig_text(desktop_tsconfig.read_text(encoding="utf-8")))
+
     release_workflow = root / RELEASE_PACKAGE_WORKFLOW_PATH
     if not release_workflow.is_file():
         issues.append(f"missing required file: {RELEASE_PACKAGE_WORKFLOW_PATH.as_posix()}")
@@ -181,6 +188,23 @@ def validate_builder_config_text(text: str) -> list[str]:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
             break
+    return issues
+
+
+def validate_desktop_tsconfig_text(text: str) -> list[str]:
+    issues: list[str] = []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return ["apps/desktop/tsconfig.json is not valid JSON"]
+
+    compiler_options = payload.get("compilerOptions")
+    paths = compiler_options.get("paths") if isinstance(compiler_options, dict) else None
+    expected_alias = ["../../packages/integration-configs/src/index.ts"]
+    if not isinstance(paths, dict) or paths.get("@minix/integration-configs") != expected_alias:
+        issues.append(
+            "apps/desktop/tsconfig.json must map @minix/integration-configs to source"
+        )
     return issues
 
 
