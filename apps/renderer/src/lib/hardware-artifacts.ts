@@ -71,8 +71,25 @@ export type HardwareArtifactInspectionResult = {
   visualCardPreflight: HardwareVisualCardPreflight | null;
 };
 
+export type HardwareHostReadiness = {
+  status: string;
+  platform: string;
+  controllerVisible: boolean | null;
+  canAttemptStageA: boolean;
+  detail: string;
+  checks: Array<{
+    name: string;
+    status: string;
+    evidence: string;
+  }>;
+};
+
 export type HardwareArtifactInspector = {
   inspect: () => Promise<HardwareArtifactInspectionResult | null>;
+};
+
+export type HardwareReadinessProvider = {
+  check: () => Promise<HardwareHostReadiness>;
 };
 
 export const desktopHardwareArtifactInspector: HardwareArtifactInspector = {
@@ -82,5 +99,15 @@ export const desktopHardwareArtifactInspector: HardwareArtifactInspector = {
       throw new Error("Hardware artifact inspection is unavailable");
     }
     return inspectHardwareArtifact();
+  }
+};
+
+export const desktopHardwareReadinessProvider: HardwareReadinessProvider = {
+  async check() {
+    const checkHostBluetoothReadiness = window.minix?.checkHostBluetoothReadiness;
+    if (!checkHostBluetoothReadiness) {
+      throw new Error("Host Bluetooth readiness check is unavailable");
+    }
+    return checkHostBluetoothReadiness();
   }
 };

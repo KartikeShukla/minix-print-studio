@@ -1,7 +1,61 @@
 import { describe, expect, it } from "vitest";
-import { inspectHardwareArtifact } from "../src/main/hardwareArtifacts";
+import {
+  checkHostBluetoothReadiness,
+  inspectHardwareArtifact
+} from "../src/main/hardwareArtifacts";
 
 describe("hardware artifact inspection bridge", () => {
+  it("runs the shared hardware-test CLI host readiness diagnostic", async () => {
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+
+    const result = await checkHostBluetoothReadiness({
+      repoRoot: "/repo/minix",
+      runner: async (command, args, options) => {
+        calls.push({ command, args, cwd: options.cwd });
+        return {
+          stdout: JSON.stringify({
+            status: "not_visible",
+            platform: "Darwin",
+            controllerVisible: false,
+            canAttemptStageA: false,
+            detail: "macOS did not report a Bluetooth controller to this process.",
+            checks: [
+              {
+                name: "system_profiler SPBluetoothDataType",
+                status: "not_visible",
+                evidence: "controllerInfo == nil"
+              }
+            ]
+          }),
+          stderr: "",
+          exitCode: 0
+        };
+      }
+    });
+
+    expect(result).toEqual({
+      status: "not_visible",
+      platform: "Darwin",
+      controllerVisible: false,
+      canAttemptStageA: false,
+      detail: "macOS did not report a Bluetooth controller to this process.",
+      checks: [
+        {
+          name: "system_profiler SPBluetoothDataType",
+          status: "not_visible",
+          evidence: "controllerInfo == nil"
+        }
+      ]
+    });
+    expect(calls).toEqual([
+      {
+        command: "/repo/minix/.venv/bin/python",
+        args: ["-m", "minixd.hardware_test_cli", "host-readiness"],
+        cwd: "/repo/minix"
+      }
+    ]);
+  });
+
   it("runs the shared hardware-test CLI inspection and protocol preflight", async () => {
     const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
 

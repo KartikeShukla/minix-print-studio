@@ -30,7 +30,7 @@ physical validation before a stable public release.
 
 | Stage | Status | Artifact |
 | --- | --- | --- |
-| Host Bluetooth readiness | Implemented for macOS CLI diagnostics | `minix-hardware-test host-readiness` |
+| Host Bluetooth readiness | Implemented for macOS CLI and Electron diagnostics | `minix-hardware-test host-readiness` / Printer panel |
 | Stage A: read-only verification | Implemented in daemon, renderer, and CLI | `hardware-test-<timestamp>.zip` |
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |

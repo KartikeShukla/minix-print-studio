@@ -106,8 +106,11 @@ import {
 } from "@/lib/setup-checklist";
 import {
   desktopHardwareArtifactInspector,
+  desktopHardwareReadinessProvider,
   type HardwareArtifactInspectionResult,
-  type HardwareArtifactInspector
+  type HardwareArtifactInspector,
+  type HardwareHostReadiness,
+  type HardwareReadinessProvider
 } from "@/lib/hardware-artifacts";
 import {
   desktopSupportBundleExporter,
@@ -157,6 +160,7 @@ export type AppProps = {
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
+  hardwareReadinessProvider?: HardwareReadinessProvider;
   supportBundleExporter?: SupportBundleExporter;
   updateChannelProvider?: UpdateChannelProvider;
 };
@@ -222,6 +226,12 @@ type HardwarePreflightWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "ready"; result: HardwareArtifactInspectionResult }
+  | { status: "error"; message: string };
+
+type HardwareReadinessWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: HardwareHostReadiness }
   | { status: "error"; message: string };
 
 type AgentIntegrationWorkflow =
@@ -316,6 +326,7 @@ export function App({
   agentIntegrationProvider,
   agentIntegrationInstaller,
   hardwareArtifactInspector,
+  hardwareReadinessProvider,
   supportBundleExporter,
   updateChannelProvider
 }: AppProps) {
@@ -331,6 +342,10 @@ export function App({
   const artifactInspector = useMemo(
     () => hardwareArtifactInspector ?? desktopHardwareArtifactInspector,
     [hardwareArtifactInspector]
+  );
+  const readinessProvider = useMemo(
+    () => hardwareReadinessProvider ?? desktopHardwareReadinessProvider,
+    [hardwareReadinessProvider]
   );
   const supportExporter = useMemo(
     () => supportBundleExporter ?? desktopSupportBundleExporter,
@@ -378,6 +393,8 @@ export function App({
     });
   const [hardwarePreflightWorkflow, setHardwarePreflightWorkflow] =
     useState<HardwarePreflightWorkflow>({ status: "idle" });
+  const [hardwareReadinessWorkflow, setHardwareReadinessWorkflow] =
+    useState<HardwareReadinessWorkflow>({ status: "idle" });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
     useState<AgentIntegrationWorkflow>({
       status: "loading"
@@ -911,6 +928,19 @@ export function App({
     },
     [client]
   );
+
+  const checkHostBluetoothReadiness = useCallback(async () => {
+    setHardwareReadinessWorkflow({ status: "running" });
+    try {
+      const result = await readinessProvider.check();
+      setHardwareReadinessWorkflow({ status: "ready", result });
+    } catch (error: unknown) {
+      setHardwareReadinessWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Host Bluetooth check failed"
+      });
+    }
+  }, [readinessProvider]);
 
   const loadProjects = useCallback(async () => {
     if (!client.listProjects) {
@@ -1568,8 +1598,10 @@ export function App({
             />
             <PrinterPanel
               workflow={printerWorkflow}
+              hardwareReadinessWorkflow={hardwareReadinessWorkflow}
               hardwareArtifactWorkflow={hardwareArtifactWorkflow}
               hardwarePreflightWorkflow={hardwarePreflightWorkflow}
+              onCheckHostBluetooth={checkHostBluetoothReadiness}
               onVerify={runReadOnlyVerify}
               onExportHardwareArtifact={runHardwareArtifactExport}
               onInspectHardwareArtifact={inspectHardwareArtifact}
@@ -3340,15 +3372,19 @@ function CanvasQrElement({
 
 function PrinterPanel({
   workflow,
+  hardwareReadinessWorkflow,
   hardwareArtifactWorkflow,
   hardwarePreflightWorkflow,
+  onCheckHostBluetooth,
   onVerify,
   onExportHardwareArtifact,
   onInspectHardwareArtifact
 }: {
   workflow: PrinterWorkflow;
+  hardwareReadinessWorkflow: HardwareReadinessWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   hardwarePreflightWorkflow: HardwarePreflightWorkflow;
+  onCheckHostBluetooth: () => void;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
   onExportHardwareArtifact: (deviceId: string) => void;
   onInspectHardwareArtifact: () => void;
@@ -3381,6 +3417,10 @@ function PrinterPanel({
         </div>
       </div>
 
+      <HostBluetoothReadinessStatus
+        workflow={hardwareReadinessWorkflow}
+        onCheck={onCheckHostBluetooth}
+      />
       <PrinterDiscoveryStatus
         workflow={workflow}
         candidate={primaryCandidate}
@@ -3402,6 +3442,51 @@ function PrinterPanel({
         onInspect={onInspectHardwareArtifact}
       />
     </section>
+  );
+}
+
+function HostBluetoothReadinessStatus({
+  workflow,
+  onCheck
+}: {
+  workflow: HardwareReadinessWorkflow;
+  onCheck: () => void;
+}) {
+  const result = workflow.status === "ready" ? workflow.result : null;
+  const title = result ? formatHostReadinessStatus(result.status) : null;
+  const primaryEvidence = result?.checks[0]?.evidence;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onCheck}
+        disabled={workflow.status === "running"}
+      >
+        <Bluetooth className="size-4" aria-hidden="true" />
+        {workflow.status === "running" ? "Checking host Bluetooth" : "Check host Bluetooth"}
+      </Button>
+      {result ? (
+        <div className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3">
+          <div className="font-medium text-warning">{title}</div>
+          <div className="text-muted-foreground">{result.detail}</div>
+          {primaryEvidence ? (
+            <div className="break-words font-mono text-xs">{primaryEvidence}</div>
+          ) : null}
+          <Badge variant={result.canAttemptStageA ? "success" : "warning"}>
+            {result.canAttemptStageA
+              ? "Stage A can scan from this host"
+              : "Stage A unavailable from this host"}
+          </Badge>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -3903,6 +3988,16 @@ function formatDiscoveryStage(stage: string): string {
     unsupported: "Unsupported"
   };
   return labels[stage] ?? stage;
+}
+
+function formatHostReadinessStatus(status: string): string {
+  const labels: Record<string, string> = {
+    ready_to_scan: "Host Bluetooth ready",
+    not_visible: "Host Bluetooth not visible",
+    unsupported_platform: "Host Bluetooth check unsupported",
+    unknown: "Host Bluetooth readiness unknown"
+  };
+  return labels[status] ?? "Host Bluetooth readiness unknown";
 }
 
 function formatCoverage(preview: DocumentPreviewResponse): string {

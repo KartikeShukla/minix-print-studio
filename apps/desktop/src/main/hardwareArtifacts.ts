@@ -74,6 +74,19 @@ export type HardwareArtifactInspectionResult = {
   visualCardPreflight: HardwareVisualCardPreflight | null;
 };
 
+export type HardwareHostReadiness = {
+  status: string;
+  platform: string;
+  controllerVisible: boolean | null;
+  canAttemptStageA: boolean;
+  detail: string;
+  checks: Array<{
+    name: string;
+    status: string;
+    evidence: string;
+  }>;
+};
+
 export type CommandResult = {
   stdout: string;
   stderr: string;
@@ -128,15 +141,30 @@ export async function inspectHardwareArtifact({
   };
 }
 
+export async function checkHostBluetoothReadiness({
+  repoRoot,
+  runner = runCommand
+}: {
+  repoRoot: string;
+  runner?: CommandRunner;
+}): Promise<HardwareHostReadiness> {
+  return runHardwareCliJson<HardwareHostReadiness>({
+    repoRoot,
+    commandName: "host-readiness",
+    runner
+  });
+}
+
 async function runHardwareCliJson<T>({
   artifactPath,
   repoRoot,
   commandName,
   runner
 }: {
-  artifactPath: string;
+  artifactPath?: string;
   repoRoot: string;
   commandName:
+    | "host-readiness"
     | "inspect-artifact"
     | "protocol-sanity-preflight"
     | "tiny-visual-card-preflight";
@@ -144,7 +172,12 @@ async function runHardwareCliJson<T>({
 }): Promise<T> {
   const result = await runner(
     path.join(repoRoot, ".venv", "bin", "python"),
-    ["-m", "minixd.hardware_test_cli", commandName, artifactPath],
+    [
+      "-m",
+      "minixd.hardware_test_cli",
+      commandName,
+      ...(artifactPath ? [artifactPath] : [])
+    ],
     { cwd: repoRoot }
   );
 

@@ -132,6 +132,7 @@
 - Electron exposes an offline Stage A artifact inspector from the Printer panel that reuses the shared hardware-test CLI safety checks and shows the Stage B protocol sanity preflight without BLE writes.
 - Non-mock BLE scan now maps host Bluetooth-unavailable failures to a structured `503` response, and the renderer daemon client preserves daemon `detail` text so the UI can show actionable setup errors.
 - `minix-hardware-test host-readiness` reports whether the current host context exposes a Bluetooth controller before Stage A, with macOS `system_profiler SPBluetoothDataType` parsing for the no-controller-visible failure mode.
+- Electron exposes the shared host Bluetooth readiness diagnostic from the Printer panel before Stage A scan attempts.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
@@ -190,6 +191,7 @@
 - TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.
 - TDD red/green checks for host Bluetooth readiness CLI output and macOS no-controller-visible parsing.
+- TDD red/green checks for the Electron host-readiness bridge and renderer Printer panel readiness result.
 - TDD red/green checks for the Stage A hardware-test CLI scan/export flow and daemon error-detail preservation.
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.

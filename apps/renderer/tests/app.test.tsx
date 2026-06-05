@@ -783,6 +783,54 @@ describe("MiniX Print Studio shell", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:hardware-test");
   });
 
+  it("checks host Bluetooth readiness before Stage A scan", async () => {
+    const check = vi.fn().mockResolvedValue({
+      status: "not_visible",
+      platform: "Darwin",
+      controllerVisible: false,
+      canAttemptStageA: false,
+      detail: "macOS did not report a Bluetooth controller to this process.",
+      checks: [
+        {
+          name: "system_profiler SPBluetoothDataType",
+          status: "not_visible",
+          evidence: "controllerInfo == nil"
+        }
+      ]
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        hardwareReadinessProvider={{ check }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Check host Bluetooth" }));
+
+    await waitFor(() => {
+      expect(check).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText("Host Bluetooth not visible")).toBeInTheDocument();
+    expect(
+      screen.getByText("macOS did not report a Bluetooth controller to this process.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("controllerInfo == nil")).toBeInTheDocument();
+    expect(screen.getByText("Stage A unavailable from this host")).toBeInTheDocument();
+  });
+
   it("inspects an exported Stage A artifact and shows the protocol sanity preflight", async () => {
     const inspect = vi.fn().mockResolvedValue({
       artifactPath: "/tmp/hardware-test-stage-a.zip",

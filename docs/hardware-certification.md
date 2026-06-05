@@ -29,7 +29,7 @@ hardware error such as:
 Resolve Bluetooth availability, OS permission, or host adapter setup before treating
 Stage A as attempted.
 
-Before scanning, run:
+Before scanning, use `Check host Bluetooth` in the Printer panel or run:
 
 ```bash
 scripts/hardware-test.sh host-readiness
