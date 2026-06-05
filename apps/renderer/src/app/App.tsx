@@ -186,6 +186,12 @@ type SupportBundleWorkflow =
   | { status: "exported"; bundle: SupportBundleExportResult }
   | { status: "error"; message: string };
 
+type BetaFeedbackWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "copied" }
+  | { status: "error"; message: string };
+
 type HardwareArtifactWorkflow =
   | { status: "idle" }
   | { status: "running"; deviceId: string }
@@ -333,6 +339,9 @@ export function App({
     status: "idle"
   });
   const [supportBundleWorkflow, setSupportBundleWorkflow] = useState<SupportBundleWorkflow>({
+    status: "idle"
+  });
+  const [betaFeedbackWorkflow, setBetaFeedbackWorkflow] = useState<BetaFeedbackWorkflow>({
     status: "idle"
   });
   const [hardwareArtifactWorkflow, setHardwareArtifactWorkflow] =
@@ -1071,6 +1080,31 @@ export function App({
     }
   }, [supportExporter]);
 
+  const copyBetaFeedbackLink = useCallback(async () => {
+    setBetaFeedbackWorkflow({ status: "running" });
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      const createFeedbackDraft = supportExporter.createFeedbackDraft;
+      if (!createFeedbackDraft) {
+        throw new Error("Beta feedback draft is unavailable");
+      }
+      const draft = await createFeedbackDraft(
+        supportBundleWorkflow.status === "exported"
+          ? { supportBundlePath: supportBundleWorkflow.bundle.targetPath }
+          : undefined
+      );
+      await navigator.clipboard.writeText(draft.targetUrl);
+      setBetaFeedbackWorkflow({ status: "copied" });
+    } catch (error: unknown) {
+      setBetaFeedbackWorkflow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Beta feedback link unavailable"
+      });
+    }
+  }, [supportBundleWorkflow, supportExporter]);
+
   const runHardwareArtifactExport = useCallback(
     async (deviceId: string) => {
       if (!client.exportHardwareTest) {
@@ -1511,7 +1545,9 @@ export function App({
 
             <SupportBundlePanel
               workflow={supportBundleWorkflow}
+              feedbackWorkflow={betaFeedbackWorkflow}
               onExport={runSupportBundleExport}
+              onCopyFeedback={copyBetaFeedbackLink}
             />
 
             <RecentJobsPanel
@@ -1806,10 +1842,14 @@ function RecentJobsPanel({
 
 function SupportBundlePanel({
   workflow,
-  onExport
+  feedbackWorkflow,
+  onExport,
+  onCopyFeedback
 }: {
   workflow: SupportBundleWorkflow;
+  feedbackWorkflow: BetaFeedbackWorkflow;
   onExport: () => void;
+  onCopyFeedback: () => void;
 }) {
   return (
     <section className="border-t border-border p-4">
@@ -1828,6 +1868,17 @@ function SupportBundlePanel({
         <FileText className="size-4" aria-hidden="true" />
         {workflow.status === "running" ? "Exporting support bundle" : "Export support bundle"}
       </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-2 w-full"
+        onClick={onCopyFeedback}
+        disabled={feedbackWorkflow.status === "running"}
+      >
+        <Copy className="size-4" aria-hidden="true" />
+        {feedbackWorkflow.status === "running" ? "Copying feedback link" : "Copy beta feedback link"}
+      </Button>
       {workflow.status === "exported" ? (
         <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
           <div className="font-medium">Support bundle exported</div>
@@ -1841,6 +1892,15 @@ function SupportBundlePanel({
       ) : workflow.status === "error" ? (
         <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
           {workflow.message}
+        </div>
+      ) : null}
+      {feedbackWorkflow.status === "copied" ? (
+        <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
+          Beta feedback link copied
+        </div>
+      ) : feedbackWorkflow.status === "error" ? (
+        <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
+          {feedbackWorkflow.message}
         </div>
       ) : null}
     </section>

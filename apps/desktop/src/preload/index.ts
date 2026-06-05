@@ -13,5 +13,7 @@ contextBridge.exposeInMainWorld("minix", {
   exportAgentIntegrationBundle: (targetId: string) =>
     ipcRenderer.invoke("agent-integrations:export-bundle", targetId),
   exportSupportBundle: () => ipcRenderer.invoke("support:export-bundle"),
+  createBetaFeedbackDraft: (request?: { supportBundlePath?: string }) =>
+    ipcRenderer.invoke("support:create-feedback-draft", request),
   inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect")
 });

@@ -67,6 +67,7 @@ def test_source_package_check_requires_community_intake_templates() -> None:
     assert Path(".github/ISSUE_TEMPLATE/bug_report.yml") in validator.REQUIRED_SOURCE_PATHS
     assert Path(".github/ISSUE_TEMPLATE/feature_request.yml") in validator.REQUIRED_SOURCE_PATHS
     assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_SOURCE_PATHS
+    assert Path(".github/ISSUE_TEMPLATE/beta_feedback.yml") in validator.REQUIRED_SOURCE_PATHS
 
 
 def test_source_package_check_requires_desktop_package_icons() -> None:

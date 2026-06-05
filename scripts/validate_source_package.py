@@ -20,6 +20,7 @@ REQUIRED_SOURCE_PATHS = (
     Path(".github/ISSUE_TEMPLATE/bug_report.yml"),
     Path(".github/ISSUE_TEMPLATE/feature_request.yml"),
     Path(".github/ISSUE_TEMPLATE/hardware_profile.yml"),
+    Path(".github/ISSUE_TEMPLATE/beta_feedback.yml"),
     Path(".github/workflows/release-package.yml"),
     Path(".github/workflows/codeql.yml"),
     Path("docs/architecture.md"),

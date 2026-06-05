@@ -317,6 +317,51 @@ describe("MiniX Print Studio shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("copies a beta feedback issue draft from the support sidebar", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+    const createFeedbackDraft = vi.fn().mockResolvedValue({
+      targetUrl:
+        "https://github.com/minix-print-studio/minix-print-studio/issues/new?template=beta_feedback.yml",
+      title: "Beta feedback: MiniX Print Studio 0.1.0 on darwin",
+      body: "## Environment\n- App version: 0.1.0\n",
+      createdAt: "2026-06-05T00:04:00.000Z"
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        supportBundleExporter={{
+          exportBundle: vi.fn(),
+          createFeedbackDraft
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy beta feedback link" }));
+
+    await waitFor(() => {
+      expect(createFeedbackDraft).toHaveBeenCalledTimes(1);
+    });
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("beta_feedback.yml"));
+    expect(await screen.findByText("Beta feedback link copied")).toBeInTheDocument();
+  });
+
   it("requests a daemon preview and print plan before enabling print", async () => {
     const createDocumentPreview = vi.fn().mockResolvedValue({
       previewId: "prev_ready",

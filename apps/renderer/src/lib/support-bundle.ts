@@ -4,8 +4,20 @@ export type SupportBundleExportResult = {
   entries: string[];
 };
 
+export type BetaFeedbackDraft = {
+  targetUrl: string;
+  title: string;
+  body: string;
+  createdAt: string;
+};
+
+export type BetaFeedbackDraftRequest = {
+  supportBundlePath?: string;
+};
+
 export type SupportBundleExporter = {
   exportBundle: () => Promise<SupportBundleExportResult>;
+  createFeedbackDraft?: (request?: BetaFeedbackDraftRequest) => Promise<BetaFeedbackDraft>;
 };
 
 export const desktopSupportBundleExporter: SupportBundleExporter = {
@@ -16,4 +28,11 @@ export const desktopSupportBundleExporter: SupportBundleExporter = {
     }
     return exportSupportBundle();
   },
+  async createFeedbackDraft(request) {
+    const createBetaFeedbackDraft = window.minix?.createBetaFeedbackDraft;
+    if (!createBetaFeedbackDraft) {
+      throw new Error("Beta feedback draft is unavailable");
+    }
+    return createBetaFeedbackDraft(request);
+  }
 };

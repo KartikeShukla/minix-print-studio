@@ -23,6 +23,7 @@ REQUIRED_FILES = (
     Path(".github/ISSUE_TEMPLATE/bug_report.yml"),
     Path(".github/ISSUE_TEMPLATE/feature_request.yml"),
     Path(".github/ISSUE_TEMPLATE/hardware_profile.yml"),
+    Path(".github/ISSUE_TEMPLATE/beta_feedback.yml"),
 )
 
 REQUIRED_DOCS = (

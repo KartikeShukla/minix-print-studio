@@ -1,0 +1,56 @@
+name: Beta Feedback
+description: Share install, setup, printer, packaging, or integration feedback from a beta build.
+title: "[Beta]: "
+labels: ["beta-feedback", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Review support bundles before attaching them. Do not include bearer tokens, runtime files, raw raster bytes, or private file paths.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: App version, OS, install type, and printer profile if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: worked
+    attributes:
+      label: What Worked
+      description: Which install, setup, editor, printer, or integration steps completed successfully?
+    validations:
+      required: true
+  - type: textarea
+    id: blocked
+    attributes:
+      label: What Blocked You
+      description: Note crashes, confusing steps, missing permissions, failed validation, or hardware issues.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Install or update
+        - First run
+        - Editor workflow
+        - Printer setup
+        - Print validation
+        - MCP/agent integration
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: support_bundle
+    attributes:
+      label: Support Bundle
+      description: Attach a reviewed support bundle if it helps explain the issue.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy Check
+      options:
+        - label: I reviewed attachments for tokens, private paths, raw raster bytes, and unredacted diagnostics.
+          required: true

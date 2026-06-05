@@ -7,7 +7,11 @@ import type {
   AgentIntegrationTargetId
 } from "@/lib/agent-integrations";
 import type { HardwareArtifactInspectionResult } from "@/lib/hardware-artifacts";
-import type { SupportBundleExportResult } from "@/lib/support-bundle";
+import type {
+  BetaFeedbackDraft,
+  BetaFeedbackDraftRequest,
+  SupportBundleExportResult
+} from "@/lib/support-bundle";
 import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
@@ -89,6 +93,7 @@ declare global {
         targetId: AgentIntegrationTargetId
       ) => Promise<AgentIntegrationExportResult>;
       exportSupportBundle?: () => Promise<SupportBundleExportResult>;
+      createBetaFeedbackDraft?: (request?: BetaFeedbackDraftRequest) => Promise<BetaFeedbackDraft>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
     };
   }

@@ -75,3 +75,9 @@ Release notes should include:
 - Upgrade and uninstall notes.
 - Diagnostics redaction statement.
 - Hardware validation evidence summary.
+
+## Beta Feedback
+
+Beta builds should point testers to the desktop Support panel. The panel can export a
+redacted support bundle and copy a GitHub beta feedback issue draft that includes the
+app version, platform, timestamp, and support bundle file name without private paths.

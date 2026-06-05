@@ -6,6 +6,7 @@ import {
   testAgentIntegrationConnection,
   type AgentIntegrationTargetId
 } from "./agentIntegrations";
+import { buildBetaFeedbackDraft } from "./betaFeedback";
 import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
 import {
   installAgentIntegrationConfig,
@@ -122,6 +123,13 @@ ipcMain.handle("support:export-bundle", () =>
     userDataPath: app.getPath("userData"),
     appVersion: app.getVersion(),
     platform: process.platform
+  })
+);
+ipcMain.handle("support:create-feedback-draft", (_event, request?: { supportBundlePath?: string }) =>
+  buildBetaFeedbackDraft({
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    supportBundlePath: request?.supportBundlePath ?? null
   })
 );
 ipcMain.handle("hardware-artifacts:inspect", async () => {

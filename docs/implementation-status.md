@@ -102,6 +102,8 @@
 - Renderer daemon client and Recent Jobs panel can request the redacted diagnostics export and show the exported bundle job count.
 - Electron support bundle export writes a redacted desktop ZIP under app user data with `support.json`, desktop logs, crash metadata, and a README while excluding runtime token files.
 - Electron preload exposes the support bundle export through IPC, and the renderer Support panel can export the bundle and show the generated file name plus entry count.
+- Electron can generate a beta feedback GitHub issue draft that includes app version, platform, timestamp, and only the support bundle file name; the renderer Support panel can copy the draft link.
+- Open-source intake now includes a dedicated beta feedback issue template, and package validators require it in the tracked source set.
 - Electron writes daemon runtime handoff files under user data: `runtime/runtime.json` contains base URL, PID, start time, mock flag, and token-file path while `runtime/token` stores the bearer token separately.
 - MCP integration config generators can include `MINIX_DAEMON_RUNTIME_FILE` for Codex, Claude Desktop/Code, OpenCode, and generic stdio configs without embedding bearer tokens.
 - MCP stdio shim resolves daemon base URL and token from the Electron runtime handoff file, rejects inline tokens in runtime JSON, and keeps the existing explicit environment fallback for development.
@@ -163,6 +165,7 @@
 - Playwright smoke against fresh renderer `http://127.0.0.1:5173/` and mock daemon `http://127.0.0.1:39281/`: run Preview -> Print -> Export diagnostics, verify Recent Jobs localStorage persistence and `Diagnostics exported` with `1 job in bundle`.
 - TDD red/green checks for deterministic long-print marker generation in the shared document model and renderer toolbar insertion with persisted Undo history.
 - TDD red/green checks for redacted desktop support bundle ZIP contents and the renderer Support panel export action.
+- TDD red/green checks for beta feedback draft URL generation, renderer Support panel copy action, and required beta feedback issue-template packaging.
 - TDD red/green checks for Electron runtime handoff, MCP config runtime-file env generation, and MCP shim runtime resolution.
 - TDD red/green checks for desktop Agent Integration preview generation and renderer copyable Agent Integrations panel.
 - TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.

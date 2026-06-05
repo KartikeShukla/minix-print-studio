@@ -40,3 +40,9 @@ tokens, approval tokens, raw raster bytes, and private file paths.
 Use the desktop Support panel to export a support bundle when reporting crashes or
 startup issues. The bundle includes redacted desktop logs and crash metadata, excludes
 runtime token files, and should still be reviewed before sharing publicly.
+
+## Beta Feedback
+
+Use the desktop Support panel to copy a beta feedback issue link. If a support bundle
+was exported first, the generated issue draft references only the bundle file name; it
+does not include the local user-data path.

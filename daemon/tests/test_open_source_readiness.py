@@ -75,6 +75,7 @@ def test_open_source_readiness_check_requires_community_intake_templates() -> No
     assert Path(".github/ISSUE_TEMPLATE/bug_report.yml") in validator.REQUIRED_FILES
     assert Path(".github/ISSUE_TEMPLATE/feature_request.yml") in validator.REQUIRED_FILES
     assert Path(".github/ISSUE_TEMPLATE/hardware_profile.yml") in validator.REQUIRED_FILES
+    assert Path(".github/ISSUE_TEMPLATE/beta_feedback.yml") in validator.REQUIRED_FILES
 
 
 def test_open_source_readiness_check_requires_dependabot_config() -> None:
