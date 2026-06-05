@@ -21,6 +21,8 @@
 - Public support matrix and known limitations docs that distinguish mock/development support from hardware-certified support.
 - Source package validator that checks the tracked release source set for required public files and forbidden runtime/build/cache paths.
 - Release packaging scaffold with electron-builder config, root package commands for unsigned local macOS/Windows packages, ignored in-repo Electron build caches for restricted environments, and a validator that keeps publishing/signing disabled until release credentials exist.
+- Release packaging validator rejects accidental inclusion of hardware-test artifacts alongside runtime state, diagnostics, previews, jobs, signing identity, and publishing settings.
+- Windows unsigned directory packaging is pinned to x64 and disables executable resource editing so local scaffold validation does not depend on Wine code-sign/resource tools.
 - Documentation gate consistency validation that keeps `CONTRIBUTING.md`, `docs/release.md`, and `docs/testing.md` aligned with the current non-hardware release checks.
 - Public release notes template covering supported profiles, limitations, install/upgrade/uninstall notes, diagnostics redaction, hardware evidence, and validation checks.
 
@@ -119,6 +121,7 @@
 - `pnpm source-package-check`
 - `pnpm release-package-check`
 - `pnpm package:mac`
+- `pnpm package:win`
 - `.venv/bin/python -m ruff check daemon mcp`
 - `.venv/bin/python -m mypy daemon/src mcp/src`
 - `.venv/bin/python -m pytest daemon/tests mcp/tests`
@@ -148,9 +151,12 @@
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for release packaging scaffold validation, including package scripts, runtime-state exclusions, disabled publishing, and absent signing identity.
+- TDD red/green checks for release packaging rejection of tracked hardware-artifact includes.
+- TDD red/green checks for Windows packaging x64 targeting and disabled executable resource editing.
 - TDD red/green checks for documented non-hardware gate consistency across contributor, release, and testing docs.
 - TDD red/green checks requiring the release notes template in both open-source readiness and tracked source-package validation.
 - Unsigned macOS package smoke via `pnpm package:mac`; electron-builder produced `dist/release/mac-arm64` and skipped code signing because `identity` is `null`.
+- Unsigned Windows directory package smoke via `pnpm package:win`; electron-builder produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.

@@ -14,7 +14,7 @@ ROOT_REQUIRED_PACKAGE_SCRIPTS = {
 
 DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
     "package:mac": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
-    "package:win": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --publish never",
+    "package:win": "pnpm build && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
@@ -23,6 +23,7 @@ BUILDER_REQUIRED_SNIPPETS = (
     "productName: MiniX Print Studio",
     "output: ../../dist/release",
     "main: out/main/index.js",
+    "signAndEditExecutable: false",
     "publish: null",
 )
 FORBIDDEN_PACKAGED_PREFIXES = (
@@ -31,6 +32,7 @@ FORBIDDEN_PACKAGED_PREFIXES = (
     "diagnostics/",
     "previews/",
     "jobs/",
+    "hardware-artifacts/",
 )
 PRIVATE_PATH_MARKERS = (
     "/Users/",
@@ -103,6 +105,8 @@ def validate_builder_config_text(text: str) -> list[str]:
         issues.append("electron-builder config must not contain a signing identity")
     if _publishing_enabled(text):
         issues.append("electron-builder config must keep publishing disabled")
+    if not _windows_resource_editing_disabled(text):
+        issues.append("electron-builder config must disable Windows executable resource editing")
     for marker in PRIVATE_PATH_MARKERS:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
@@ -144,6 +148,13 @@ def _publishing_enabled(text: str) -> bool:
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("publish:") and stripped not in {"publish: null", "publish: never"}:
+            return True
+    return False
+
+
+def _windows_resource_editing_disabled(text: str) -> bool:
+    for line in text.splitlines():
+        if line.strip() == "signAndEditExecutable: false":
             return True
     return False
 
