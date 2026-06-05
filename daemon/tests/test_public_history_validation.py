@@ -76,7 +76,7 @@ def test_public_history_check_parses_git_log_records() -> None:
 
 def test_public_history_check_passes_for_main_history() -> None:
     result = subprocess.run(
-        [sys.executable, str(PUBLIC_HISTORY_SCRIPT), "origin/main..origin/main"],
+        [sys.executable, str(PUBLIC_HISTORY_SCRIPT), "HEAD..HEAD"],
         cwd=PROJECT_ROOT,
         text=True,
         capture_output=True,
