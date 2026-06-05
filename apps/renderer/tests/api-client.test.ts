@@ -321,6 +321,128 @@ describe("daemon API client", () => {
     );
   });
 
+  it("manages persisted projects through the daemon with auth", async () => {
+    const document = createDefaultDocument({
+      title: "Project fixture",
+      now: new Date("2026-06-05T00:00:00.000Z")
+    });
+    const projectResponse = {
+      projectId: "prj_api",
+      name: "Kitchen checklist",
+      document,
+      createdAt: "2026-06-05T00:00:00Z",
+      updatedAt: "2026-06-05T00:00:00Z"
+    };
+    const updatedResponse = {
+      ...projectResponse,
+      name: "Updated checklist",
+      updatedAt: "2026-06-05T00:01:00Z"
+    };
+    const listResponse = {
+      projects: [
+        {
+          projectId: "prj_api",
+          name: "Kitchen checklist",
+          documentId: document.id,
+          updatedAt: "2026-06-05T00:00:00Z"
+        }
+      ]
+    };
+    const assetResponse = {
+      assetId: "sha256-abc123",
+      sha256: "abc123",
+      fileName: "badge.png",
+      mimeType: "image/png",
+      byteLength: 18
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => listResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => projectResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => projectResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => updatedResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => assetResponse })
+      .mockResolvedValueOnce({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    await expect(client.listProjects()).resolves.toEqual(listResponse);
+    await expect(client.createProject({ name: "Kitchen checklist", document })).resolves.toEqual(
+      projectResponse
+    );
+    await expect(client.getProject("prj_api")).resolves.toEqual(projectResponse);
+    await expect(
+      client.updateProject("prj_api", { name: "Updated checklist", document })
+    ).resolves.toEqual(updatedResponse);
+    await expect(
+      client.uploadProjectAsset("prj_api", {
+        fileName: "badge.png",
+        mimeType: "image/png",
+        dataBase64: "iVBORw0KGgo="
+      })
+    ).resolves.toEqual(assetResponse);
+    await expect(client.deleteProject("prj_api")).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:39281/v1/projects", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer secret-token"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://127.0.0.1:39281/v1/projects", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: "Kitchen checklist", document })
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "http://127.0.0.1:39281/v1/projects/prj_api", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer secret-token"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "http://127.0.0.1:39281/v1/projects/prj_api", {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: "Updated checklist", document })
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      "http://127.0.0.1:39281/v1/projects/prj_api/assets",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret-token",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          fileName: "badge.png",
+          mimeType: "image/png",
+          dataBase64: "iVBORw0KGgo="
+        })
+      }
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(6, "http://127.0.0.1:39281/v1/projects/prj_api", {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer secret-token"
+      }
+    });
+  });
+
   it("includes daemon error details when printer scan fails", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: false,

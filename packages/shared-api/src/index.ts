@@ -141,6 +141,35 @@ export const diagnosticsExportResponseSchema = z
   })
   .passthrough();
 
+export const projectDocumentSchema = z.record(z.unknown());
+
+export const projectResponseSchema = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  document: projectDocumentSchema,
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
+export const projectSummarySchema = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  documentId: z.string(),
+  updatedAt: z.string()
+});
+
+export const projectListResponseSchema = z.object({
+  projects: z.array(projectSummarySchema)
+});
+
+export const projectAssetResponseSchema = z.object({
+  assetId: z.string(),
+  sha256: z.string(),
+  fileName: z.string(),
+  mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+  byteLength: z.number().int().nonnegative()
+});
+
 export const printerCandidateSchema = z.object({
   deviceId: z.string(),
   name: z.string().nullable(),
@@ -237,6 +266,10 @@ export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSche
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
 export type DiagnosticsExportResponse = z.infer<typeof diagnosticsExportResponseSchema>;
+export type ProjectResponse = z.infer<typeof projectResponseSchema>;
+export type ProjectSummary = z.infer<typeof projectSummarySchema>;
+export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
+export type ProjectAssetResponse = z.infer<typeof projectAssetResponseSchema>;
 export type PrinterCandidate = z.infer<typeof printerCandidateSchema>;
 export type PrinterScanResponse = z.infer<typeof printerScanResponseSchema>;
 export type ReadOnlyVerification = z.infer<typeof readOnlyVerificationSchema>;
@@ -267,6 +300,12 @@ export type HardwareTestExportRequest = {
   deviceId: string;
   stage: "read_only_verification";
   userConfirmation?: Record<string, unknown>;
+};
+
+export type ProjectAssetUploadRequest = {
+  fileName: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  dataBase64: string;
 };
 
 export type DiscoveredPrinter = {

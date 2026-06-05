@@ -91,8 +91,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+type AppDaemonClient = Pick<
+  DaemonClient,
+  | "getHealth"
+  | "createDocumentPreview"
+  | "planApprovedPreview"
+  | "printApprovedPreview"
+  | "scanPrinters"
+  | "readOnlyVerify"
+  | "exportDiagnostics"
+  | "exportHardwareTest"
+>;
+
 export type AppProps = {
-  daemonClient?: DaemonClient;
+  daemonClient?: AppDaemonClient;
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
 };

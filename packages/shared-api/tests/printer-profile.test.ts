@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   classifyDiscoveredPrinter,
   healthResponseSchema,
+  projectAssetResponseSchema,
+  projectListResponseSchema,
+  projectResponseSchema,
   printerCandidateSchema,
   printerProfileSchema,
   readOnlyVerificationSchema,
@@ -98,5 +101,54 @@ describe("printer discovery API contracts", () => {
 
     expect(parsed.printable).toBe(false);
     expect(parsed.profileSupportLevel).toBe("official");
+  });
+});
+
+describe("project API contracts", () => {
+  it("validates project records, summaries, and hash-addressed assets", () => {
+    const project = projectResponseSchema.parse({
+      projectId: "prj_123",
+      name: "Kitchen checklist",
+      document: {
+        schemaVersion: 1,
+        id: "doc_project",
+        title: "Project fixture",
+        target: {
+          profileId: "seznik-minix-s1-lyin48d-gy",
+          widthDots: 384,
+          heightDots: 120,
+          dpi: 203,
+          paperMode: "continuous",
+          density: "medium"
+        },
+        background: { color: "#ffffff" },
+        elements: [],
+        assets: [],
+        metadata: {}
+      },
+      createdAt: "2026-06-05T00:00:00Z",
+      updatedAt: "2026-06-05T00:00:00Z"
+    });
+    const list = projectListResponseSchema.parse({
+      projects: [
+        {
+          projectId: project.projectId,
+          name: project.name,
+          documentId: "doc_project",
+          updatedAt: project.updatedAt
+        }
+      ]
+    });
+    const asset = projectAssetResponseSchema.parse({
+      assetId: "sha256-abc123",
+      sha256: "abc123",
+      fileName: "badge.png",
+      mimeType: "image/png",
+      byteLength: 18
+    });
+
+    expect(list.projects[0].documentId).toBe("doc_project");
+    expect(asset.assetId).toBe("sha256-abc123");
+    expect("path" in asset).toBe(false);
   });
 });

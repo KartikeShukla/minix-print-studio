@@ -10,6 +10,9 @@ import {
   diagnosticsExportResponseSchema,
   documentPreviewResponseSchema,
   healthResponseSchema,
+  projectAssetResponseSchema,
+  projectListResponseSchema,
+  projectResponseSchema,
   printJobResponseSchema,
   printPlanResponseSchema,
   printerScanResponseSchema,
@@ -19,6 +22,10 @@ import {
   type DocumentPreviewResponse,
   type HardwareTestExportRequest,
   type HealthResponse,
+  type ProjectAssetResponse,
+  type ProjectAssetUploadRequest,
+  type ProjectListResponse,
+  type ProjectResponse,
   type PrintJobResponse,
   type PrintPlanRequest,
   type PrintPlanResponse,
@@ -45,6 +52,20 @@ export type DaemonClient = {
   exportHardwareTest?: (deviceId: string) => Promise<Blob>;
   scanPrinters: () => Promise<PrinterScanResponse>;
   readOnlyVerify: (deviceId: string) => Promise<ReadOnlyVerification>;
+  listProjects: () => Promise<ProjectListResponse>;
+  createProject: (request: ProjectMutationRequest) => Promise<ProjectResponse>;
+  getProject: (projectId: string) => Promise<ProjectResponse>;
+  updateProject: (projectId: string, request: ProjectMutationRequest) => Promise<ProjectResponse>;
+  deleteProject: (projectId: string) => Promise<void>;
+  uploadProjectAsset: (
+    projectId: string,
+    request: ProjectAssetUploadRequest
+  ) => Promise<ProjectAssetResponse>;
+};
+
+export type ProjectMutationRequest = {
+  name: string;
+  document: PrintDocument;
 };
 
 declare global {
@@ -152,13 +173,71 @@ export function createDaemonClient(): DaemonClient {
         readOnlyVerificationSchema.parse,
         "Daemon read-only printer verification"
       );
+    },
+    async listProjects() {
+      return requestDaemon(
+        "/v1/projects",
+        {},
+        projectListResponseSchema.parse,
+        "Daemon project list"
+      );
+    },
+    async createProject(request) {
+      return requestDaemon(
+        "/v1/projects",
+        {
+          method: "POST",
+          body: request
+        },
+        projectResponseSchema.parse,
+        "Daemon project create"
+      );
+    },
+    async getProject(projectId) {
+      return requestDaemon(
+        `/v1/projects/${encodeURIComponent(projectId)}`,
+        {},
+        projectResponseSchema.parse,
+        "Daemon project get"
+      );
+    },
+    async updateProject(projectId, request) {
+      return requestDaemon(
+        `/v1/projects/${encodeURIComponent(projectId)}`,
+        {
+          method: "PUT",
+          body: request
+        },
+        projectResponseSchema.parse,
+        "Daemon project update"
+      );
+    },
+    async deleteProject(projectId) {
+      return requestDaemonVoid(
+        `/v1/projects/${encodeURIComponent(projectId)}`,
+        {
+          method: "DELETE"
+        },
+        "Daemon project delete"
+      );
+    },
+    async uploadProjectAsset(projectId, request) {
+      return requestDaemon(
+        `/v1/projects/${encodeURIComponent(projectId)}/assets`,
+        {
+          method: "POST",
+          body: request
+        },
+        projectAssetResponseSchema.parse,
+        "Daemon project asset upload"
+      );
     }
   };
 }
 
 async function requestDaemon<T>(
   path: string,
-  options: { method?: "GET" | "POST"; body?: object },
+  options: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: object },
   parse: (value: unknown) => T,
   label: string
 ): Promise<T> {
@@ -183,6 +262,25 @@ async function requestDaemon<T>(
   }
 
   return parse(await response.json());
+}
+
+async function requestDaemonVoid(
+  path: string,
+  options: { method: "DELETE" },
+  label: string
+): Promise<void> {
+  const runtime = await getRuntime();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${runtime.token}`
+  };
+  const response = await fetch(`${runtime.baseUrl}${path}`, {
+    method: options.method,
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error(await formatDaemonError(response, label));
+  }
 }
 
 async function requestDaemonBlob(
