@@ -46,6 +46,7 @@ import {
   updateElement,
   type ImageElement,
   type PrintDocument,
+  type ProjectImageAssetRef,
   type QrElement,
   type RectElement,
   type TextElement
@@ -65,8 +66,10 @@ import type {
   DiagnosticsExportResponse,
   DocumentPreviewResponse,
   HealthResponse,
+  ProjectAssetResponse,
   ProjectResponse,
   ProjectSummary,
+  ProjectAssetUploadRequest,
   PrintJobResponse,
   PrintPlanResponse,
   PrinterCandidate,
@@ -468,32 +471,67 @@ export function App({
         return;
       }
       const reader = new FileReader();
-      reader.addEventListener("load", () => {
+      reader.addEventListener("load", async () => {
         if (typeof reader.result !== "string") {
           return;
+        }
+        const dataUrl = reader.result as string;
+        let projectAsset: ProjectImageAssetRef | undefined;
+        if (
+          activeProjectId &&
+          client.uploadProjectAsset &&
+          isProjectAssetMimeType(file.type)
+        ) {
+          const dataBase64 = dataBase64FromImageDataUrl(dataUrl);
+          if (!dataBase64) {
+            setProjectWorkflow((current) => ({
+              status: "error",
+              projects: current.projects,
+              message: "Image import failed"
+            }));
+            return;
+          }
+          try {
+            const uploadedAsset = await client.uploadProjectAsset(activeProjectId, {
+              fileName: file.name,
+              mimeType: file.type,
+              dataBase64
+            });
+            projectAsset = projectAssetRefFromResponse(activeProjectId, uploadedAsset);
+          } catch (error: unknown) {
+            setProjectWorkflow((current) => ({
+              status: "error",
+              projects: current.projects,
+              message: error instanceof Error ? error.message : "Project image upload failed"
+            }));
+            return;
+          }
         }
         commitDocument((currentDocument) => {
           const imageCount = currentDocument.elements.filter(
             (element) => element.type === "image"
           ).length;
-          const element = createImageElement({
+          const imageElementOptions = {
             name: `Image ${imageCount + 1}`,
-            dataUrl: reader.result as string,
+            dataUrl,
             mimeType: file.type,
             x: 32,
             y: 280 + imageCount * 32,
             width: Math.min(256, currentDocument.target.widthDots - 64),
             height: 160
-          });
+          };
+          const element = createImageElement(
+            projectAsset ? { ...imageElementOptions, projectAsset } : imageElementOptions
+          );
           return {
-            document: appendElement(currentDocument, element),
+            document: appendImageElementWithAsset(currentDocument, element, projectAsset),
             selectedElementId: element.id
           };
         });
       });
       reader.readAsDataURL(file);
     },
-    [commitDocument]
+    [activeProjectId, client, commitDocument]
   );
 
   const handleImageFileChange = useCallback(
@@ -3143,6 +3181,63 @@ function upsertProjectSummary(
     (project) => project.projectId !== nextProject.projectId
   );
   return [nextProject, ...remainingProjects];
+}
+
+const PROJECT_ASSET_MIME_TYPES: ProjectAssetUploadRequest["mimeType"][] = [
+  "image/png",
+  "image/jpeg",
+  "image/webp"
+];
+
+function isProjectAssetMimeType(
+  mimeType: string
+): mimeType is ProjectAssetUploadRequest["mimeType"] {
+  return PROJECT_ASSET_MIME_TYPES.includes(mimeType as ProjectAssetUploadRequest["mimeType"]);
+}
+
+function dataBase64FromImageDataUrl(dataUrl: string): string | null {
+  const marker = ";base64,";
+  const markerIndex = dataUrl.indexOf(marker);
+  return markerIndex >= 0 ? dataUrl.slice(markerIndex + marker.length) : null;
+}
+
+function projectAssetRefFromResponse(
+  projectId: string,
+  asset: ProjectAssetResponse
+): ProjectImageAssetRef {
+  return {
+    kind: "daemon_project_asset",
+    projectId,
+    assetId: asset.assetId,
+    sha256: asset.sha256,
+    fileName: asset.fileName,
+    mimeType: asset.mimeType,
+    byteLength: asset.byteLength
+  };
+}
+
+function appendImageElementWithAsset(
+  document: PrintDocument,
+  element: ImageElement,
+  projectAsset: ProjectImageAssetRef | undefined
+): PrintDocument {
+  const nextDocument = appendElement(document, element);
+  if (!projectAsset) {
+    return nextDocument;
+  }
+  const remainingAssets = nextDocument.assets.filter(
+    (asset) =>
+      !(
+        typeof asset === "object" &&
+        asset !== null &&
+        "assetId" in asset &&
+        asset.assetId === projectAsset.assetId
+      )
+  );
+  return {
+    ...nextDocument,
+    assets: [...remainingAssets, projectAsset]
+  };
 }
 
 function normalizeDotValue(value: number, minimum: number): number {

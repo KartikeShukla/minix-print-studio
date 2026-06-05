@@ -35,10 +35,21 @@ export const rectElementSchema = elementBaseSchema.extend({
 
 export const imageFitSchema = z.enum(["contain", "cover", "stretch"]);
 
+export const projectImageAssetRefSchema = z.object({
+  kind: z.literal("daemon_project_asset"),
+  projectId: z.string(),
+  assetId: z.string(),
+  sha256: z.string(),
+  fileName: z.string(),
+  mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+  byteLength: z.number().int().nonnegative()
+});
+
 export const embeddedImageSourceSchema = z.object({
   kind: z.literal("embedded_data_url"),
   dataUrl: z.string().startsWith("data:image/"),
-  mimeType: z.string().startsWith("image/")
+  mimeType: z.string().startsWith("image/"),
+  projectAsset: projectImageAssetRefSchema.optional()
 });
 
 export const imageProcessingSchema = z.object({
@@ -88,6 +99,7 @@ export type TextElement = z.infer<typeof textElementSchema>;
 export type RectElement = z.infer<typeof rectElementSchema>;
 export type ImageElement = z.infer<typeof imageElementSchema>;
 export type QrElement = z.infer<typeof qrElementSchema>;
+export type ProjectImageAssetRef = z.infer<typeof projectImageAssetRefSchema>;
 
 export type DefaultDocumentOptions = {
   title?: string;
@@ -127,6 +139,7 @@ export type CreateImageElementOptions = {
   fit?: ImageElement["fit"];
   threshold?: number;
   invert?: boolean;
+  projectAsset?: ProjectImageAssetRef;
 };
 
 export type CreateQrElementOptions = {
@@ -220,7 +233,8 @@ export function createImageElement(options: CreateImageElementOptions): ImageEle
     source: {
       kind: "embedded_data_url",
       dataUrl: options.dataUrl,
-      mimeType: options.mimeType
+      mimeType: options.mimeType,
+      ...(options.projectAsset ? { projectAsset: options.projectAsset } : {})
     },
     fit: options.fit ?? "contain",
     processing: {

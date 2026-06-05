@@ -1332,4 +1332,108 @@ describe("MiniX Print Studio shell", () => {
 
     confirm.mockRestore();
   });
+
+  it("uploads imported images to the opened daemon project asset store", async () => {
+    const loadedDocument = createDefaultDocument({
+      title: "Asset-backed checklist",
+      now: new Date("2026-06-05T00:07:00.000Z")
+    });
+    const listProjects = vi.fn().mockResolvedValue({
+      projects: [
+        {
+          projectId: "prj_assets",
+          name: "Asset-backed checklist",
+          documentId: loadedDocument.id,
+          updatedAt: "2026-06-05T00:07:00Z"
+        }
+      ]
+    });
+    const getProject = vi.fn().mockResolvedValue({
+      projectId: "prj_assets",
+      name: "Asset-backed checklist",
+      document: loadedDocument,
+      createdAt: "2026-06-05T00:07:00Z",
+      updatedAt: "2026-06-05T00:07:00Z"
+    });
+    const uploadProjectAsset = vi.fn().mockResolvedValue({
+      assetId: "sha256-uploaded",
+      sha256: "uploaded",
+      fileName: "logo.png",
+      mimeType: "image/png",
+      byteLength: 68
+    });
+    const pngBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+    const imageFile = new File(
+      [Uint8Array.from(atob(pngBase64), (character) => character.charCodeAt(0))],
+      "logo.png",
+      { type: "image/png" }
+    );
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+          listProjects,
+          getProject,
+          uploadProjectAsset
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
+    expect(await screen.findByText("Asset-backed checklist")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Asset-backed checklist project" }));
+    expect(await screen.findByText("Opened project prj_assets")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Import image"), {
+      target: { files: [imageFile] }
+    });
+
+    await waitFor(() => {
+      expect(uploadProjectAsset).toHaveBeenCalledWith("prj_assets", {
+        fileName: "logo.png",
+        mimeType: "image/png",
+        dataBase64: pngBase64
+      });
+    });
+    expect(await screen.findByText("Image 1")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      );
+      expect(stored.assets).toEqual([
+        expect.objectContaining({
+          kind: "daemon_project_asset",
+          projectId: "prj_assets",
+          assetId: "sha256-uploaded",
+          fileName: "logo.png",
+          mimeType: "image/png",
+          byteLength: 68
+        })
+      ]);
+      expect(stored.elements).toEqual([
+        expect.objectContaining({
+          type: "image",
+          source: expect.objectContaining({
+            projectAsset: expect.objectContaining({
+              projectId: "prj_assets",
+              assetId: "sha256-uploaded"
+            })
+          })
+        })
+      ]);
+    });
+  });
 });
