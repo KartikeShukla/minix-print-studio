@@ -7,8 +7,8 @@ physical validation before a stable public release.
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| macOS | Development target | Unsigned local Electron package scaffold exists; signing and notarization are not complete. |
-| Windows | Planned build target | Unsigned local Electron package scaffold exists; installer packaging and signing are not complete. |
+| macOS | Development target | Unsigned local Electron package scaffold exists; packaged sidecar path resolution is implemented, but sidecar binary inclusion, signing, and notarization are not complete. |
+| Windows | Planned build target | Unsigned local Electron package scaffold exists; packaged sidecar path resolution is implemented, but sidecar binary inclusion, installer packaging, and signing are not complete. |
 | Linux | Developer-only | Not a first supported desktop release target. |
 
 ## Printer Profiles

@@ -96,6 +96,7 @@
 - Desktop Agent Integration uninstall removes only the MiniX-managed config entry and can revert a mutation from its backup manifest.
 - Renderer Agent Integrations panel shows install/uninstall controls only for installable targets and requires explicit confirmation before invoking the desktop installer.
 - Electron materializes a stable executable `minix-mcp` shim under app user data that launches the existing Python MCP server via the repo-local MCP source path without embedding daemon tokens.
+- Packaged Electron mode resolves daemon and MCP shim execution to `resources/sidecars/minixd` and `resources/sidecars/minix-mcp` instead of repo-local `.venv` and `mcp/src` paths.
 - Desktop Agent Integration connection tests verify the stable shim and runtime handoff prerequisites for a selected target.
 - Renderer Agent Integrations panel exposes a non-mutating Test action and surfaces the desktop connection-test result per target.
 - MCP stdio smoke helper launches the real Python MCP server against a mock daemon runtime handoff and validates daemon status without exposing daemon bearer tokens.
@@ -138,6 +139,7 @@
 - TDD red/green checks for backup-first Agent Integration install/uninstall helpers and confirmation-gated renderer install controls.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Agent Integrations browser fallback renders in the right rail; daemon health fetch errors are expected in non-Electron browser mode.
 - TDD red/green checks for stable MCP shim materialization, Agent Integration connection-prerequisite checks, and renderer Test action.
+- TDD red/green checks for packaged daemon/MCP sidecar path resolution without repo-local Python or source-path dependencies.
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
@@ -169,5 +171,6 @@
 
 ## Next Implementation Slices
 
-1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
-2. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.
+1. Build daemon and MCP sidecar binaries with PyInstaller, place them under `dist/sidecars`, and include them in Electron packages.
+2. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
+3. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.

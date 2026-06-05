@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ensureMcpShim } from "./mcpShim";
 import { getRuntimeHandoffPaths } from "./runtimeHandoff";
+import type { SidecarMode } from "./daemonSupervisor";
 
 export type ClaudeDesktopMcpbExportResult = {
   targetId: "claude-desktop";
@@ -27,14 +28,16 @@ export function exportClaudeDesktopMcpb({
   userDataPath,
   repoRoot,
   platform = process.platform,
+  sidecarMode = "source",
   now = new Date(),
 }: {
   userDataPath: string;
   repoRoot: string;
   platform?: NodeJS.Platform;
+  sidecarMode?: SidecarMode;
   now?: Date;
 }): ClaudeDesktopMcpbExportResult {
-  const shim = ensureMcpShim({ userDataPath, repoRoot, platform });
+  const shim = ensureMcpShim({ userDataPath, repoRoot, platform, sidecarMode });
   const runtimeFilePath = getRuntimeHandoffPaths(userDataPath).runtimeFile;
   const targetPath = path.join(
     userDataPath,

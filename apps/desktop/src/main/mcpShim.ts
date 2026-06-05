@@ -3,8 +3,10 @@ import path from "node:path";
 
 export type McpShimInstallResult = {
   shimPath: string;
-  pythonPath: string;
-  mcpSourcePath: string;
+  commandPath: string;
+  sidecarMode: "source" | "bundled";
+  pythonPath?: string;
+  mcpSourcePath?: string;
 };
 
 export function getMcpShimPath(
@@ -18,22 +20,27 @@ export function ensureMcpShim({
   userDataPath,
   repoRoot,
   platform = process.platform,
-  pythonPath = path.join(repoRoot, ".venv", "bin", "python")
+  sidecarMode = "source",
+  pythonPath = getSourcePythonPath(repoRoot, platform)
 }: {
   userDataPath: string;
   repoRoot: string;
   platform?: NodeJS.Platform;
+  sidecarMode?: "source" | "bundled";
   pythonPath?: string;
 }): McpShimInstallResult {
   const shimPath = getMcpShimPath(userDataPath, platform);
   const mcpSourcePath = path.join(repoRoot, "mcp", "src");
+  const bundledCommandPath = getBundledMcpPath(repoRoot, platform);
 
   mkdirSync(path.dirname(shimPath), { recursive: true });
   writeFileSync(
     shimPath,
-    platform === "win32"
-      ? buildWindowsShim({ pythonPath, mcpSourcePath })
-      : buildPosixShim({ pythonPath, mcpSourcePath }),
+    sidecarMode === "bundled"
+      ? buildBundledShim({ platform, commandPath: bundledCommandPath })
+      : platform === "win32"
+        ? buildWindowsSourceShim({ pythonPath, mcpSourcePath })
+        : buildPosixSourceShim({ pythonPath, mcpSourcePath }),
     {
       encoding: "utf-8",
       mode: 0o755
@@ -43,12 +50,13 @@ export function ensureMcpShim({
 
   return {
     shimPath,
-    pythonPath,
-    mcpSourcePath
+    commandPath: sidecarMode === "bundled" ? bundledCommandPath : pythonPath,
+    sidecarMode,
+    ...(sidecarMode === "source" ? { pythonPath, mcpSourcePath } : {})
   };
 }
 
-function buildPosixShim({
+function buildPosixSourceShim({
   pythonPath,
   mcpSourcePath
 }: {
@@ -68,7 +76,7 @@ function buildPosixShim({
   ].join("\n");
 }
 
-function buildWindowsShim({
+function buildWindowsSourceShim({
   pythonPath,
   mcpSourcePath
 }: {
@@ -86,6 +94,30 @@ function buildWindowsShim({
     '"%PYTHON_BIN%" -m minix_mcp %*',
     ""
   ].join("\r\n");
+}
+
+function buildBundledShim({
+  platform,
+  commandPath
+}: {
+  platform: NodeJS.Platform;
+  commandPath: string;
+}): string {
+  if (platform === "win32") {
+    return ["@echo off", "setlocal", `"${commandPath}" %*`, ""].join("\r\n");
+  }
+  return ["#!/bin/sh", "set -eu", `exec ${shellSingleQuote(commandPath)} "$@"`, ""].join("\n");
+}
+
+function getSourcePythonPath(repoRoot: string, platform: NodeJS.Platform): string {
+  if (platform === "win32") {
+    return path.join(repoRoot, ".venv", "Scripts", "python.exe");
+  }
+  return path.join(repoRoot, ".venv", "bin", "python");
+}
+
+function getBundledMcpPath(resourcesPath: string, platform: NodeJS.Platform): string {
+  return path.join(resourcesPath, "sidecars", platform === "win32" ? "minix-mcp.exe" : "minix-mcp");
 }
 
 function shellSingleQuote(value: string): string {

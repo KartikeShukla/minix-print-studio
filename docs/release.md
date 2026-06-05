@@ -34,6 +34,9 @@ Hardware gates are separate from CI and require the physical printer:
   release build and notarization before stable release.
 - Windows: unsigned local Electron package scaffold via `pnpm package:win`; signed
   installer before stable release.
+- Daemon and MCP sidecars: packaged app path resolution targets
+  `resources/sidecars`; PyInstaller sidecar binary production is still required
+  before publishing installers.
 
 Do not publish installers that embed local runtime state, bearer tokens, diagnostic
 artifacts, or private file paths.

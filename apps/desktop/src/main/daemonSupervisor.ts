@@ -9,12 +9,16 @@ export type DaemonRuntime = {
   mock: boolean;
 };
 
+export type SidecarMode = "source" | "bundled";
+
 export type DaemonLaunchOptions = {
   repoRoot: string;
   port: number;
   token: string;
   mock: boolean;
   dataDir?: string;
+  sidecarMode?: SidecarMode;
+  platform?: NodeJS.Platform;
 };
 
 export type DaemonLaunchConfig = {
@@ -37,9 +41,14 @@ export function createDaemonRuntime(options: Partial<DaemonRuntime> = {}): Daemo
 }
 
 export function createDaemonLaunchConfig(options: DaemonLaunchOptions): DaemonLaunchConfig {
+  const platform = options.platform ?? process.platform;
+  const sidecarMode = options.sidecarMode ?? "source";
   return {
-    command: path.join(options.repoRoot, ".venv", "bin", "python"),
-    args: ["-m", "minixd"],
+    command:
+      sidecarMode === "bundled"
+        ? getBundledDaemonPath(options.repoRoot, platform)
+        : getSourcePythonPath(options.repoRoot, platform),
+    args: sidecarMode === "bundled" ? [] : ["-m", "minixd"],
     env: {
       ...process.env,
       MINIX_DAEMON_PORT: String(options.port),
@@ -56,4 +65,15 @@ export function startDaemon(config: DaemonLaunchConfig): ChildProcess {
     stdio: "ignore",
     detached: false
   });
+}
+
+function getSourcePythonPath(repoRoot: string, platform: NodeJS.Platform): string {
+  if (platform === "win32") {
+    return path.join(repoRoot, ".venv", "Scripts", "python.exe");
+  }
+  return path.join(repoRoot, ".venv", "bin", "python");
+}
+
+function getBundledDaemonPath(resourcesPath: string, platform: NodeJS.Platform): string {
+  return path.join(resourcesPath, "sidecars", platform === "win32" ? "minixd.exe" : "minixd");
 }

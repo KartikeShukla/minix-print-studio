@@ -41,12 +41,14 @@ function createWindow(): void {
 
 function startSidecar(): void {
   const repoRoot = getRepoRoot();
+  const sidecarMode = app.isPackaged ? "bundled" : "source";
   const config = createDaemonLaunchConfig({
     repoRoot,
     port: runtime.port,
     token: runtime.token,
     mock: runtime.mock,
-    dataDir: path.join(app.getPath("userData"), "daemon")
+    dataDir: path.join(app.getPath("userData"), "daemon"),
+    sidecarMode
   });
 
   const child = startDaemon(config);
@@ -58,7 +60,8 @@ function startSidecar(): void {
     });
     ensureMcpShim({
       userDataPath: app.getPath("userData"),
-      repoRoot
+      repoRoot,
+      sidecarMode
     });
   } catch (error) {
     log.warn("Unable to write daemon runtime handoff or MCP shim", error);
@@ -99,7 +102,8 @@ ipcMain.handle("agent-integrations:test", (_event, targetId: AgentIntegrationTar
   testAgentIntegrationConnection({
     targetId,
     userDataPath: app.getPath("userData"),
-    repoRoot: getRepoRoot()
+    repoRoot: getRepoRoot(),
+    sidecarMode: app.isPackaged ? "bundled" : "source"
   })
 );
 ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentIntegrationTargetId) => {
@@ -108,7 +112,8 @@ ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentInteg
   }
   return exportClaudeDesktopMcpb({
     userDataPath: app.getPath("userData"),
-    repoRoot: getRepoRoot()
+    repoRoot: getRepoRoot(),
+    sidecarMode: app.isPackaged ? "bundled" : "source"
   });
 });
 ipcMain.handle("hardware-artifacts:inspect", async () => {

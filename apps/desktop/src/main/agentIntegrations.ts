@@ -9,6 +9,7 @@ import {
 } from "@minix/integration-configs";
 import { ensureMcpShim, getMcpShimPath } from "./mcpShim";
 import { getRuntimeHandoffPaths } from "./runtimeHandoff";
+import type { SidecarMode } from "./daemonSupervisor";
 
 export type AgentIntegrationTargetId =
   | "codex"
@@ -107,11 +108,13 @@ export function testAgentIntegrationConnection({
   targetId,
   userDataPath,
   repoRoot,
+  sidecarMode = "source",
   now = new Date()
 }: {
   targetId: AgentIntegrationTargetId;
   userDataPath: string;
   repoRoot: string;
+  sidecarMode?: SidecarMode;
   now?: Date;
 }): AgentIntegrationConnectionTestResult {
   const preview = buildAgentIntegrationPreview({ userDataPath });
@@ -120,7 +123,7 @@ export function testAgentIntegrationConnection({
     throw new Error(`Unknown agent integration target: ${targetId}`);
   }
 
-  const shim = ensureMcpShim({ userDataPath, repoRoot });
+  const shim = ensureMcpShim({ userDataPath, repoRoot, sidecarMode });
   const runtimeFilePath = getRuntimeHandoffPaths(userDataPath).runtimeFile;
   const missing = [
     ...(existsSync(shim.shimPath) ? [] : ["MCP shim"]),

@@ -17,4 +17,23 @@ describe("MCP shim materialization", () => {
     expect(readFileSync(result.shimPath, "utf-8")).toContain(path.join(repoRoot, "mcp", "src"));
     expect(readFileSync(result.shimPath, "utf-8")).not.toContain("MINIX_DAEMON_TOKEN");
   });
+
+  it("writes a packaged shim that executes the bundled MCP sidecar", () => {
+    const userDataPath = mkdtempSync(path.join(os.tmpdir(), "minix-user-data-"));
+    const resourcesPath = mkdtempSync(path.join(os.tmpdir(), "minix-resources-"));
+
+    const result = ensureMcpShim({
+      userDataPath,
+      repoRoot: resourcesPath,
+      platform: "darwin",
+      sidecarMode: "bundled"
+    });
+
+    const shimText = readFileSync(result.shimPath, "utf-8");
+    expect(result.commandPath).toBe(path.join(resourcesPath, "sidecars", "minix-mcp"));
+    expect(shimText).toContain(path.join(resourcesPath, "sidecars", "minix-mcp"));
+    expect(shimText).not.toContain("PYTHONPATH");
+    expect(shimText).not.toContain("mcp/src");
+    expect(shimText).not.toContain("MINIX_DAEMON_TOKEN");
+  });
 });
