@@ -401,6 +401,19 @@ def run(
             )
             stdout.write("long-print-reliability-recorded\n")
             return 0
+        if args.command == "record-stable-support-gate":
+            record_stable_support_gate(
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
+                tiny_visual_card_artifact_path=Path(args.tiny_visual_card_artifact),
+                trusted_printer_record_path=Path(args.trusted_printer_record),
+                long_print_reliability_artifact_path=Path(
+                    args.long_print_reliability_artifact
+                ),
+                output_dir=Path(args.output_dir),
+            )
+            stdout.write("stable-support-gate-recorded\n")
+            return 0
         if args.command == "print-long-print-reliability":
             print_long_print_reliability_fixture(
                 client=client,
@@ -614,6 +627,44 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=".",
         help="Directory for the Stage D hardware-test ZIP artifact.",
+    )
+
+    record_stable_support_parser = subparsers.add_parser(
+        "record-stable-support-gate",
+        help=(
+            "Record reviewed Stage D evidence that enables stable support claims "
+            "without enabling agent direct printing."
+        ),
+    )
+    record_stable_support_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP for the printer.",
+    )
+    record_stable_support_parser.add_argument(
+        "--protocol-sanity-artifact",
+        required=True,
+        help="Path to the confirmed Stage B protocol-sanity hardware-test ZIP.",
+    )
+    record_stable_support_parser.add_argument(
+        "--tiny-visual-card-artifact",
+        required=True,
+        help="Path to the confirmed Stage C tiny visual-card hardware-test ZIP.",
+    )
+    record_stable_support_parser.add_argument(
+        "--trusted-printer-record",
+        required=True,
+        help="Path to the local trusted-printer JSON record.",
+    )
+    record_stable_support_parser.add_argument(
+        "--long-print-reliability-artifact",
+        required=True,
+        help="Path to the confirmed Stage D long-print reliability ZIP.",
+    )
+    record_stable_support_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the stable-support gate JSON record.",
     )
 
     print_long_print_parser = subparsers.add_parser(
@@ -1961,6 +2012,135 @@ def record_long_print_reliability_artifact(
     return artifact_path
 
 
+def record_stable_support_gate(
+    *,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    tiny_visual_card_artifact_path: Path,
+    trusted_printer_record_path: Path,
+    long_print_reliability_artifact_path: Path,
+    output_dir: Path,
+) -> Path:
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    stage_a_artifact_sha = hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest()
+    protocol_sanity_summary = _inspect_protocol_sanity_artifact(
+        artifact_path=protocol_sanity_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    tiny_visual_card_summary = _inspect_tiny_visual_card_artifact(
+        artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+        protocol_sanity_summary=protocol_sanity_summary,
+    )
+    trusted_printer_summary = _inspect_trusted_printer_record(
+        record_path=trusted_printer_record_path,
+        stage_a_artifact_path=stage_a_artifact_path,
+        protocol_sanity_artifact_path=protocol_sanity_artifact_path,
+        tiny_visual_card_artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    _inspect_long_print_reliability_artifact(
+        artifact_path=long_print_reliability_artifact_path,
+        stage_a_summary=stage_a_summary,
+        stage_a_artifact_sha=stage_a_artifact_sha,
+        protocol_sanity_summary=protocol_sanity_summary,
+        tiny_visual_card_summary=tiny_visual_card_summary,
+        trusted_printer_summary=trusted_printer_summary,
+    )
+    trusted_printer_artifact_sha = hashlib.sha256(
+        trusted_printer_record_path.read_bytes()
+    ).hexdigest()
+    long_print_artifact_sha = hashlib.sha256(
+        long_print_reliability_artifact_path.read_bytes()
+    ).hexdigest()
+    device_fingerprint = _device_fingerprint(
+        _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    )
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    record_path = output_dir / (
+        f"stable-support-gate-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    record = {
+        "schemaVersion": 1,
+        "status": "stable_support_claims_enabled",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "profileId": profile_id,
+        "trustedFor": [
+            "manual_continuous_printing",
+            "long_print_continuous_printing",
+            "stable_support_claims",
+        ],
+        "operatorNoteIncluded": False,
+        "rasterBytesIncluded": False,
+        "hardwareEvidence": {
+            "stageA": {
+                "stage": "read_only_verification",
+                "status": _required_json_string(
+                    stage_a_summary,
+                    "status",
+                    "print-transfer-manifest.json",
+                ),
+                "artifactSha256": stage_a_artifact_sha,
+            },
+            "protocolSanity": {
+                "stage": "protocol_sanity_test",
+                "status": _required_json_string(
+                    protocol_sanity_summary,
+                    "status",
+                    "protocol-sanity-summary",
+                ),
+                "artifactSha256": _required_json_string(
+                    protocol_sanity_summary,
+                    "artifactSha256",
+                    "protocol-sanity-summary",
+                ),
+            },
+            "tinyVisualCard": {
+                "stage": "tiny_visual_test_card",
+                "status": _required_json_string(
+                    tiny_visual_card_summary,
+                    "status",
+                    "tiny-visual-card-summary",
+                ),
+                "artifactSha256": _required_json_string(
+                    tiny_visual_card_summary,
+                    "artifactSha256",
+                    "tiny-visual-card-summary",
+                ),
+            },
+            "trustedPrinter": {
+                "stage": "trusted_printer_record",
+                "status": "trusted_for_manual_continuous_printing",
+                "artifactSha256": trusted_printer_artifact_sha,
+            },
+            "longPrintReliability": {
+                "stage": "long_print_reliability",
+                "status": "confirmed_complete",
+                "artifactSha256": long_print_artifact_sha,
+            },
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityPassed": True,
+            "longPrintPrintingEnabled": True,
+            "stableSupportClaimEnabled": True,
+            "agentDirectPrintingEnabled": False,
+            "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": "agent_direct_printing_policy_review",
+    }
+    record_path.write_text(f"{json.dumps(record, indent=2)}\n", encoding="utf-8")
+    return record_path
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
     _require_artifact_files(
         archive,
@@ -2532,6 +2712,383 @@ def _inspect_trusted_printer_record(
         ),
         "artifactSha256": artifact_sha256,
     }
+
+
+def _inspect_long_print_reliability_artifact(
+    *,
+    artifact_path: Path,
+    stage_a_summary: Mapping[str, object],
+    stage_a_artifact_sha: str,
+    protocol_sanity_summary: Mapping[str, object],
+    tiny_visual_card_summary: Mapping[str, object],
+    trusted_printer_summary: Mapping[str, object],
+) -> dict[str, object]:
+    try:
+        artifact_sha256 = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        with ZipFile(artifact_path) as archive:
+            _require_artifact_files(
+                archive,
+                (
+                    "stage-chain-summary.json",
+                    "trusted-printer-summary.json",
+                    "long-print-job-summary.json",
+                    "print-transfer-manifest.json",
+                    "band-manifest.json",
+                    "finalizer-result.json",
+                    "safety-report.json",
+                    "user-confirmation.json",
+                ),
+                label="long-print reliability artifact",
+            )
+            stage_chain = _read_zip_json_object(archive, "stage-chain-summary.json")
+            trusted_summary = _read_zip_json_object(
+                archive,
+                "trusted-printer-summary.json",
+            )
+            job_summary = _read_zip_json_object(archive, "long-print-job-summary.json")
+            transfer_manifest = _read_zip_json_object(
+                archive,
+                "print-transfer-manifest.json",
+            )
+            band_manifest = _read_zip_json_object(archive, "band-manifest.json")
+            finalizer_result = _read_zip_json_object(archive, "finalizer-result.json")
+            safety_report = _read_zip_json_object(archive, "safety-report.json")
+            user_confirmation = _read_zip_json_object(archive, "user-confirmation.json")
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("long-print reliability artifact not found") from exc
+    except BadZipFile as exc:
+        raise HardwareTestCliError(
+            "long-print reliability artifact is not a ZIP file"
+        ) from exc
+
+    _validate_long_print_reliability_artifact(
+        stage_chain=stage_chain,
+        trusted_summary=trusted_summary,
+        job_summary=job_summary,
+        transfer_manifest=transfer_manifest,
+        band_manifest=band_manifest,
+        finalizer_result=finalizer_result,
+        safety_report=safety_report,
+        user_confirmation=user_confirmation,
+        stage_a_summary=stage_a_summary,
+        stage_a_artifact_sha=stage_a_artifact_sha,
+        protocol_sanity_summary=protocol_sanity_summary,
+        tiny_visual_card_summary=tiny_visual_card_summary,
+        trusted_printer_summary=trusted_printer_summary,
+    )
+    return {
+        "stage": "long_print_reliability",
+        "status": "confirmed_complete",
+        "artifactSha256": artifact_sha256,
+    }
+
+
+def _validate_long_print_reliability_artifact(
+    *,
+    stage_chain: Mapping[str, object],
+    trusted_summary: Mapping[str, object],
+    job_summary: Mapping[str, object],
+    transfer_manifest: Mapping[str, object],
+    band_manifest: Mapping[str, object],
+    finalizer_result: Mapping[str, object],
+    safety_report: Mapping[str, object],
+    user_confirmation: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+    stage_a_artifact_sha: str,
+    protocol_sanity_summary: Mapping[str, object],
+    tiny_visual_card_summary: Mapping[str, object],
+    trusted_printer_summary: Mapping[str, object],
+) -> None:
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    device_fingerprint = _device_fingerprint(
+        _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    )
+    trusted_sha = _required_json_string(
+        trusted_printer_summary,
+        "artifactSha256",
+        "trusted-printer-record",
+    )
+
+    if (
+        _required_json_string(transfer_manifest, "stage", "print-transfer-manifest.json")
+        != "long_print_reliability"
+    ):
+        raise HardwareTestCliError("long-print reliability artifact has wrong stage")
+    if (
+        _required_json_string(transfer_manifest, "status", "print-transfer-manifest.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("long-print reliability artifact is not complete")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "requiredPriorStage",
+            "print-transfer-manifest.json",
+        )
+        != "trusted_printer_record"
+    ):
+        raise HardwareTestCliError("long-print reliability artifact has wrong prior stage")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        )
+        != "maintainer_review_for_stable_support"
+    ):
+        raise HardwareTestCliError("long-print reliability artifact skips stable review")
+    if (
+        _required_json_string(transfer_manifest, "profileId", "print-transfer-manifest.json")
+        != profile_id
+    ):
+        raise HardwareTestCliError("long-print reliability artifact profile does not match")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "priorStageArtifactSha256",
+            "print-transfer-manifest.json",
+        )
+        != trusted_sha
+    ):
+        raise HardwareTestCliError("long-print reliability artifact is not chained to trust")
+    if not _required_json_bool(
+        transfer_manifest,
+        "printCommandsSent",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact did not send print commands")
+    if _required_json_bool(
+        transfer_manifest,
+        "rasterBytesIncluded",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact includes raster bytes")
+    if not _required_json_bool(
+        transfer_manifest,
+        "operatorConfirmed",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact lacks confirmation")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "completionLevel",
+            "print-transfer-manifest.json",
+        )
+        != "verified"
+    ):
+        raise HardwareTestCliError("long-print reliability artifact is not verified")
+    if not _required_json_bool(
+        transfer_manifest,
+        "longPrintReliabilityPassed",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact did not pass")
+
+    if (
+        _required_json_string(trusted_summary, "status", "trusted-printer-summary.json")
+        != _required_json_string(
+            trusted_printer_summary,
+            "status",
+            "trusted-printer-record",
+        )
+    ):
+        raise HardwareTestCliError("long-print reliability trusted summary is stale")
+    if (
+        _required_json_string(trusted_summary, "profileId", "trusted-printer-summary.json")
+        != profile_id
+    ):
+        raise HardwareTestCliError("long-print reliability trusted profile does not match")
+    trusted_device = _required_json_object(
+        trusted_summary,
+        "device",
+        "trusted-printer-summary.json",
+    )
+    if not _required_json_bool(
+        trusted_device,
+        "idRedacted",
+        "trusted-printer-summary.json.device",
+    ):
+        raise HardwareTestCliError("long-print reliability trusted summary exposes device id")
+    if (
+        _required_json_string(
+            trusted_device,
+            "fingerprint",
+            "trusted-printer-summary.json.device",
+        )
+        != device_fingerprint
+    ):
+        raise HardwareTestCliError("long-print reliability trusted device does not match")
+    if "manual_continuous_printing" not in _required_json_string_list(
+        trusted_summary,
+        "trustedFor",
+        "trusted-printer-summary.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact lacks manual trust")
+
+    job_device = _required_json_object(
+        job_summary,
+        "device",
+        "long-print-job-summary.json",
+    )
+    if not _required_json_bool(job_device, "idRedacted", "long-print-job-summary.json.device"):
+        raise HardwareTestCliError("long-print reliability job summary exposes device id")
+    if (
+        _required_json_string(
+            job_device,
+            "fingerprint",
+            "long-print-job-summary.json.device",
+        )
+        != device_fingerprint
+    ):
+        raise HardwareTestCliError("long-print reliability job device does not match")
+    if (
+        _required_json_string(job_summary, "profileId", "long-print-job-summary.json")
+        != profile_id
+    ):
+        raise HardwareTestCliError("long-print reliability job profile does not match")
+    if (
+        _required_json_string(job_summary, "state", "long-print-job-summary.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("long-print reliability job is not complete")
+    if (
+        _required_json_string(job_summary, "completionLevel", "long-print-job-summary.json")
+        != "verified"
+    ):
+        raise HardwareTestCliError("long-print reliability job is not verified")
+    if _required_json_bool(
+        job_summary,
+        "requiresUserCheck",
+        "long-print-job-summary.json",
+    ):
+        raise HardwareTestCliError("long-print reliability job still requires a user check")
+    if _required_json_bool(
+        job_summary,
+        "rasterBytesIncluded",
+        "long-print-job-summary.json",
+    ):
+        raise HardwareTestCliError("long-print reliability job summary includes raster bytes")
+    if _required_json_bool(
+        job_summary,
+        "operatorNoteIncluded",
+        "long-print-job-summary.json",
+    ):
+        raise HardwareTestCliError("long-print reliability job summary includes operator note")
+
+    for field, expected_total_field in (
+        ("bandsSent", "totalBands"),
+        ("rowsSent", "totalRows"),
+        ("bytesSent", "totalBytes"),
+    ):
+        if _required_json_int(band_manifest, field, "band-manifest.json") != (
+            _required_json_int(band_manifest, expected_total_field, "band-manifest.json")
+        ):
+            raise HardwareTestCliError("long-print reliability artifact is incomplete")
+    if (
+        _required_json_int(band_manifest, "totalBands", "band-manifest.json")
+        < LONG_PRINT_RELIABILITY_MIN_BANDS
+        or _required_json_int(band_manifest, "totalRows", "band-manifest.json")
+        < LONG_PRINT_RELIABILITY_MIN_ROWS
+    ):
+        raise HardwareTestCliError("long-print reliability artifact is below coverage minimum")
+    if not _required_json_bool(
+        band_manifest,
+        "requiresLongPrintMode",
+        "band-manifest.json",
+    ):
+        raise HardwareTestCliError("long-print reliability artifact does not use long print mode")
+    if _required_json_bool(band_manifest, "rasterBytesIncluded", "band-manifest.json"):
+        raise HardwareTestCliError("long-print reliability band manifest includes raster bytes")
+
+    if (
+        _required_json_string(finalizer_result, "state", "finalizer-result.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("long-print reliability finalizer is not complete")
+    if (
+        _required_json_string(
+            finalizer_result,
+            "completionConfidence",
+            "finalizer-result.json",
+        )
+        != "operator_paper_output_confirmed"
+    ):
+        raise HardwareTestCliError("long-print reliability finalizer lacks confirmation")
+
+    if (
+        _required_json_string(safety_report, "stage", "safety-report.json")
+        != "long_print_reliability"
+    ):
+        raise HardwareTestCliError("long-print reliability safety has wrong stage")
+    if not _required_json_bool(
+        safety_report,
+        "longPrintReliabilityPassed",
+        "safety-report.json",
+    ):
+        raise HardwareTestCliError("long-print reliability safety did not pass")
+    if not _required_json_bool(
+        safety_report,
+        "manualContinuousPrintingAlreadyTrusted",
+        "safety-report.json",
+    ):
+        raise HardwareTestCliError("long-print reliability safety lost manual trust")
+    if _required_json_bool(safety_report, "certificationComplete", "safety-report.json"):
+        raise HardwareTestCliError("long-print reliability artifact already completed support")
+    for field in ("stableSupportClaimEnabled", "agentDirectPrintingEnabled"):
+        if _required_json_bool(safety_report, field, "safety-report.json"):
+            raise HardwareTestCliError("long-print reliability artifact unlocks support early")
+    if _required_json_bool(safety_report, "rasterBytesIncluded", "safety-report.json"):
+        raise HardwareTestCliError("long-print reliability safety includes raster bytes")
+
+    if (
+        _required_json_string(user_confirmation, "outcome", "user-confirmation.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("long-print reliability confirmation is incomplete")
+    for field in ("printedTextReadable", "endMarkerVisible", "noOverheat", "noDisconnect"):
+        if not _required_json_bool(user_confirmation, field, "user-confirmation.json"):
+            raise HardwareTestCliError("long-print reliability checklist did not pass")
+    if _required_json_bool(
+        user_confirmation,
+        "operatorNoteIncluded",
+        "user-confirmation.json",
+    ):
+        raise HardwareTestCliError("long-print reliability confirmation includes operator note")
+
+    expected_chain = {
+        "stageA": stage_a_artifact_sha,
+        "protocolSanity": _required_json_string(
+            protocol_sanity_summary,
+            "artifactSha256",
+            "protocol-sanity-summary",
+        ),
+        "tinyVisualCard": _required_json_string(
+            tiny_visual_card_summary,
+            "artifactSha256",
+            "tiny-visual-card-summary",
+        ),
+        "trustedPrinter": trusted_sha,
+    }
+    for field, expected_sha in expected_chain.items():
+        evidence = _required_json_object(
+            stage_chain,
+            field,
+            "stage-chain-summary.json",
+        )
+        if (
+            _required_json_string(
+                evidence,
+                "artifactSha256",
+                f"stage-chain-summary.json.{field}",
+            )
+            != expected_sha
+        ):
+            raise HardwareTestCliError("long-print reliability evidence chain is stale")
 
 
 def _validate_confirmed_tiny_visual_job(

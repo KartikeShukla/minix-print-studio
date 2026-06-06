@@ -41,7 +41,7 @@ Public development is on `main`; implementation slices use short-lived
 - Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Release evidence validator can check a downloaded manual workflow run for successful metadata, platform-named macOS/Windows artifacts, checksum coverage, bundled sidecars, and forbidden runtime/scratch paths before making Windows release claims.
 - Windows unsigned installer packaging is wired through `pnpm
-  package:win-installer`, the Release Package workflow, and the release
+package:win-installer`, the Release Package workflow, and the release
   packaging/evidence validators as `minix-print-studio-windows-installer-unsigned`.
 - Public GitHub repository `KartikeShukla/minix-print-studio` is live with the implementation work merged into `main`.
 - Manual Release Package workflow run `27053365446` on public `main` commit `028ca71` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py` with the Bluetooth usage-description gate enabled.
@@ -196,7 +196,7 @@ Public development is on `main`; implementation slices use short-lived
 - Electron exposes the shared host Bluetooth readiness diagnostic and recommended actions from the Printer panel before Stage A scan attempts.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - Stage A CLI `scan --require-host-ready` and `export-read-only
-  --require-host-ready` refuse daemon contact when host Bluetooth readiness says
+--require-host-ready` refuse daemon contact when host Bluetooth readiness says
   the current host cannot attempt Stage A.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
@@ -216,6 +216,10 @@ Public development is on `main`; implementation slices use short-lived
   the Stage A/B/C/trusted-record chain, redacts device identity, excludes
   operator free text and raster bytes, and keeps stable support plus agent direct
   printing disabled.
+- `minix-hardware-test record-stable-support-gate` records an offline local JSON
+  gate from reviewed Stage A/B/C/trusted-record/Stage D evidence, enables stable
+  support claims plus long-print continuous trust, keeps stdout status-only, and
+  leaves agent direct printing disabled by default.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -317,6 +321,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for Stage D long-print reliability artifact recording
   from a confirmed long-print job while keeping stable support and agent direct
   printing disabled.
+- TDD red/green checks for stable-support gate recording from reviewed Stage D
+  evidence while enabling stable support claims and long-print trust without
+  enabling agent direct printing.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -346,7 +353,7 @@ Public development is on `main`; implementation slices use short-lived
 - `scripts/hardware-test.sh --help`
 - `scripts/hardware-test.sh host-readiness`
 - `scripts/hardware-test.sh scan --help` and `scripts/hardware-test.sh
-  export-read-only --help` show `--require-host-ready` as a guarded Stage A
+export-read-only --help` show `--require-host-ready` as a guarded Stage A
   option.
 - `scripts/hardware-test.sh scan --require-host-ready` refuses daemon contact
   on this host while `system_profiler SPBluetoothDataType` reports no visible
@@ -384,8 +391,11 @@ Public development is on `main`; implementation slices use short-lived
   produced local artifact
   `hardware-test-long-print-reliability-job_004ed6c044ff434abed1381626ea5c84.zip`
   outside the repository.
-  Stable support claims, long-print trust, and agent direct printing still
-  require an explicit support-gating update.
+- The offline support-gating command was exercised against the local
+  Stage A/B/C/trusted-record/Stage D physical evidence chain and produced
+  `stable-support-gate-fa0f77ee9e7e43ea.json` outside the repository, enabling
+  stable support claims plus long-print trust while keeping agent direct printing
+  disabled.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -393,6 +403,4 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Gate stable support claims on reviewed Stage D evidence without enabling
-   agent direct printing by default.
-2. Surface the reviewed Stage D result in the desktop setup/support flow.
+1. Surface the reviewed Stage D result in the desktop setup/support flow.

@@ -26,9 +26,9 @@ recording. Stage B/C hardware-test artifact recording is implemented for reviewe
 physical runs, and reviewed artifacts can produce a local trusted-printer record
 for manual continuous printing. Long-print reliability print execution and
 artifact recording are implemented, and local physical Stage D evidence was
-recorded on 2026-06-06. Stable support, long-print trust, and agent direct
-printing remain gated until the support profile consumes the reviewed Stage D
-evidence.
+recorded on 2026-06-06. Reviewed Stage D evidence can now produce a local
+stable-support gate record for stable support claims and long-print trust while
+agent direct printing remains disabled by default.
 
 ## Safety Model
 

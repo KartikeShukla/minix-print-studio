@@ -15,12 +15,13 @@ not yet a stable public installer.
 - Stage B physical protocol sanity and Stage C tiny-card artifact evidence exists
   locally. Long-print reliability print execution and artifact recording are
   implemented, and local Stage D physical evidence was recorded on 2026-06-06.
-  Stable support claims still require an explicit support-gating update.
+  Stable support claims require the local stable-support gate record, and agent
+  direct printing still requires a later policy review.
 - User-initiated physical BLE transfer is implemented as an experimental path,
   and operator paper-output confirmation can now be recorded on the job. Stage
   B/C artifact-recording, local trusted-printer record, and long-print
-  reliability print/artifact commands are implemented, but stable support still
-  requires the reviewed Stage D evidence to be consumed by the support gate.
+  reliability print/artifact commands are implemented, and reviewed Stage D
+  evidence can now be consumed by the support gate.
 - Only the Seznik MiniX profile is present.
 
 ## Packaging
@@ -39,9 +40,9 @@ not yet a stable public installer.
 
 - The mock print flow, experimental physical BLE transport, and manual continuous
   trusted-printer record path are implemented. Long-print reliability print
-  execution and artifact recording exist, but long-print and agent-direct trust
-  remain certification-gated until the reviewed Stage D evidence is wired into
-  the support gate.
+  execution, artifact recording, and stable-support gate recording exist, but
+  agent-direct trust remains policy-gated after reviewed Stage D evidence is
+  consumed.
 - Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
   use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.
