@@ -82,6 +82,7 @@ async def test_mcp_server_lists_minix_tools(client_session: ClientSession) -> No
         "list_supported_profiles",
         "preview_document",
         "print_note",
+        "render_preview",
     }
 
 
@@ -100,6 +101,27 @@ async def test_mcp_server_calls_preview_document_without_exposing_token(
 ) -> None:
     result = await client_session.call_tool(
         "preview_document",
+        {
+            "document": {
+                "schemaVersion": 1,
+                "target": {"profileId": "seznik-minix-s1-lyin48d-gy"},
+            },
+            "render_settings": {"threshold": 128},
+        },
+    )
+
+    assert result.structuredContent is not None
+    assert result.structuredContent["status"] == "approval_required"
+    assert result.structuredContent["previewId"] == "prev_stdio"
+    assert "approvalToken" not in result.structuredContent
+
+
+@pytest.mark.anyio
+async def test_mcp_server_calls_render_preview_tool(
+    client_session: ClientSession,
+) -> None:
+    result = await client_session.call_tool(
+        "render_preview",
         {
             "document": {
                 "schemaVersion": 1,

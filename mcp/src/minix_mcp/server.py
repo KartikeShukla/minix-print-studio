@@ -60,6 +60,18 @@ def build_mcp_server(
         )
 
     @server.tool()
+    def render_preview(
+        document: dict[str, Any],
+        render_settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Render a daemon-canonical preview and return approval-required metadata."""
+        return preview_document_tool(
+            factory(),
+            document=cast(JsonObject, document),
+            render_settings=cast(JsonObject, render_settings),
+        )
+
+    @server.tool()
     def print_note(
         text: str,
         title: str = "Agent note",

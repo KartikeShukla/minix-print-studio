@@ -83,6 +83,7 @@ describe("Claude Desktop MCPB export", () => {
       "list_supported_profiles",
       "preview_document",
       "print_note",
+      "render_preview",
     ]);
 
     const bridge = readRequiredEntry(

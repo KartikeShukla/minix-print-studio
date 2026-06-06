@@ -84,7 +84,9 @@ Public development is on `main`; implementation slices use short-lived
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
 - MCP daemon HTTP client for bearer-authenticated daemon health, profile listing,
   document-preview, and print-job status requests.
-- MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
+- MCP core tool handlers for daemon status, document preview/render preview,
+  and note preview flows that return approval-required responses without
+  exposing approval tokens.
 - MCP print-note responses include explicit agent policy decisions and daemon
   preview safety metrics while keeping approval tokens redacted.
 - MCP `get_job_status` returns redacted daemon job state, completion confidence,
@@ -96,7 +98,7 @@ Public development is on `main`; implementation slices use short-lived
   details.
 - FastMCP stdio server wrapper that registers `get_daemon_status`,
   `get_job_status`, `list_supported_profiles`, `preview_document`, and
-  `print_note` against the core MCP tool handlers.
+  `render_preview`/`print_note` against the core MCP tool handlers.
 - `minix-mcp` CLI entrypoint now runs the FastMCP stdio server instead of returning a static app-not-running response.
 - Mock-first BLE discovery service that classifies profile/service/name matches as `detected_unverified` without granting print permission.
 - Read-only device verification flow that matches model and firmware against the printer profile while keeping printing locked until protocol sanity testing.
@@ -223,7 +225,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for MCP approval-required policy decisions, safety metric
   propagation, approval-token redaction in print-note responses, and redacted
-  job-status/profile lookup through the stdio server.
+  job-status/profile lookup plus spec-facing `render_preview` through the stdio
+  server.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest
   metadata, advertised safe tool list, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.

@@ -26,9 +26,11 @@ MiniX entry.
 
 ## Security Boundary
 
-- MCP tools are semantic: preview document, print note, daemon status, redacted
-  job status, and supported profile listing.
+- MCP tools are semantic: render preview, preview document compatibility, print
+  note, daemon status, redacted job status, and supported profile listing.
 - MCP tools do not expose approval tokens.
+- `render_preview` is the spec-facing preview tool; `preview_document` remains
+  available as a compatibility alias.
 - `get_job_status` returns daemon job state, completion confidence, progress,
   and safe user actions without raw raster or segment payloads.
 - `list_supported_profiles` returns safe profile summaries without BLE UUIDs,

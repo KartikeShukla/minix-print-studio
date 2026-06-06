@@ -133,6 +133,11 @@ function buildManifest({
         description:
           "Create a print preview for a short note without directly printing.",
       },
+      {
+        name: "render_preview",
+        description:
+          "Render a daemon-canonical preview and return approval-required metadata.",
+      },
     ],
     compatibility: {
       platforms: [platform],
