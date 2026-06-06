@@ -38,6 +38,11 @@ class StubDaemonClient:
             "profileId": "seznik-minix-s1-lyin48d-gy",
             "widthDots": 384,
             "heightDots": 240,
+            "safety": {
+                "allowed": True,
+                "warnings": [],
+                "metrics": {"totalBlackCoverage": 0.08, "maxBandCoverage64": 0.12},
+            },
             "expiresAt": "2026-06-04T00:10:00.000Z",
         }
 
@@ -73,6 +78,11 @@ def test_preview_document_returns_approval_required_without_leaking_token() -> N
         "profileId": "seznik-minix-s1-lyin48d-gy",
         "widthDots": 384,
         "heightDots": 240,
+        "safety": {
+            "allowed": True,
+            "warnings": [],
+            "metrics": {"totalBlackCoverage": 0.08, "maxBandCoverage64": 0.12},
+        },
         "expiresAt": "2026-06-04T00:10:00.000Z",
         "message": "Preview created. User approval is required before printing.",
     }
@@ -117,6 +127,26 @@ def test_print_note_builds_preview_document_and_requires_approval() -> None:
         }
     ]
     assert render_settings == {"threshold": 128, "dither": "none"}
+
+
+def test_print_note_explains_agent_direct_policy_without_leaking_token() -> None:
+    client = StubDaemonClient()
+
+    response = print_note_tool(client, text="Restock labels", title="Agent note")
+
+    assert response["status"] == "approval_required"
+    assert response["policyDecision"] == {
+        "tool": "print_note",
+        "directPrintAllowed": False,
+        "reasons": ["agent_direct_print_disabled", "printer_not_trusted"],
+        "rateLimit": {"jobsPerMinute": 3},
+    }
+    assert response["safety"] == {
+        "allowed": True,
+        "warnings": [],
+        "metrics": {"totalBlackCoverage": 0.08, "maxBandCoverage64": 0.12},
+    }
+    assert "approvalToken" not in str(response)
 
 
 def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:

@@ -28,5 +28,8 @@ MiniX entry.
 
 - MCP tools are semantic: preview document, print note, daemon status.
 - MCP tools do not expose approval tokens.
+- Print-related MCP responses include daemon preview safety data when available.
+- `print_note` returns an explicit policy decision when direct printing is
+  blocked by the default agent policy.
 - MCP tools do not accept raw BLE commands.
 - The daemon remains the only production owner of printer transport.

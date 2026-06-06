@@ -11,7 +11,9 @@ explicit certification stages pass.
 - Stage B protocol sanity testing is a physical test and requires review of the
   offline preflight plan first.
 - Tiny visual cards and long-print reliability tests require user confirmation.
-- Agent direct printing is disabled by default.
+- Agent direct printing is disabled by default, and MCP print tools return
+  approval-required responses with policy reasons instead of silently skipping
+  the policy decision.
 
 ## Preview Binding
 
@@ -28,6 +30,9 @@ output can still generate a preview artifact for review, but a preview with
 `allowed: false` is refused by both print planning and direct print submission.
 The renderer keeps the blocked preview's coverage, warnings, and errors visible
 without enabling Print.
+
+MCP preview and print-note responses preserve daemon safety metrics when the
+preview is created, while still redacting approval tokens.
 
 ## Thermal Pacing
 
