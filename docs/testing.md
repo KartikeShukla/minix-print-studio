@@ -31,6 +31,9 @@ pnpm release-package-check
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
 - Mock print-queue tests cover segment-boundary transport disconnects so printable
   partial output is never reported as a safe retry or verified completion.
+- Physical-transport unit tests cover AiYin/LuckPrinter command sequencing,
+  profile chunking, name-only advertisement scan fallback, and explicit
+  `deviceId` targeting before non-mock output.
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
 - Host-readiness tests cover the CLI diagnostic that distinguishes local
@@ -57,6 +60,19 @@ pnpm release-package-check
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
+
+## Physical Validation Notes
+
+Physical validation is not part of CI. On 2026-06-06, an unsandboxed non-mock
+daemon on `127.0.0.1:39282` completed:
+
+- `scripts/hardware-test.sh --timeout 25 scan --require-host-ready`
+- `scripts/hardware-test.sh --timeout 45 export-read-only --device-id <device-id>
+  --require-host-ready --output-dir <local-output-dir>`
+- Offline `inspect-artifact`, `protocol-sanity-preflight`,
+  `tiny-visual-card-preflight`, and `evidence-summary`
+- One experimental tiny-card `/v1/jobs/print` transfer that reported
+  `completed_unverified`; operator paper-output confirmation remains required.
 
 ## Release Evidence Gate
 

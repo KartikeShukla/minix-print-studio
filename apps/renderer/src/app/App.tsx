@@ -1117,6 +1117,8 @@ export function App({
     if (previewWorkflow.status !== "ready") {
       return;
     }
+    const verifiedDeviceId =
+      printerWorkflow.status === "verified" ? printerWorkflow.verification.deviceId : undefined;
     setPrintWorkflow({ status: "running" });
     try {
       const job = await client.printApprovedPreview({
@@ -1128,7 +1130,8 @@ export function App({
         paperMode: document.target.paperMode,
         density: document.target.density,
         copies: 1,
-        source: "ui"
+        source: "ui",
+        ...(verifiedDeviceId ? { deviceId: verifiedDeviceId } : {})
       });
       setJobHistory((currentHistory) => {
         const nextHistory = prependStoredPrintJob(currentHistory, job);
@@ -1142,7 +1145,7 @@ export function App({
         message: error instanceof Error ? error.message : "Print failed"
       });
     }
-  }, [client, document, previewWorkflow]);
+  }, [client, document, previewWorkflow, printerWorkflow]);
 
   const runDiagnosticsExport = useCallback(async () => {
     if (!client.exportDiagnostics) {
@@ -3753,7 +3756,7 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
   if (workflow.status === "running") {
     return (
       <div className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-        Sending approved preview to mock queue.
+        Sending approved preview to print queue.
       </div>
     );
   }

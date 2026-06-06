@@ -17,6 +17,12 @@ Stage A checks identity and BLE shape only:
 
 Stage A must not move paper, send raster bytes, or unlock printing.
 
+On macOS, the Seznik MiniX may advertise its local name without advertising the
+FF00 service UUID. The daemon therefore tries the profile service filter first,
+then falls back to an unfiltered scan and classifies known name-prefix matches as
+`detected_unverified`. Read-only verification must still connect and confirm the
+model/firmware before the artifact can advance to protocol sanity.
+
 If the host cannot access Bluetooth, the scan/export flow returns a structured
 hardware error such as:
 
@@ -158,6 +164,11 @@ When the tiny card is eventually printed, the operator must confirm the text is
 readable, left/right edge markers are visible, output is not mirrored or upside
 down, and feed completes without stall, overheat warning, disconnect, or fatal
 error.
+
+The daemon may report a physical tiny-card transfer as `completed_unverified`
+after all BLE bands are written. That is not certification. It only means the
+transport finished from the daemon's perspective; a human must inspect the paper
+output and record the confirmation before treating the stage as passed.
 
 ## Shareable Evidence Summary
 

@@ -113,8 +113,21 @@ Public development is on `main`; implementation slices use short-lived
 - Renderer daemon client methods for authenticated printer scan and read-only verification.
 - Renderer Scan Printers flow that displays detected candidates, runs identity verification, and shows `Printing still locked` after read-only verification.
 - Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
+- BLE scan now falls back to unfiltered discovery when the profile service filter
+  returns no devices, so macOS can detect `Seznik MiniX_0194_LE` advertisements
+  that expose the name but omit service UUIDs.
 - Bleak read-only connection lifecycle with async connect/disconnect, GATT service/characteristic discovery, notify subscription, and raw notification capture.
-- Profile-backed read-only model/firmware probing uses the profile's configured query commands and write characteristic while keeping printing locked until protocol sanity testing.
+- Profile-backed read-only model/firmware probing uses the profile's configured
+  query commands and write characteristic, waits past early status
+  notifications for expected ASCII identity responses, and keeps printing locked
+  until protocol sanity testing.
+- User-initiated physical BLE transport can send an approved preview to an
+  explicit `deviceId` through the AiYin/LuckPrinter command sequence with profile
+  chunking, notify subscription, raster band transfer, inter-chunk delay, and
+  thermal pacing metadata. Completion remains `completed_unverified` and requires
+  operator inspection.
+- Electron starts the real daemon by default and keeps `MINIX_DAEMON_MOCK=true`
+  as the explicit development/CI mock override.
 - Versioned document model now includes typed text elements with stable thermal defaults and immutable movement updates.
 - Renderer document persistence hydrates and saves the current document through localStorage with schema validation.
 - Initial React Konva artboard renders the document model, supports adding text layers from the toolbar, selects/moves text elements, and keeps the daemon preview/print state invalidated after edits.
@@ -294,7 +307,21 @@ Public development is on `main`; implementation slices use short-lived
   on this host while `system_profiler SPBluetoothDataType` reports no visible
   Bluetooth controller.
 - `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
-- Non-mock Stage A scan attempt on 2026-06-05 against a separate daemon on `127.0.0.1:39282` returned `Bluetooth unavailable: Bluetooth is unsupported`; `system_profiler SPBluetoothDataType` reported no visible controller, so no physical printer validation was possible from this execution context even with the printer powered on.
+- Non-mock Stage A scan/export on 2026-06-06 against a separate daemon on
+  `127.0.0.1:39282` detected `Seznik MiniX_0194_LE` by name after unfiltered
+  fallback, exported a local uncommitted Stage A artifact, and inspected it as a
+  valid Stage A artifact with model `S1_LYiN48D_GY`, firmware `V1.9.11`, and
+  next stage `protocol_sanity_test`.
+- Offline Stage B/C preflights from that Stage A artifact produced the
+  wake/density/paper-mode protocol plan and tiny visual card digest
+  `5d48130dd0e3c6a38c417711741a89efa655ab03d3ddab573ce59c446592ca85` without
+  including raw raster bytes.
+- Experimental physical tiny-card transfer through `/v1/render/preview` and
+  `/v1/jobs/print` on 2026-06-06 completed as `completed_unverified` for
+  job `job_7e1aad3feba34dc48d0461f3c5ebf295`, sending 2/2 bands and 15,360
+  raster bytes to the verified MiniX device with redacted fingerprint
+  `sha256:fa0f77ee9e7e43ea`; operator paper-output confirmation is still
+  required.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -302,6 +329,10 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity plus tiny visual card preflight output.
-2. After Stage A is confirmed on hardware, implement the physical protocol sanity executor and physical tiny visual card executor without unlocking trusted printing until user confirmation exists.
+1. Capture operator confirmation for the physical tiny-card output: text
+   readability, edge markers, orientation, smooth feed, and no stall/overheat or
+   disconnect warning.
+2. Implement durable Stage B/C hardware-test artifact recording for physical
+   protocol sanity and tiny visual card runs instead of relying on an ad hoc
+   local transfer response.
 3. After Stage B and visual-card evidence exists, implement trusted-printer confirmation and keep long-print reliability as a separate certification gate.

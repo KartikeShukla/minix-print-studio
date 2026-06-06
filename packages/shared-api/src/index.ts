@@ -102,6 +102,7 @@ export const printJobResponseSchema = z.object({
   jobId: z.string(),
   previewId: z.string(),
   planId: z.string(),
+  deviceId: z.string().nullable().default(null),
   state: z.string(),
   phase: z.string(),
   completionLevel: z.string(),
@@ -299,6 +300,7 @@ export type PrintPlanRequest = {
 export type PrintPreviewRequest = Omit<PrintPlanRequest, "jobId"> & {
   copies: number;
   source: string;
+  deviceId?: string;
 };
 
 export type DiagnosticsExportRequest = {

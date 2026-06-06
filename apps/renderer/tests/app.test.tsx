@@ -661,6 +661,7 @@ describe("MiniX Print Studio shell", () => {
       jobId: "job_print",
       previewId: "prev_print",
       planId: "plan_job_print",
+      deviceId: "mock-minix-0194",
       state: "completed_unverified",
       phase: "waiting_for_final_status",
       completionLevel: "unverified",
@@ -697,6 +698,40 @@ describe("MiniX Print Studio shell", () => {
       recentErrors: [],
       recentMcpCalls: []
     });
+    const scanPrinters = vi.fn().mockResolvedValue({
+      printers: [
+        {
+          deviceId: "mock-minix-0194",
+          name: "Seznik MiniX_0194_LE",
+          serviceUuids: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+          rssi: -42,
+          supportLevel: "detected_unverified",
+          candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
+          printable: false,
+          nextRequiredStage: "read_only_verification",
+          reason: "Service UUID and name match; model query required."
+        }
+      ]
+    });
+    const readOnlyVerify = vi.fn().mockResolvedValue({
+      status: "read_only_verified",
+      deviceId: "mock-minix-0194",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      profileSupportLevel: "official",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      printable: false,
+      nextRequiredStage: "protocol_sanity_test",
+      reason: "Model and firmware match profile; protocol sanity test required.",
+      services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
+      notifyCharacteristics: [
+        "0000ff01-0000-1000-8000-00805f9b34fb",
+        "0000ff03-0000-1000-8000-00805f9b34fb"
+      ],
+      rawNotifications: [],
+      timingEvents: []
+    });
 
     render(
       <App
@@ -711,11 +746,16 @@ describe("MiniX Print Studio shell", () => {
           planApprovedPreview,
           printApprovedPreview,
           exportDiagnostics,
-          scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          scanPrinters,
+          readOnlyVerify
         }}
       />
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Scan printers" }));
+    await screen.findByText("Seznik MiniX_0194_LE");
+    fireEvent.click(screen.getByRole("button", { name: "Verify printer identity" }));
+    await screen.findByText("Read-only verified");
 
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
     await screen.findByText("Preview ready");
@@ -735,7 +775,8 @@ describe("MiniX Print Studio shell", () => {
       paperMode: "continuous",
       density: "medium",
       copies: 1,
-      source: "ui"
+      source: "ui",
+      deviceId: "mock-minix-0194"
     });
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]");

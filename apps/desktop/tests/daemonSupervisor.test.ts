@@ -1,8 +1,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createDaemonLaunchConfig } from "../src/main/daemonSupervisor";
+import { createDaemonLaunchConfig, resolveDaemonMockMode } from "../src/main/daemonSupervisor";
 
 describe("daemon launch config", () => {
+  it("starts the physical daemon by default unless mock mode is explicitly requested", () => {
+    expect(resolveDaemonMockMode({})).toBe(false);
+    expect(resolveDaemonMockMode({ MINIX_DAEMON_MOCK: "true" })).toBe(true);
+    expect(resolveDaemonMockMode({ MINIX_DAEMON_MOCK: "false" })).toBe(false);
+  });
+
   it("launches the repo-local Python daemon in mock mode for development", () => {
     const repoRoot = path.join("/", "repo");
 

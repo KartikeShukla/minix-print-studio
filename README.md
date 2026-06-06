@@ -18,9 +18,10 @@ This repository is being built from the implementation plan in
 [docs/Initial Spec.md](docs/Initial%20Spec.md). It is still pre-release: no stable
 public release has been published, and physical printer certification is not complete.
 
-The current development branch has mock printing, document editing, daemon-backed
-preview and planning, MCP integration scaffolding, unsigned macOS and Windows
-package evidence, and community governance docs. Printing to hardware remains gated
+The current development branch has document editing, daemon-backed preview and
+planning, MCP integration scaffolding, unsigned macOS and Windows package
+evidence, community governance docs, Stage A physical read-only verification, and
+an experimental user-initiated BLE transport path. Trusted printing remains gated
 until the staged certification flow produces reviewed evidence.
 
 ## Safety Model
@@ -50,8 +51,9 @@ in the repository, but stable support still requires physical evidence:
 - Stage C tiny visual test card confirmation.
 - Long-print reliability before stable support claims.
 
-Do not treat BLE discovery, a matching name, or a matching service UUID as permission
-to print. See [docs/support-matrix.md](docs/support-matrix.md) and
+Do not treat BLE discovery, a matching name, a matching service UUID, or an
+unverified transfer result as stable printer certification. See
+[docs/support-matrix.md](docs/support-matrix.md) and
 [docs/printer-profiles.md](docs/printer-profiles.md).
 
 ## Development
@@ -73,6 +75,9 @@ Run the desktop app during development:
 ```bash
 pnpm dev
 ```
+
+The desktop app launches the real daemon by default. For UI-only development without
+BLE or hardware access, run with `MINIX_DAEMON_MOCK=true`.
 
 Run the normal non-hardware gates before proposing a change:
 

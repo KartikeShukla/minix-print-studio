@@ -8,6 +8,11 @@ from uuid import uuid4
 
 from minixd.printing.planner import PrintPlanPackage, RasterBand, create_print_plan
 from minixd.printing.safety import preview_safety_block_reason
+from minixd.printing.transport import (
+    PrintTransport,
+    PrintTransportError,
+    PrintTransportResult,
+)
 from minixd.render.preview_store import PreviewBindingError, PreviewStore
 
 
@@ -27,6 +32,7 @@ class PrintJob:
     requires_user_check: bool
     source: str
     copies: int
+    device_id: str | None
     bands_sent: int
     total_bands: int
     rows_sent: int
@@ -46,11 +52,13 @@ class PrintQueue:
         mock: bool,
         job_store_path: Path | None = None,
         mock_disconnect_after_band_index: int | None = None,
+        transport: PrintTransport | None = None,
     ) -> None:
         self._profiles = profiles
         self._preview_store = preview_store
         self._mock = mock
         self._mock_disconnect_after_band_index = mock_disconnect_after_band_index
+        self._transport = transport
         self._jobs: dict[str, PrintJob] = {}
         self._segments: dict[str, list[RasterBand]] = {}
         self._job_store_path = job_store_path
@@ -68,9 +76,10 @@ class PrintQueue:
         density: str,
         copies: int,
         source: str,
+        device_id: str | None = None,
     ) -> PrintJob:
         if copies != 1:
-            raise PrintRejectedError("mock queue currently supports exactly one copy")
+            raise PrintRejectedError("print queue currently supports exactly one copy")
         profile = self._find_profile(profile_id)
         try:
             preview = self._preview_store.verify(
@@ -96,12 +105,14 @@ class PrintQueue:
             paper_mode=paper_mode,
             density=density,
         )
-        job = self._mock_complete_unverified_job(
+        job = self._complete_unverified_job(
             job_id=job_id,
             preview_id=preview.preview_id,
             plan_package=plan_package,
             source=source,
             copies=copies,
+            device_id=device_id,
+            profile=profile,
         )
         self._jobs[job.job_id] = job
         self._segments[job.job_id] = plan_package.bands
@@ -123,7 +134,7 @@ class PrintQueue:
                 return profile
         raise PrintRejectedError(f"unknown profile: {profile_id}")
 
-    def _mock_complete_unverified_job(
+    def _complete_unverified_job(
         self,
         *,
         job_id: str,
@@ -131,9 +142,19 @@ class PrintQueue:
         plan_package: PrintPlanPackage,
         source: str,
         copies: int,
+        device_id: str | None,
+        profile: dict[str, object],
     ) -> PrintJob:
         if not self._mock:
-            raise PrintRejectedError("real printer transport is not implemented yet")
+            return self._physical_print_job(
+                job_id=job_id,
+                preview_id=preview_id,
+                plan_package=plan_package,
+                source=source,
+                copies=copies,
+                device_id=device_id,
+                profile=profile,
+            )
         if self._mock_disconnect_after_band_index is not None:
             return self._mock_disconnect_job(
                 job_id=job_id,
@@ -154,6 +175,7 @@ class PrintQueue:
             requires_user_check=True,
             source=source,
             copies=copies,
+            device_id=device_id,
             bands_sent=len(plan_package.bands),
             total_bands=len(plan_package.bands),
             rows_sent=plan_package.plan.transfer_height_dots,
@@ -162,6 +184,101 @@ class PrintQueue:
             total_bytes=plan_package.plan.total_raster_bytes,
             tail_blank_rows_dots=plan_package.plan.tail_blank_rows_dots,
             safe_actions=["confirm_complete", "feed_paper", "reprint_from_start"],
+        )
+
+    def _physical_print_job(
+        self,
+        *,
+        job_id: str,
+        preview_id: str,
+        plan_package: PrintPlanPackage,
+        source: str,
+        copies: int,
+        device_id: str | None,
+        profile: dict[str, object],
+    ) -> PrintJob:
+        if not device_id:
+            raise PrintRejectedError("deviceId is required for physical printer output")
+        if self._transport is None:
+            raise PrintRejectedError("physical printer transport is unavailable")
+
+        try:
+            result = self._transport.print_plan(
+                device_id=device_id,
+                profile=profile,
+                plan_package=plan_package,
+            )
+        except PrintTransportError as exc:
+            return self._transport_failure_job(
+                job_id=job_id,
+                preview_id=preview_id,
+                plan_package=plan_package,
+                source=source,
+                copies=copies,
+                device_id=device_id,
+                result=_transport_result_from_error(exc),
+            )
+
+        return PrintJob(
+            job_id=job_id,
+            preview_id=preview_id,
+            plan_id=plan_package.plan.plan_id,
+            state="completed_unverified",
+            phase="waiting_for_user_confirmation",
+            completion_level="unverified",
+            completion_confidence="ble_transfer_completed_final_ack_unverified",
+            requires_user_check=True,
+            source=source,
+            copies=copies,
+            device_id=device_id,
+            bands_sent=result.bands_sent,
+            total_bands=len(plan_package.bands),
+            rows_sent=result.rows_sent,
+            total_rows=plan_package.plan.transfer_height_dots,
+            bytes_sent=result.raster_bytes_sent,
+            total_bytes=plan_package.plan.total_raster_bytes,
+            tail_blank_rows_dots=plan_package.plan.tail_blank_rows_dots,
+            safe_actions=["confirm_complete", "feed_paper", "reprint_from_start"],
+        )
+
+    def _transport_failure_job(
+        self,
+        *,
+        job_id: str,
+        preview_id: str,
+        plan_package: PrintPlanPackage,
+        source: str,
+        copies: int,
+        device_id: str,
+        result: PrintTransportResult,
+    ) -> PrintJob:
+        partial_output = result.raster_bytes_sent > 0
+        return PrintJob(
+            job_id=job_id,
+            preview_id=preview_id,
+            plan_id=plan_package.plan.plan_id,
+            state="failed_partial_output" if partial_output else "failed_before_output",
+            phase="transport_disconnected",
+            completion_level=(
+                "failed_partial_output" if partial_output else "failed_before_output"
+            ),
+            completion_confidence="ble_transport_error",
+            requires_user_check=partial_output,
+            source=source,
+            copies=copies,
+            device_id=device_id,
+            bands_sent=result.bands_sent,
+            total_bands=len(plan_package.bands),
+            rows_sent=result.rows_sent,
+            total_rows=plan_package.plan.transfer_height_dots,
+            bytes_sent=result.raster_bytes_sent,
+            total_bytes=plan_package.plan.total_raster_bytes,
+            tail_blank_rows_dots=plan_package.plan.tail_blank_rows_dots,
+            safe_actions=(
+                ["inspect_output", "clear_printer", "reprint_from_start"]
+                if partial_output
+                else ["retry_from_start"]
+            ),
         )
 
     def _mock_disconnect_job(
@@ -194,6 +311,7 @@ class PrintQueue:
             requires_user_check=partial_output,
             source=source,
             copies=copies,
+            device_id=None,
             bands_sent=len(sent_bands),
             total_bands=len(plan_package.bands),
             rows_sent=printable_rows_sent,
@@ -269,6 +387,7 @@ def _deserialize_job(payload: dict[str, Any]) -> PrintJob:
         bytes_sent=_int(payload, "bytes_sent"),
         total_bytes=_int(payload, "total_bytes"),
         tail_blank_rows_dots=_int(payload, "tail_blank_rows_dots"),
+        device_id=_optional_string(payload, "device_id"),
         safe_actions=_string_list(payload, "safe_actions"),
     )
 
@@ -280,6 +399,16 @@ def _sent_bands_for_disconnect(
     if disconnect_after_band_index < 0:
         return []
     return bands[: min(disconnect_after_band_index + 1, len(bands))]
+
+
+def _transport_result_from_error(exc: PrintTransportError) -> PrintTransportResult:
+    return PrintTransportResult(
+        bands_sent=exc.bands_sent,
+        rows_sent=exc.rows_sent,
+        raster_bytes_sent=exc.raster_bytes_sent,
+        protocol_bytes_sent=exc.protocol_bytes_sent,
+        notification_count=exc.notification_count,
+    )
 
 
 def _serialize_segment(segment: RasterBand) -> dict[str, object]:
@@ -315,6 +444,15 @@ def _deserialize_segment(payload: dict[str, Any]) -> RasterBand:
 
 def _string(payload: dict[str, Any], key: str) -> str:
     value = payload[key]
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be a string")
+    return value
+
+
+def _optional_string(payload: dict[str, Any], key: str) -> str | None:
+    value = payload.get(key)
+    if value is None:
+        return None
     if not isinstance(value, str):
         raise ValueError(f"{key} must be a string")
     return value

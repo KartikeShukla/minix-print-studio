@@ -36,6 +36,7 @@ class PrintJobRequest(BaseModel):
     density: Annotated[str, Field(pattern="^(light|medium|dark)$")]
     copies: Annotated[int, Field(gt=0, le=5)]
     source: Annotated[str, Field(min_length=1)]
+    device_id: Annotated[str | None, Field(alias="deviceId", min_length=1)] = None
 
 
 def create_jobs_router(
@@ -87,6 +88,7 @@ def create_jobs_router(
                 density=request.density,
                 copies=request.copies,
                 source=request.source,
+                device_id=request.device_id,
             )
         except PrintRejectedError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -185,6 +187,7 @@ def _serialize_print_job(job: PrintJob) -> dict[str, object]:
         "requiresUserCheck": job.requires_user_check,
         "source": job.source,
         "copies": job.copies,
+        "deviceId": job.device_id,
         "bandsSent": job.bands_sent,
         "totalBands": job.total_bands,
         "rowsSent": job.rows_sent,

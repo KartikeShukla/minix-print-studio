@@ -185,13 +185,16 @@ class PrinterDiscoveryService:
             )
 
         profile_ids = [_profile_id(profile) for profile in candidate_profiles]
+        service_matches = any(
+            _profile_service_matches(advertisement.service_uuids, profile)
+            for profile in candidate_profiles
+        )
         name_matches = any(
             _profile_name_matches(advertisement.name, profile) for profile in candidate_profiles
         )
-        reason = (
-            "Service UUID and name match; model query required."
-            if name_matches
-            else "Service UUID matches; model query required."
+        reason = _candidate_reason(
+            service_matches=service_matches,
+            name_matches=name_matches,
         )
         return PrinterCandidate(
             device_id=advertisement.device_id,
@@ -206,7 +209,9 @@ class PrinterDiscoveryService:
         )
 
     def _candidate_profiles_for(self, advertisement: BleAdvertisement) -> list[dict[str, Any]]:
-        return self._candidate_profiles_for_services(advertisement.service_uuids)
+        service_matches = self._candidate_profiles_for_services(advertisement.service_uuids)
+        name_matches = self._candidate_profiles_for_name(advertisement.name)
+        return _dedupe_profiles([*service_matches, *name_matches])
 
     def _candidate_profiles_for_services(
         self,
@@ -218,6 +223,13 @@ class PrinterDiscoveryService:
             for profile in self._profiles
             if (service_uuid := _profile_service_uuid(profile)) is not None
             and service_uuid in services
+        ]
+
+    def _candidate_profiles_for_name(self, name: str | None) -> list[dict[str, Any]]:
+        return [
+            profile
+            for profile in self._profiles
+            if _profile_name_matches(name, profile)
         ]
 
     def _read_only_info_matches_profile(
@@ -234,6 +246,26 @@ class PrinterDiscoveryService:
 
 def _normalise_uuids(values: Sequence[str]) -> list[str]:
     return [value.lower() for value in values]
+
+
+def _dedupe_profiles(profiles: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for profile in profiles:
+        profile_id = _profile_id(profile)
+        if profile_id in seen:
+            continue
+        seen.add(profile_id)
+        deduped.append(profile)
+    return deduped
+
+
+def _candidate_reason(*, service_matches: bool, name_matches: bool) -> str:
+    if service_matches and name_matches:
+        return "Service UUID and name match; model query required."
+    if service_matches:
+        return "Service UUID matches; model query required."
+    return "Name matches; model query required."
 
 
 def _profile_ble(profile: dict[str, Any]) -> dict[str, Any]:
@@ -262,6 +294,11 @@ def _profile_service_uuid(profile: dict[str, Any]) -> str | None:
     if isinstance(value, str):
         return value.lower()
     return None
+
+
+def _profile_service_matches(service_uuids: Sequence[str], profile: dict[str, Any]) -> bool:
+    service_uuid = _profile_service_uuid(profile)
+    return service_uuid is not None and service_uuid in set(_normalise_uuids(service_uuids))
 
 
 def _profile_model_response(profile: dict[str, Any]) -> str | None:
