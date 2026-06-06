@@ -114,6 +114,16 @@ function buildManifest({
           "Check whether the local MiniX Print Studio daemon is reachable.",
       },
       {
+        name: "get_job_status",
+        description:
+          "Fetch redacted print job state and safe user actions from the local daemon.",
+      },
+      {
+        name: "list_supported_profiles",
+        description:
+          "List safe summaries of supported printer profiles and print dimensions.",
+      },
+      {
         name: "preview_document",
         description:
           "Create a daemon-canonical print preview that requires user approval.",

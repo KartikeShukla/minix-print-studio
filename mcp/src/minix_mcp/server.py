@@ -11,6 +11,7 @@ from minix_mcp.tools import (
     DaemonClient,
     get_daemon_status_tool,
     get_job_status_tool,
+    list_supported_profiles_tool,
     preview_document_tool,
     print_note_tool,
 )
@@ -40,6 +41,11 @@ def build_mcp_server(
     def get_job_status(job_id: str) -> dict[str, Any]:
         """Fetch a redacted daemon print job status by job id."""
         return get_job_status_tool(factory(), job_id=job_id)
+
+    @server.tool()
+    def list_supported_profiles() -> dict[str, Any]:
+        """List supported printer profiles without low-level BLE or command payloads."""
+        return list_supported_profiles_tool(factory())
 
     @server.tool()
     def preview_document(

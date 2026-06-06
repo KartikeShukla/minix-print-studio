@@ -48,6 +48,9 @@ class DaemonHttpClient:
     def get_health(self) -> JsonObject:
         return self._request("GET", "/v1/health")
 
+    def get_profiles(self) -> JsonObject:
+        return self._request("GET", "/v1/profiles")
+
     def create_document_preview(
         self,
         *,

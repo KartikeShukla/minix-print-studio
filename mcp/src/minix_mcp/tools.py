@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, cast
 
 from minix_mcp.daemon_client import (
     DaemonUnavailable,
@@ -38,6 +38,8 @@ class DaemonClient(Protocol):
     ) -> JsonObject: ...
 
     def get_job_status(self, job_id: str) -> JsonObject: ...
+
+    def get_profiles(self) -> JsonObject: ...
 
 
 def get_daemon_status_tool(client: DaemonClient) -> JsonObject:
@@ -93,12 +95,73 @@ def get_job_status_tool(client: DaemonClient, *, job_id: str) -> JsonObject:
     return {"status": "ok", "job": _redacted_job_status(job)}
 
 
+def list_supported_profiles_tool(client: DaemonClient) -> JsonObject:
+    try:
+        response = client.get_profiles()
+    except DaemonUnavailable:
+        return build_app_not_running_response()
+
+    profiles = response.get("profiles")
+    if not isinstance(profiles, list):
+        raise ValueError("profiles must be a list")
+    return {
+        "status": "ok",
+        "profiles": [
+            _profile_summary(cast(JsonObject, profile))
+            for profile in profiles
+            if isinstance(profile, dict)
+        ],
+    }
+
+
 def _redacted_job_status(job: JsonObject) -> JsonObject:
     return {
         key: value
         for key, value in job.items()
         if key not in JOB_STATUS_REDACTED_KEYS
     }
+
+
+def _profile_summary(profile: JsonObject) -> JsonObject:
+    summary: JsonObject = {"id": _string_value(profile, "id")}
+    _copy_optional_string(summary, profile, "displayName")
+    _copy_optional_string(summary, profile, "supportLevel")
+    _copy_optional_string(summary, profile, "profileVersion")
+    _copy_optional_string(summary, profile, "manufacturer")
+    _copy_optional_string(summary, profile, "modelResponse")
+
+    observed_firmware = _optional_string_list_value(profile, "observedFirmware")
+    if observed_firmware is not None:
+        summary["observedFirmware"] = observed_firmware
+
+    print_config = _optional_object_value(profile, "print")
+    if print_config is not None:
+        summary["print"] = _print_profile_summary(print_config)
+
+    safety = _optional_object_value(profile, "safety")
+    if safety is not None:
+        safety_limits: JsonObject = {}
+        _copy_optional_int(safety_limits, safety, "maxHeightDotsAgentDirect")
+        _copy_optional_int(safety_limits, safety, "maxCopiesAgentDirect")
+        if safety_limits:
+            summary["agentSafetyLimits"] = safety_limits
+
+    return summary
+
+
+def _print_profile_summary(print_config: JsonObject) -> JsonObject:
+    summary: JsonObject = {}
+    _copy_optional_int(summary, print_config, "widthDots")
+    _copy_optional_int(summary, print_config, "rowBytes")
+    _copy_optional_string(summary, print_config, "defaultPaperMode")
+    _copy_optional_string(summary, print_config, "defaultDensity")
+    paper_modes = _optional_string_list_value(print_config, "paperModes")
+    if paper_modes is not None:
+        summary["paperModes"] = paper_modes
+    density_modes = _optional_string_list_value(print_config, "densityModes")
+    if density_modes is not None:
+        summary["densityModes"] = density_modes
+    return summary
 
 
 def _approval_required_response(
@@ -191,6 +254,27 @@ def _int_value(source: JsonObject, key: str) -> int:
     if not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
     return value
+
+
+def _copy_optional_string(target: JsonObject, source: JsonObject, key: str) -> None:
+    value = source.get(key)
+    if isinstance(value, str):
+        target[key] = value
+
+
+def _copy_optional_int(target: JsonObject, source: JsonObject, key: str) -> None:
+    value = source.get(key)
+    if isinstance(value, int):
+        target[key] = value
+
+
+def _optional_string_list_value(source: JsonObject, key: str) -> list[JsonValue] | None:
+    value = source.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{key} must be a string list")
+    return cast(list[JsonValue], value)
 
 
 def _optional_object_value(source: JsonObject, key: str) -> JsonObject | None:

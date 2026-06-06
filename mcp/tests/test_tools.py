@@ -2,6 +2,7 @@ from minix_mcp.daemon_client import DaemonUnavailable, JsonObject
 from minix_mcp.tools import (
     get_daemon_status_tool,
     get_job_status_tool,
+    list_supported_profiles_tool,
     preview_document_tool,
     print_note_tool,
 )
@@ -63,6 +64,41 @@ class StubDaemonClient:
             "approvalToken": "secret-approval-token",
             "raster": "raw-raster-bytes",
             "segments": [{"payload": "raw-segment"}],
+        }
+
+    def get_profiles(self) -> JsonObject:
+        if self.fail:
+            raise DaemonUnavailable("daemon unavailable")
+        return {
+            "profiles": [
+                {
+                    "id": "seznik-minix-s1-lyin48d-gy",
+                    "displayName": "Seznik MiniX - S1_LYiN48D_GY",
+                    "supportLevel": "official",
+                    "profileVersion": "1.0.0",
+                    "manufacturer": "unknown-or-confirm-after-user-input",
+                    "modelResponse": "S1_LYiN48D_GY",
+                    "observedFirmware": ["V1.9.11"],
+                    "ble": {
+                        "serviceUuid": "0000ff00-0000-1000-8000-00805f9b34fb",
+                        "writeCharUuid": "0000ff02-0000-1000-8000-00805f9b34fb",
+                    },
+                    "readOnly": {"modelCommandHex": "10 ff 20 f0"},
+                    "print": {
+                        "protocol": "aiyin-gs-v0-wrapper",
+                        "widthDots": 384,
+                        "rowBytes": 48,
+                        "defaultPaperMode": "continuous",
+                        "paperModes": ["continuous", "gap_label", "black_mark"],
+                        "densityModes": ["light", "medium", "dark"],
+                        "defaultDensity": "medium",
+                    },
+                    "safety": {
+                        "maxHeightDotsAgentDirect": 1000,
+                        "maxCopiesAgentDirect": 1,
+                    },
+                }
+            ]
         }
 
 
@@ -189,6 +225,40 @@ def test_get_job_status_returns_structured_daemon_job_without_raw_segments() -> 
     assert "raster" not in str(response)
 
 
+def test_list_supported_profiles_returns_safe_profile_summaries() -> None:
+    response = list_supported_profiles_tool(StubDaemonClient())
+
+    assert response == {
+        "status": "ok",
+        "profiles": [
+            {
+                "id": "seznik-minix-s1-lyin48d-gy",
+                "displayName": "Seznik MiniX - S1_LYiN48D_GY",
+                "supportLevel": "official",
+                "profileVersion": "1.0.0",
+                "manufacturer": "unknown-or-confirm-after-user-input",
+                "modelResponse": "S1_LYiN48D_GY",
+                "observedFirmware": ["V1.9.11"],
+                "print": {
+                    "widthDots": 384,
+                    "rowBytes": 48,
+                    "defaultPaperMode": "continuous",
+                    "paperModes": ["continuous", "gap_label", "black_mark"],
+                    "densityModes": ["light", "medium", "dark"],
+                    "defaultDensity": "medium",
+                },
+                "agentSafetyLimits": {
+                    "maxHeightDotsAgentDirect": 1000,
+                    "maxCopiesAgentDirect": 1,
+                },
+            }
+        ],
+    }
+    assert "serviceUuid" not in str(response)
+    assert "modelCommandHex" not in str(response)
+    assert "aiyin-gs-v0-wrapper" not in str(response)
+
+
 def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:
     client = StubDaemonClient(fail=True)
 
@@ -199,3 +269,4 @@ def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:
     )
     assert print_note_tool(client, text="hello")["status"] == "app_not_running"
     assert get_job_status_tool(client, job_id="job_123")["status"] == "app_not_running"
+    assert list_supported_profiles_tool(client)["status"] == "app_not_running"
