@@ -169,6 +169,9 @@ Public development is on `main`; implementation slices use short-lived
 - `minix-hardware-test host-readiness` reports whether the current host context exposes a Bluetooth controller before Stage A, with macOS `system_profiler SPBluetoothDataType` parsing and recommended actions for the no-controller-visible failure mode.
 - Electron exposes the shared host Bluetooth readiness diagnostic and recommended actions from the Printer panel before Stage A scan attempts.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
+- Stage A CLI `scan --require-host-ready` and `export-read-only
+  --require-host-ready` refuse daemon contact when host Bluetooth readiness says
+  the current host cannot attempt Stage A.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
 - `minix-hardware-test tiny-visual-card-preflight` validates a Stage A artifact and emits deterministic Stage C tiny-card metadata for `MINIX TEST 7K4P`, including dimensions, raster byte counts, and a digest without including printable bytes or contacting BLE.
@@ -243,6 +246,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.
 - TDD red/green checks for host Bluetooth readiness CLI output and macOS no-controller-visible parsing.
 - TDD red/green checks for the Electron host-readiness bridge and renderer Printer panel readiness result.
+- TDD red/green checks for guarded Stage A CLI scan/export refusing daemon
+  contact when host Bluetooth readiness blocks Stage A.
 - TDD red/green checks for the Stage A hardware-test CLI scan/export flow and daemon error-detail preservation.
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
@@ -272,6 +277,12 @@ Public development is on `main`; implementation slices use short-lived
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
 - `scripts/hardware-test.sh host-readiness`
+- `scripts/hardware-test.sh scan --help` and `scripts/hardware-test.sh
+  export-read-only --help` show `--require-host-ready` as a guarded Stage A
+  option.
+- `scripts/hardware-test.sh scan --require-host-ready` refuses daemon contact
+  on this host while `system_profiler SPBluetoothDataType` reports no visible
+  Bluetooth controller.
 - `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
 - Non-mock Stage A scan attempt on 2026-06-05 against a separate daemon on `127.0.0.1:39282` returned `Bluetooth unavailable: Bluetooth is unsupported`; `system_profiler SPBluetoothDataType` reported no visible controller, so no physical printer validation was possible from this execution context even with the printer powered on.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.

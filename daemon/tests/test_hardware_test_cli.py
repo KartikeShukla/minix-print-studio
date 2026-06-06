@@ -139,6 +139,93 @@ def test_hardware_test_cli_preserves_daemon_error_detail() -> None:
     assert stderr.getvalue().strip() == "Bluetooth unavailable: Bluetooth is unsupported"
 
 
+def test_hardware_test_cli_guarded_scan_requires_host_readiness() -> None:
+    calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
+    stderr = io.StringIO()
+
+    def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> HttpResponse:
+        calls.append((method, url, body, headers, timeout))
+        raise AssertionError("guarded scan must not contact the daemon when host is blocked")
+
+    exit_code = run(
+        ["scan", "--require-host-ready"],
+        stderr=stderr,
+        transport=transport,
+        host_bluetooth_probe=lambda: {
+            "status": "not_visible",
+            "platform": "Darwin",
+            "controllerVisible": False,
+            "canAttemptStageA": False,
+            "detail": "macOS did not report a Bluetooth controller to this process.",
+            "recommendedActions": [
+                "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+                (
+                    "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed "
+                    "local session with Bluetooth access."
+                ),
+            ],
+        },
+    )
+
+    assert exit_code == 2
+    assert calls == []
+    assert stderr.getvalue().strip() == (
+        "Stage A host readiness blocked: macOS did not report a Bluetooth controller "
+        "to this process. Recommended actions: Open macOS System Settings > Bluetooth "
+        "and confirm Bluetooth is on.; Run MiniX Print Studio or scripts/hardware-test.sh "
+        "from an unsandboxed local session with Bluetooth access."
+    )
+
+
+def test_hardware_test_cli_guarded_export_requires_host_readiness(tmp_path: Path) -> None:
+    calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
+    stderr = io.StringIO()
+
+    def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> HttpResponse:
+        calls.append((method, url, body, headers, timeout))
+        raise AssertionError("guarded export must not contact the daemon when host is blocked")
+
+    exit_code = run(
+        [
+            "export-read-only",
+            "--device-id",
+            "mock-minix-0194",
+            "--output-dir",
+            str(tmp_path),
+            "--require-host-ready",
+        ],
+        stderr=stderr,
+        transport=transport,
+        host_bluetooth_probe=lambda: {
+            "status": "not_visible",
+            "platform": "Darwin",
+            "controllerVisible": False,
+            "canAttemptStageA": False,
+            "detail": "macOS did not report a Bluetooth controller to this process.",
+        },
+    )
+
+    assert exit_code == 2
+    assert calls == []
+    assert not list(tmp_path.iterdir())
+    assert stderr.getvalue().strip() == (
+        "Stage A host readiness blocked: macOS did not report a Bluetooth controller "
+        "to this process."
+    )
+
+
 def test_hardware_test_cli_reports_host_bluetooth_readiness() -> None:
     stdout = io.StringIO()
 

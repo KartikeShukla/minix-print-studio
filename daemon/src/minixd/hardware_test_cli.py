@@ -193,6 +193,8 @@ def run(
 
     try:
         if args.command == "scan":
+            if args.require_host_ready:
+                _require_stage_a_host_ready(host_bluetooth_probe)
             stdout.write(json.dumps(client.scan_printers(), indent=2, sort_keys=True))
             stdout.write("\n")
             return 0
@@ -204,6 +206,8 @@ def run(
             stdout.write("\n")
             return 0
         if args.command == "export-read-only":
+            if args.require_host_ready:
+                _require_stage_a_host_ready(host_bluetooth_probe)
             artifact_path = client.export_read_only_artifact(
                 device_id=args.device_id,
                 output_dir=Path(args.output_dir),
@@ -280,7 +284,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=10.0, help="HTTP timeout in seconds.")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("scan", help="Scan for visible printer candidates.")
+    scan_parser = subparsers.add_parser("scan", help="Scan for visible printer candidates.")
+    _add_require_host_ready_argument(scan_parser)
     subparsers.add_parser(
         "host-readiness",
         help="Check whether the host exposes a Bluetooth controller for Stage A.",
@@ -291,6 +296,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Export the Stage A read-only hardware-test artifact for a device id.",
     )
     export_parser.add_argument("--device-id", required=True, help="Device id from scan output.")
+    _add_require_host_ready_argument(export_parser)
     export_parser.add_argument(
         "--output-dir",
         default=".",
@@ -327,6 +333,38 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a Stage A hardware-test ZIP.",
     )
     return parser
+
+
+def _add_require_host_ready_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--require-host-ready",
+        action="store_true",
+        help="Refuse Stage A daemon contact unless host Bluetooth readiness can attempt scanning.",
+    )
+
+
+def _require_stage_a_host_ready(host_bluetooth_probe: HostBluetoothProbe | None) -> None:
+    probe_result = (host_bluetooth_probe or collect_host_bluetooth_readiness)()
+    if probe_result.get("canAttemptStageA") is True:
+        return
+
+    detail = probe_result.get("detail")
+    detail_text = (
+        detail
+        if isinstance(detail, str) and detail.strip()
+        else "Host Bluetooth readiness did not allow Stage A."
+    )
+    action_text = _recommended_action_text(probe_result.get("recommendedActions"))
+    if action_text:
+        detail_text = f"{detail_text} Recommended actions: {action_text}"
+    raise HardwareTestCliError(f"Stage A host readiness blocked: {detail_text}")
+
+
+def _recommended_action_text(value: object) -> str:
+    if not isinstance(value, list):
+        return ""
+    actions = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return "; ".join(actions)
 
 
 def inspect_stage_a_artifact(artifact_path: Path) -> dict[str, object]:
