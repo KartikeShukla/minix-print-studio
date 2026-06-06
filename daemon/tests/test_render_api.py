@@ -36,3 +36,27 @@ def test_render_preview_endpoint_stores_binding_metadata_without_raw_raster() ->
     assert stored["documentHash"] == "sha256:document"
     assert stored["rasterHash"] == created["rasterHash"]
     assert "raster" not in stored
+
+
+def test_render_preview_endpoint_recomputes_profile_safety_for_raw_raster() -> None:
+    client = TestClient(create_app(mock=True))
+
+    response = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": 64,
+            "rasterBase64": base64.b64encode(b"\xFF" * 48 * 64).decode("ascii"),
+            "safety": {"allowed": True, "warnings": [], "metrics": {}},
+        },
+    )
+
+    assert response.status_code == 200
+    safety = response.json()["safety"]
+    assert safety["allowed"] is False
+    assert safety["metrics"]["totalBlackCoverage"] == 1.0
+    assert safety["metrics"]["maxBandCoverage64"] == 1.0
+    assert safety["errors"][0]["code"] == "band_coverage_blocked"

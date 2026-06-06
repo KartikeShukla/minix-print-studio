@@ -557,6 +557,71 @@ describe("MiniX Print Studio shell", () => {
     expect(printApprovedPreview).not.toHaveBeenCalled();
   });
 
+  it("shows blocked preview safety details without enabling print", async () => {
+    const createDocumentPreview = vi.fn().mockResolvedValue({
+      previewId: "prev_blocked",
+      approvalToken: "appr_blocked",
+      documentHash: "sha256:dense-document",
+      renderSettingsHash: "sha256:settings",
+      rasterHash: "sha256:dense-raster",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      widthDots: 384,
+      heightDots: 64,
+      safety: {
+        allowed: false,
+        warnings: [
+          {
+            code: "total_black_coverage_high",
+            message: "Total black coverage is 91%, above the 35% warning limit."
+          }
+        ],
+        errors: [
+          {
+            code: "band_coverage_blocked",
+            message: "A 64-dot band is 100% black, above the 70% thermal safety limit."
+          }
+        ],
+        metrics: { totalBlackCoverage: 0.91, maxBandCoverage64: 1 }
+      },
+      createdAt: "2026-06-04T00:00:00.000Z",
+      expiresAt: "2026-06-04T00:10:00.000Z"
+    });
+    const planApprovedPreview = vi
+      .fn()
+      .mockRejectedValue(new Error("preview safety blocked printing: band_coverage_blocked"));
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview,
+          planApprovedPreview,
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(await screen.findByText("Preview blocked by safety")).toBeInTheDocument();
+    expect(screen.getByText("91%")).toBeInTheDocument();
+    expect(
+      screen.getByText("Total black coverage is 91%, above the 35% warning limit.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("A 64-dot band is 100% black, above the 70% thermal safety limit.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("prev_blocked")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print" })).toBeDisabled();
+  });
+
   it("prints an approved preview through the mock queue and shows user-check state", async () => {
     const createDocumentPreview = vi.fn().mockResolvedValue({
       previewId: "prev_print",

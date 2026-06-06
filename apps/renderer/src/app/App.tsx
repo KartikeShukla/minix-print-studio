@@ -183,6 +183,7 @@ type PreviewWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "ready"; preview: DocumentPreviewResponse; plan: PrintPlanResponse }
+  | { status: "blocked"; preview: DocumentPreviewResponse; message: string }
   | { status: "error"; message: string };
 
 type PrintWorkflow =
@@ -881,17 +882,29 @@ export function App({
     setPrintWorkflow({ status: "idle" });
     try {
       const preview = await client.createDocumentPreview(document, DEFAULT_RENDER_SETTINGS);
-      const plan = await client.planApprovedPreview({
-        jobId: "job_preview",
-        previewId: preview.previewId,
-        approvalToken: preview.approvalToken,
-        documentHash: preview.documentHash,
-        renderSettingsHash: preview.renderSettingsHash,
-        profileId: document.target.profileId,
-        paperMode: document.target.paperMode,
-        density: document.target.density
-      });
-      setPreviewWorkflow({ status: "ready", preview, plan });
+      try {
+        const plan = await client.planApprovedPreview({
+          jobId: "job_preview",
+          previewId: preview.previewId,
+          approvalToken: preview.approvalToken,
+          documentHash: preview.documentHash,
+          renderSettingsHash: preview.renderSettingsHash,
+          profileId: document.target.profileId,
+          paperMode: document.target.paperMode,
+          density: document.target.density
+        });
+        setPreviewWorkflow({ status: "ready", preview, plan });
+      } catch (error: unknown) {
+        if (preview.safety.allowed === false) {
+          setPreviewWorkflow({
+            status: "blocked",
+            preview,
+            message: error instanceof Error ? error.message : "Preview blocked by safety"
+          });
+          return;
+        }
+        throw error;
+      }
     } catch (error: unknown) {
       setPreviewWorkflow({
         status: "error",
@@ -1423,6 +1436,10 @@ export function App({
       ? "Daemon offline"
       : "Checking daemon";
   const previewReady = previewWorkflow.status === "ready";
+  const safetyPreview =
+    previewWorkflow.status === "ready" || previewWorkflow.status === "blocked"
+      ? previewWorkflow.preview
+      : null;
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
   const canvasZoom =
@@ -1616,12 +1633,13 @@ export function App({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Coverage</span>
-                  <span>{previewReady ? formatCoverage(previewWorkflow.preview) : "0%"}</span>
+                  <span>{safetyPreview ? formatCoverage(safetyPreview) : "0%"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Agent direct print</span>
                   <span>Off</span>
                 </div>
+                {safetyPreview ? <SafetyMessages preview={safetyPreview} /> : null}
               </div>
             </section>
 
@@ -1655,6 +1673,18 @@ export function App({
                 <p className="text-sm leading-6 text-muted-foreground">
                   Requesting daemon preview and print plan.
                 </p>
+              ) : previewWorkflow.status === "blocked" ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant="warning">Preview blocked by safety</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Preview</span>
+                    <span>{previewWorkflow.preview.previewId}</span>
+                  </div>
+                  <p className="leading-6 text-destructive">{previewWorkflow.message}</p>
+                </div>
               ) : previewWorkflow.status === "error" ? (
                 <p className="text-sm leading-6 text-destructive">{previewWorkflow.message}</p>
               ) : (
@@ -3768,6 +3798,32 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
   );
 }
 
+function SafetyMessages({ preview }: { preview: DocumentPreviewResponse }) {
+  const warnings = safetyEntryMessages(preview.safety.warnings);
+  const errors = safetyEntryMessages(preview.safety.errors);
+  if (warnings.length === 0 && errors.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-1 pt-2">
+      {warnings.map((message) => (
+        <div key={`warning-${message}`} className="rounded-md bg-warning/10 px-2 py-1 text-xs text-warning">
+          {message}
+        </div>
+      ))}
+      {errors.map((message) => (
+        <div
+          key={`error-${message}`}
+          className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive"
+        >
+          {message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function useLoadedCanvasImage(dataUrl: string): HTMLImageElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
 
@@ -4045,6 +4101,25 @@ function formatHostReadinessStatus(status: string): string {
 function formatCoverage(preview: DocumentPreviewResponse): string {
   const value = preview.safety.metrics?.totalBlackCoverage;
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "0%";
+}
+
+function safetyEntryMessages(entries: unknown[] | undefined): string[] {
+  if (!entries) {
+    return [];
+  }
+  return entries.flatMap((entry) => {
+    if (typeof entry === "string") {
+      return [entry];
+    }
+    if (isObjectRecord(entry) && typeof entry.message === "string") {
+      return [entry.message];
+    }
+    return [];
+  });
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function formatQueueStatus(previewReady: boolean, workflow: PrintWorkflow): string {

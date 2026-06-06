@@ -24,7 +24,11 @@ class RenderedDocument:
     safety: dict[str, object]
 
 
-def render_document(document: dict[str, Any]) -> RenderedDocument:
+def render_document(
+    document: dict[str, Any],
+    *,
+    profile: dict[str, Any] | None = None,
+) -> RenderedDocument:
     target = _dict_value(document, "target")
     width_dots = _int_value(target, "widthDots")
     height_dots = _int_value(target, "heightDots")
@@ -58,13 +62,33 @@ def render_document(document: dict[str, Any]) -> RenderedDocument:
         packed_raster=packed,
         raster_hash=_sha256(packed),
         preview_png=preview,
-        safety=_build_safety_report(packed, width_dots=width_dots, height_dots=height_dots),
+        safety=_build_safety_report(
+            packed,
+            width_dots=width_dots,
+            height_dots=height_dots,
+            profile=profile,
+        ),
     )
 
 
 def render_settings_hash(render_settings: dict[str, object]) -> str:
     canonical = repr(sorted(render_settings.items())).encode("utf-8")
     return _sha256(canonical)
+
+
+def build_raster_safety_report(
+    packed: bytes,
+    *,
+    width_dots: int,
+    height_dots: int,
+    profile: dict[str, Any] | None = None,
+) -> dict[str, object]:
+    return _build_safety_report(
+        packed,
+        width_dots=width_dots,
+        height_dots=height_dots,
+        profile=profile,
+    )
 
 
 def document_hash(document: dict[str, Any]) -> str:
@@ -190,22 +214,108 @@ def _build_safety_report(
     *,
     width_dots: int,
     height_dots: int,
+    profile: dict[str, Any] | None,
 ) -> dict[str, object]:
     total_black_pixels = sum(value.bit_count() for value in packed)
     total_pixels = width_dots * height_dots
     coverage = calculate_black_coverage(packed, width_dots=width_dots, height_dots=height_dots)
+    band_height = _safety_int(profile, "bandHeightDots") or 64
+    max_band_coverage = _max_band_coverage(
+        packed,
+        width_dots=width_dots,
+        height_dots=height_dots,
+        band_height_dots=band_height,
+    )
+    warn_total_black_coverage = _safety_float(profile, "warnTotalBlackCoverage")
+    block_band_coverage = _safety_float(profile, "blockBandCoverage")
+    warnings: list[dict[str, object]] = []
+    errors: list[dict[str, object]] = []
+
+    if warn_total_black_coverage is not None and coverage > warn_total_black_coverage:
+        warnings.append(
+            {
+                "code": "total_black_coverage_high",
+                "message": (
+                    f"Total black coverage is {_format_percent(coverage)}, above the "
+                    f"{_format_percent(warn_total_black_coverage)} warning limit."
+                ),
+                "threshold": warn_total_black_coverage,
+                "value": coverage,
+            }
+        )
+    if block_band_coverage is not None and max_band_coverage > block_band_coverage:
+        errors.append(
+            {
+                "code": "band_coverage_blocked",
+                "message": (
+                    f"A {band_height}-dot band is {_format_percent(max_band_coverage)} black, "
+                    f"above the {_format_percent(block_band_coverage)} thermal safety limit."
+                ),
+                "threshold": block_band_coverage,
+                "value": max_band_coverage,
+            }
+        )
+
     return {
-        "allowed": True,
-        "warnings": [],
-        "errors": [],
+        "allowed": not errors,
+        "warnings": warnings,
+        "errors": errors,
         "metrics": {
             "heightDots": height_dots,
             "totalBlackPixels": total_black_pixels,
             "totalPixels": total_pixels,
             "totalBlackCoverage": coverage,
-            "maxBandCoverage64": coverage,
+            "maxBandCoverage64": max_band_coverage,
         },
     }
+
+
+def _max_band_coverage(
+    packed: bytes,
+    *,
+    width_dots: int,
+    height_dots: int,
+    band_height_dots: int,
+) -> float:
+    row_bytes = width_dots // 8
+    max_coverage = 0.0
+    for start_row in range(0, height_dots, band_height_dots):
+        rows = min(band_height_dots, height_dots - start_row)
+        start_byte = start_row * row_bytes
+        end_byte = start_byte + (rows * row_bytes)
+        black_pixels = sum(value.bit_count() for value in packed[start_byte:end_byte])
+        max_coverage = max(max_coverage, black_pixels / (width_dots * rows))
+    return max_coverage
+
+
+def _safety_float(profile: dict[str, Any] | None, key: str) -> float | None:
+    safety = _profile_safety(profile)
+    value = safety.get(key)
+    if isinstance(value, int | float):
+        return float(value)
+    return None
+
+
+def _safety_int(profile: dict[str, Any] | None, key: str) -> int | None:
+    safety = _profile_safety(profile)
+    value = safety.get(key)
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _profile_safety(profile: dict[str, Any] | None) -> dict[str, Any]:
+    if profile is None:
+        return {}
+    value = profile.get("safety")
+    return value if isinstance(value, dict) else {}
+
+
+def _format_percent(value: float) -> str:
+    percentage = value * 100
+    if percentage.is_integer():
+        return f"{int(percentage)}%"
+    return f"{percentage:.1f}%"
 
 
 def _color_value(value: object) -> int:

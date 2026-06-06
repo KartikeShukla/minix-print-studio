@@ -78,7 +78,7 @@ def create_app(
         profiles=profiles_data,
         adapter=_create_ble_adapter(profiles=profiles_data, mock=mock),
     )
-    app.include_router(create_render_router(preview_store=preview_store))
+    app.include_router(create_render_router(preview_store=preview_store, profiles=profiles_data))
     app.include_router(create_projects_router(project_store=project_store))
     app.include_router(create_printers_router(discovery_service=discovery_service))
     app.include_router(

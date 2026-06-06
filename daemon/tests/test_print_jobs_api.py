@@ -150,6 +150,49 @@ def test_print_endpoint_rejects_bad_approval_token_without_creating_job() -> Non
     assert client.get("/v1/jobs").json() == {"jobs": []}
 
 
+def test_print_endpoint_rejects_preview_blocked_by_safety_without_creating_job() -> None:
+    client = TestClient(create_app(mock=True))
+    row_bytes = 48
+    content_height = 64
+    content_raster = bytes([0xFF]) * row_bytes * content_height
+    preview = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": content_height,
+            "rasterBase64": base64.b64encode(content_raster).decode("ascii"),
+            "safety": {
+                "allowed": False,
+                "warnings": [],
+                "errors": [{"code": "band_coverage_blocked"}],
+                "metrics": {"maxBandCoverage64": 1.0},
+            },
+        },
+    ).json()
+
+    response = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "preview safety blocked printing: band_coverage_blocked"
+    assert client.get("/v1/jobs").json() == {"jobs": []}
+
+
 def test_print_jobs_survive_daemon_app_restart_with_data_dir(tmp_path: Path) -> None:
     client = TestClient(create_app(mock=True, data_dir=tmp_path))
     document = {

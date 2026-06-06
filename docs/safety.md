@@ -19,6 +19,16 @@ The daemon creates preview-bound approval artifacts. Print planning requires a m
 preview id, document hash, render settings hash, raster hash, and approval token.
 Diagnostics exports must not expose approval tokens or raw raster bytes.
 
+## Thermal Coverage Policy
+
+Canonical preview rendering uses the selected printer profile's safety thresholds.
+The daemon recomputes safety for both document-rendered previews and raw raster
+preview submissions instead of trusting client-provided safety fields. Dense
+output can still generate a preview artifact for review, but a preview with
+`allowed: false` is refused by both print planning and direct print submission.
+The renderer keeps the blocked preview's coverage, warnings, and errors visible
+without enabling Print.
+
 ## Runtime Boundaries
 
 - Electron renderers use context isolation, sandboxing, and a narrow preload API.
