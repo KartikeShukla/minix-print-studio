@@ -36,6 +36,9 @@ pnpm release-package-check
 - Host-readiness tests cover the CLI diagnostic that distinguishes local
   Bluetooth controller visibility failures from printer-level Stage A failures
   and emits remediation actions for blocked hosts.
+- Guarded Stage A CLI tests cover `scan --require-host-ready` and
+  `export-read-only --require-host-ready` refusing daemon contact when host
+  Bluetooth readiness blocks Stage A.
 - Desktop and renderer tests cover exposing that host-readiness result in the
   Printer panel before Stage A scan attempts, including recommended actions.
 - Offline certification-preflight tests cover Stage B protocol command metadata
