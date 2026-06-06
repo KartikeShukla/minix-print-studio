@@ -82,17 +82,21 @@ Public development is on `main`; implementation slices use short-lived
   details visible when print planning is refused by the daemon.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
-- MCP daemon HTTP client for bearer-authenticated daemon health, document-preview,
-  and print-job status requests.
+- MCP daemon HTTP client for bearer-authenticated daemon health, profile listing,
+  document-preview, and print-job status requests.
 - MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
 - MCP print-note responses include explicit agent policy decisions and daemon
   preview safety metrics while keeping approval tokens redacted.
 - MCP `get_job_status` returns redacted daemon job state, completion confidence,
   progress, and safe recovery actions without exposing approval tokens, raster
   data, or raw segment payloads.
+- MCP `list_supported_profiles` returns safe profile summaries with profile id,
+  support level, dimensions, paper/density options, and agent safety limits
+  without exposing BLE UUIDs, read-only probe commands, or protocol payload
+  details.
 - FastMCP stdio server wrapper that registers `get_daemon_status`,
-  `get_job_status`, `preview_document`, and `print_note` against the core MCP
-  tool handlers.
+  `get_job_status`, `list_supported_profiles`, `preview_document`, and
+  `print_note` against the core MCP tool handlers.
 - `minix-mcp` CLI entrypoint now runs the FastMCP stdio server instead of returning a static app-not-running response.
 - Mock-first BLE discovery service that classifies profile/service/name matches as `detected_unverified` without granting print permission.
 - Read-only device verification flow that matches model and firmware against the printer profile while keeping printing locked until protocol sanity testing.
@@ -147,7 +151,9 @@ Public development is on `main`; implementation slices use short-lived
 - Desktop Agent Integration connection tests verify the stable shim and runtime handoff prerequisites for a selected target.
 - Renderer Agent Integrations panel exposes a non-mutating Test action and surfaces the desktop connection-test result per target.
 - MCP stdio smoke helper launches the real Python MCP server against a mock daemon runtime handoff and validates daemon status without exposing daemon bearer tokens.
-- Claude Desktop Agent Integration can export a token-free `.mcpb` bundle containing a manifest, local shim bridge, and install README.
+- Claude Desktop Agent Integration can export a token-free `.mcpb` bundle
+  containing a manifest, local shim bridge, install README, and the advertised
+  safe MCP tool list.
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
 - Mock print jobs can simulate a segment-boundary transport disconnect and report
   `failed_partial_output` with exact bands, rows, bytes, user-check requirement,
@@ -217,8 +223,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for MCP approval-required policy decisions, safety metric
   propagation, approval-token redaction in print-note responses, and redacted
-  job-status lookup through the stdio server.
-- TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
+  job-status/profile lookup through the stdio server.
+- TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest
+  metadata, advertised safe tool list, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
 - TDD red/green checks for virtual segment-boundary transport disconnects reporting
   `failed_partial_output` and diagnostics that explain why auto-retry is unsafe

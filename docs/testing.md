@@ -47,6 +47,9 @@ pnpm release-package-check
 - MCP tool tests cover approval-required print-note policy decisions, safety
   metric propagation, approval-token redaction, and redacted job-status lookup
   through the stdio server.
+- MCP profile-list tests cover supported-profile summaries that omit BLE UUIDs,
+  read-only probe commands, and protocol payload details while keeping profile
+  dimensions and agent safety limits available.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.

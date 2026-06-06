@@ -48,6 +48,7 @@ describe("Claude Desktop MCPB export", () => {
         };
       };
       compatibility: { platforms: string[] };
+      tools: Array<{ name: string }>;
     };
 
     expect(manifest).toMatchObject({
@@ -76,6 +77,13 @@ describe("Claude Desktop MCPB export", () => {
     });
     expect(JSON.stringify(manifest)).not.toContain("MINIX_DAEMON_TOKEN");
     expect(JSON.stringify(manifest)).not.toContain("token_");
+    expect(manifest.tools.map((tool) => tool.name)).toEqual([
+      "get_daemon_status",
+      "get_job_status",
+      "list_supported_profiles",
+      "preview_document",
+      "print_note",
+    ]);
 
     const bridge = readRequiredEntry(
       entries,

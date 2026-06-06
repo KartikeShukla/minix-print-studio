@@ -43,6 +43,19 @@ class StubDaemonClient:
             "safeActions": ["confirm_complete"],
         }
 
+    def get_profiles(self) -> JsonObject:
+        return {
+            "profiles": [
+                {
+                    "id": "seznik-minix-s1-lyin48d-gy",
+                    "displayName": "Seznik MiniX - S1_LYiN48D_GY",
+                    "supportLevel": "official",
+                    "profileVersion": "1.0.0",
+                    "print": {"widthDots": 384, "rowBytes": 48},
+                }
+            ]
+        }
+
 
 @pytest.fixture
 def anyio_backend() -> str:
@@ -66,6 +79,7 @@ async def test_mcp_server_lists_minix_tools(client_session: ClientSession) -> No
     assert {tool.name for tool in tools.tools} == {
         "get_daemon_status",
         "get_job_status",
+        "list_supported_profiles",
         "preview_document",
         "print_note",
     }
@@ -111,3 +125,15 @@ async def test_mcp_server_calls_get_job_status_tool(
     assert result.structuredContent["status"] == "ok"
     assert result.structuredContent["job"]["jobId"] == "job_123"
     assert result.structuredContent["job"]["completionLevel"] == "unverified"
+
+
+@pytest.mark.anyio
+async def test_mcp_server_calls_list_supported_profiles_tool(
+    client_session: ClientSession,
+) -> None:
+    result = await client_session.call_tool("list_supported_profiles", {})
+
+    assert result.structuredContent is not None
+    assert result.structuredContent["status"] == "ok"
+    assert result.structuredContent["profiles"][0]["id"] == "seznik-minix-s1-lyin48d-gy"
+    assert "serviceUuid" not in str(result.structuredContent)
