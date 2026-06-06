@@ -31,6 +31,7 @@ New profiles must include:
 - BLE service, write characteristic, and notify characteristic identifiers.
 - Conservative print defaults and safety limits.
 - A hardware-test artifact with user paths and device identifiers redacted before sharing.
+- A Stage A evidence summary for maintainer review before sharing a full artifact ZIP.
 
 Profiles must not unlock printing from detection alone. Printing remains gated by the
 certification stages in [hardware-certification.md](hardware-certification.md).

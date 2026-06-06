@@ -14,7 +14,7 @@ import {
 } from "./integrationInstaller";
 import { ensureMcpShim } from "./mcpShim";
 import { exportClaudeDesktopMcpb } from "./mcpbExport";
-import { inspectHardwareArtifact } from "./hardwareArtifacts";
+import { checkHostBluetoothReadiness, inspectHardwareArtifact } from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -144,6 +144,11 @@ ipcMain.handle("updates:set-channel", (_event, channel: string) =>
     userDataPath: app.getPath("userData"),
     appVersion: app.getVersion(),
     channel
+  })
+);
+ipcMain.handle("hardware-readiness:check", () =>
+  checkHostBluetoothReadiness({
+    repoRoot: getRepoRoot()
   })
 );
 ipcMain.handle("hardware-artifacts:inspect", async () => {

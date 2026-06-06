@@ -7,6 +7,15 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_PACKAGING_SCRIPT = PROJECT_ROOT / "scripts" / "validate_release_packaging.py"
+BLUETOOTH_USAGE_DESCRIPTION = (
+    "MiniX Print Studio uses Bluetooth only to connect to your local "
+    "MiniX thermal printer."
+)
+BLUETOOTH_EXTEND_INFO = (
+    "  extendInfo:\n"
+    f"    NSBluetoothAlwaysUsageDescription: {BLUETOOTH_USAGE_DESCRIPTION}\n"
+    f"    NSBluetoothPeripheralUsageDescription: {BLUETOOTH_USAGE_DESCRIPTION}\n"
+)
 
 
 def test_release_packaging_check_passes_for_repository() -> None:
@@ -67,6 +76,25 @@ def test_release_packaging_check_requires_windows_x64_package_command() -> None:
     assert issues == ["apps/desktop/package.json missing package:win script"]
 
 
+def test_release_packaging_check_requires_desktop_integration_configs_source_alias() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_desktop_tsconfig_text(
+        """
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {}
+  }
+}
+"""
+    )
+
+    assert issues == [
+        "apps/desktop/tsconfig.json must map @minix/integration-configs to source",
+    ]
+
+
 def test_release_packaging_check_requires_windows_package_workflow() -> None:
     validator = _load_validator()
 
@@ -124,11 +152,12 @@ def test_release_packaging_check_requires_sidecar_resources() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
   signAndEditExecutable: false
@@ -139,11 +168,34 @@ publish: null
     assert issues == ["electron-builder config must include sidecar binaries"]
 
 
-def test_release_packaging_check_rejects_runtime_state_and_signing_identity() -> None:
+def test_release_packaging_check_requires_macos_bluetooth_usage_descriptions() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
         """
+files:
+  - out/**
+extraResources:
+  - from: ../../dist/sidecars
+    to: sidecars
+mac:
+  icon: build/icon.png
+  identity: null
+win:
+  icon: build/icon.ico
+  signAndEditExecutable: false
+publish: null
+"""
+    )
+
+    assert issues == ["electron-builder config must set macOS Bluetooth usage descriptions"]
+
+
+def test_release_packaging_check_rejects_runtime_state_and_signing_identity() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_builder_config_text(
+        f"""
 appId: app.example.private
 productName: Private App
 directories:
@@ -157,6 +209,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
   identity: Developer ID Application: Example Person
 win:
   icon: build/icon.ico
@@ -178,7 +231,7 @@ def test_release_packaging_check_rejects_hardware_artifact_inclusion() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
   - hardware-artifacts/**
@@ -187,6 +240,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
   signAndEditExecutable: false
@@ -201,7 +255,7 @@ def test_release_packaging_check_requires_windows_resource_editing_disabled() ->
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 win:
   target:
     - target: dir
@@ -212,6 +266,7 @@ extraResources:
     to: sidecars
 mac:
   icon: build/icon.png
+{BLUETOOTH_EXTEND_INFO}\
 win:
   icon: build/icon.ico
 publish: null
@@ -227,7 +282,7 @@ def test_release_packaging_check_requires_explicit_package_icons() -> None:
     validator = _load_validator()
 
     issues = validator.validate_builder_config_text(
-        """
+        f"""
 files:
   - out/**
 extraResources:
@@ -235,6 +290,7 @@ extraResources:
     to: sidecars
 mac:
   identity: null
+{BLUETOOTH_EXTEND_INFO}\
 win:
   signAndEditExecutable: false
 publish: null
@@ -279,6 +335,21 @@ def test_release_packaging_check_requires_artifact_upload_exclusions() -> None:
     ]
 
 
+def test_release_packaging_check_requires_node24_actions_runtime_opt_in() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text().replace(
+            "env:\n  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true\n\n",
+            "",
+        )
+    )
+
+    assert issues == [
+        "release package workflow must opt into the Node 24 JavaScript action runtime",
+    ]
+
+
 def _load_validator() -> object:
     spec = importlib.util.spec_from_file_location(
         "release_packaging_validation",
@@ -297,6 +368,9 @@ name: Release Package
 
 on:
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   package:

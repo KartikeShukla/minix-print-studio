@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import platform
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -13,6 +16,7 @@ from typing import TextIO, cast
 from zipfile import BadZipFile, ZipFile
 
 from minixd.protocol.aiyin import (
+    build_raster_command,
     build_set_density_command,
     build_set_paper_mode_command,
     build_wake_command,
@@ -27,6 +31,7 @@ class HttpResponse:
 
 
 type HttpTransport = Callable[[str, str, bytes | None, Mapping[str, str], float], HttpResponse]
+type HostBluetoothProbe = Callable[[], dict[str, object]]
 
 
 class HardwareTestCliError(RuntimeError):
@@ -49,6 +54,28 @@ STAGE_A_ARTIFACT_REQUIRED_FILES = (
     "app-version.json",
     "README.md",
 )
+TINY_VISUAL_CARD_TEXT = "MINIX TEST 7K4P"
+TINY_VISUAL_CARD_HEIGHT_DOTS = 160
+TINY_VISUAL_CARD_CONFIRMATION_CHECKLIST = (
+    "Text MINIX TEST 7K4P is readable.",
+    "Left and right edge markers are visible.",
+    "Output is not mirrored or upside down.",
+    "Feed is smooth with no stall, overheat warning, disconnect, or fatal error.",
+)
+_TINY_CARD_FONT: dict[str, tuple[str, ...]] = {
+    " ": ("00000", "00000", "00000", "00000", "00000", "00000", "00000"),
+    "4": ("10010", "10010", "10010", "11111", "00010", "00010", "00010"),
+    "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
+    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+    "I": ("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
+    "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
+    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+    "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
+    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    "X": ("10001", "01010", "00100", "00100", "00100", "01010", "10001"),
+}
 
 
 class HardwareTestClient:
@@ -130,6 +157,7 @@ def run(
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
     transport: HttpTransport | None = None,
+    host_bluetooth_probe: HostBluetoothProbe | None = None,
 ) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -143,6 +171,13 @@ def run(
     try:
         if args.command == "scan":
             stdout.write(json.dumps(client.scan_printers(), indent=2, sort_keys=True))
+            stdout.write("\n")
+            return 0
+        if args.command == "host-readiness":
+            probe_result = (
+                host_bluetooth_probe or collect_host_bluetooth_readiness
+            )()
+            stdout.write(json.dumps(probe_result, indent=2, sort_keys=True))
             stdout.write("\n")
             return 0
         if args.command == "export-read-only":
@@ -166,6 +201,26 @@ def run(
             stdout.write(
                 json.dumps(
                     plan_protocol_sanity_preflight(Path(args.artifact_path)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            stdout.write("\n")
+            return 0
+        if args.command == "tiny-visual-card-preflight":
+            stdout.write(
+                json.dumps(
+                    plan_tiny_visual_card_preflight(Path(args.artifact_path)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            stdout.write("\n")
+            return 0
+        if args.command == "evidence-summary":
+            stdout.write(
+                json.dumps(
+                    build_shareable_evidence_summary(Path(args.artifact_path)),
                     indent=2,
                     sort_keys=True,
                 )
@@ -203,6 +258,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("scan", help="Scan for visible printer candidates.")
+    subparsers.add_parser(
+        "host-readiness",
+        help="Check whether the host exposes a Bluetooth controller for Stage A.",
+    )
 
     export_parser = subparsers.add_parser(
         "export-read-only",
@@ -226,6 +285,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Plan the Stage B protocol sanity command sequence from a Stage A artifact.",
     )
     preflight_parser.add_argument("artifact_path", help="Path to a Stage A hardware-test ZIP.")
+
+    visual_card_parser = subparsers.add_parser(
+        "tiny-visual-card-preflight",
+        help="Plan the Stage C tiny visual card metadata from a Stage A artifact.",
+    )
+    visual_card_parser.add_argument(
+        "artifact_path",
+        help="Path to a Stage A hardware-test ZIP.",
+    )
+
+    evidence_summary_parser = subparsers.add_parser(
+        "evidence-summary",
+        help="Build a redacted, shareable Stage A evidence summary.",
+    )
+    evidence_summary_parser.add_argument(
+        "artifact_path",
+        help="Path to a Stage A hardware-test ZIP.",
+    )
     return parser
 
 
@@ -261,6 +338,113 @@ def inspect_stage_a_artifact(artifact_path: Path) -> dict[str, object]:
             "nextRequiredStage",
             "print-transfer-manifest.json",
         ),
+    }
+
+
+def collect_host_bluetooth_readiness() -> dict[str, object]:
+    host_platform = platform.system()
+    if host_platform == "Darwin":
+        try:
+            completed = subprocess.run(
+                ["system_profiler", "SPBluetoothDataType"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {
+                "status": "unknown",
+                "platform": host_platform,
+                "controllerVisible": None,
+                "canAttemptStageA": False,
+                "detail": f"Could not run macOS Bluetooth readiness probe: {exc}",
+                "checks": [
+                    {
+                        "name": "system_profiler SPBluetoothDataType",
+                        "status": "unknown",
+                        "evidence": type(exc).__name__,
+                    }
+                ],
+            }
+        return parse_macos_bluetooth_readiness(
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            exit_code=completed.returncode,
+        )
+
+    return {
+        "status": "unsupported_platform",
+        "platform": host_platform,
+        "controllerVisible": None,
+        "canAttemptStageA": False,
+        "detail": "Bluetooth host-readiness probing is currently implemented for macOS only.",
+        "checks": [
+            {
+                "name": "platform",
+                "status": "unsupported_platform",
+                "evidence": host_platform or "unknown",
+            }
+        ],
+    }
+
+
+def parse_macos_bluetooth_readiness(
+    *,
+    stdout: str,
+    stderr: str,
+    exit_code: int,
+) -> dict[str, object]:
+    combined = f"{stdout}\n{stderr}"
+    if "controllerInfo == nil" in combined or _macos_bluetooth_report_is_empty(stdout):
+        return {
+            "status": "not_visible",
+            "platform": "Darwin",
+            "controllerVisible": False,
+            "canAttemptStageA": False,
+            "detail": "macOS did not report a Bluetooth controller to this process.",
+            "checks": [
+                {
+                    "name": "system_profiler SPBluetoothDataType",
+                    "status": "not_visible",
+                    "evidence": (
+                        "controllerInfo == nil"
+                        if "controllerInfo == nil" in combined
+                        else "empty Bluetooth report"
+                    ),
+                }
+            ],
+        }
+
+    if exit_code == 0 and _macos_bluetooth_report_has_controller(stdout):
+        return {
+            "status": "ready_to_scan",
+            "platform": "Darwin",
+            "controllerVisible": True,
+            "canAttemptStageA": True,
+            "detail": "macOS reports a Bluetooth controller to this process.",
+            "checks": [
+                {
+                    "name": "system_profiler SPBluetoothDataType",
+                    "status": "ready_to_scan",
+                    "evidence": "Bluetooth controller fields present",
+                }
+            ],
+        }
+
+    return {
+        "status": "unknown",
+        "platform": "Darwin",
+        "controllerVisible": None,
+        "canAttemptStageA": False,
+        "detail": "macOS Bluetooth readiness could not be determined from system_profiler.",
+        "checks": [
+            {
+                "name": "system_profiler SPBluetoothDataType",
+                "status": "unknown",
+                "evidence": f"exit_code={exit_code}",
+            }
+        ],
     }
 
 
@@ -338,6 +522,217 @@ def plan_protocol_sanity_preflight(artifact_path: Path) -> dict[str, object]:
     }
 
 
+def plan_tiny_visual_card_preflight(artifact_path: Path) -> dict[str, object]:
+    stage_a_summary = inspect_stage_a_artifact(artifact_path)
+    next_required_stage = _required_json_string(
+        stage_a_summary,
+        "nextRequiredStage",
+        "print-transfer-manifest.json",
+    )
+    if next_required_stage != "protocol_sanity_test":
+        raise HardwareTestCliError("artifact is not ready for tiny visual card preflight")
+
+    try:
+        with ZipFile(artifact_path) as archive:
+            profile = _read_zip_json_object(archive, "profile.json")
+    except BadZipFile as exc:
+        raise HardwareTestCliError("artifact is not a ZIP file") from exc
+
+    profile_id = _required_json_string(profile, "id", "profile.json")
+    artifact_profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    if profile_id != artifact_profile_id:
+        raise HardwareTestCliError("artifact profile does not match transfer manifest")
+
+    print_config = _required_json_object(profile, "print", "profile.json")
+    width_dots = _required_json_int(print_config, "widthDots", "profile.json.print")
+    row_bytes = _required_json_int(print_config, "rowBytes", "profile.json.print")
+    if width_dots <= 0 or width_dots % 8 != 0:
+        raise HardwareTestCliError("artifact profile has invalid print width")
+    if row_bytes != width_dots // 8:
+        raise HardwareTestCliError("artifact profile row bytes do not match print width")
+
+    density = _required_json_string(print_config, "defaultDensity", "profile.json.print")
+    paper_mode = _required_json_string(print_config, "defaultPaperMode", "profile.json.print")
+    packed_raster = _build_tiny_visual_card_raster(width_dots, TINY_VISUAL_CARD_HEIGHT_DOTS)
+    try:
+        raster_command = build_raster_command(
+            width_dots=width_dots,
+            height_dots=TINY_VISUAL_CARD_HEIGHT_DOTS,
+            packed_raster=packed_raster,
+        )
+    except ValueError as exc:
+        raise HardwareTestCliError(str(exc)) from exc
+
+    return {
+        "status": "tiny_visual_card_preflight_ready",
+        "stage": "tiny_visual_test_card",
+        "deviceId": _required_json_string(
+            stage_a_summary,
+            "deviceId",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": profile_id,
+        "requiredPriorStage": "protocol_sanity_test",
+        "displayText": TINY_VISUAL_CARD_TEXT,
+        "widthDots": width_dots,
+        "heightDots": TINY_VISUAL_CARD_HEIGHT_DOTS,
+        "rowBytes": row_bytes,
+        "density": density,
+        "paperMode": paper_mode,
+        "printCommandsSent": False,
+        "rasterBytesIncluded": False,
+        "plannedRaster": {
+            "commandName": "raster_test_card",
+            "payloadBytes": len(raster_command),
+            "rasterBytes": len(packed_raster),
+            "rawBytesIncluded": False,
+            "contentSha256": hashlib.sha256(packed_raster).hexdigest(),
+        },
+        "confirmationChecklist": list(TINY_VISUAL_CARD_CONFIRMATION_CHECKLIST),
+        "safety": {
+            "requiresPhysicalPrinter": True,
+            "requiresUserConfirmation": True,
+            "requiresPriorProtocolSanity": True,
+            "sendsRasterIfExecuted": True,
+            "unlocksPrinting": False,
+            "preflightOnly": True,
+        },
+    }
+
+
+def build_shareable_evidence_summary(artifact_path: Path) -> dict[str, object]:
+    stage_a_summary = inspect_stage_a_artifact(artifact_path)
+    protocol_preflight = plan_protocol_sanity_preflight(artifact_path)
+    visual_card_preflight = plan_tiny_visual_card_preflight(artifact_path)
+    device_id = _required_json_string(
+        stage_a_summary,
+        "deviceId",
+        "print-transfer-manifest.json",
+    )
+
+    return {
+        "status": "shareable_stage_a_evidence_ready",
+        "shareable": True,
+        "artifactStatus": _required_json_string(
+            stage_a_summary,
+            "status",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": _required_json_string(
+            stage_a_summary,
+            "profileId",
+            "print-transfer-manifest.json",
+        ),
+        "nextRequiredStage": _required_json_string(
+            stage_a_summary,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        ),
+        "device": {
+            "idRedacted": True,
+            "fingerprint": f"sha256:{hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:16]}",
+        },
+        "redaction": {
+            "artifactPathIncluded": False,
+            "localPathsIncluded": False,
+            "rawCommandLogIncluded": False,
+            "rawNotificationLogIncluded": False,
+            "commandPayloadHexIncluded": False,
+            "rasterBytesIncluded": False,
+            "bearerTokensIncluded": False,
+        },
+        "certification": {
+            "stageAReadOnlyVerified": True,
+            "printingLocked": True,
+            "certificationComplete": False,
+            "requiresStageBProtocolSanity": True,
+            "requiresTinyVisualCard": True,
+            "requiresLongPrintReliability": True,
+        },
+        "preflights": {
+            "protocolSanity": {
+                "status": _required_json_string(
+                    protocol_preflight,
+                    "status",
+                    "protocol-sanity-preflight",
+                ),
+                "stage": _required_json_string(
+                    protocol_preflight,
+                    "stage",
+                    "protocol-sanity-preflight",
+                ),
+                "commandCount": _json_list_length(
+                    protocol_preflight,
+                    "commands",
+                    "protocol-sanity-preflight",
+                ),
+                "sendsRaster": _required_json_bool(
+                    _required_json_object(
+                        protocol_preflight,
+                        "safety",
+                        "protocol-sanity-preflight",
+                    ),
+                    "sendsRaster",
+                    "protocol-sanity-preflight.safety",
+                ),
+                "unlocksPrinting": _required_json_bool(
+                    _required_json_object(
+                        protocol_preflight,
+                        "safety",
+                        "protocol-sanity-preflight",
+                    ),
+                    "unlocksPrinting",
+                    "protocol-sanity-preflight.safety",
+                ),
+            },
+            "tinyVisualCard": {
+                "status": _required_json_string(
+                    visual_card_preflight,
+                    "status",
+                    "tiny-visual-card-preflight",
+                ),
+                "stage": _required_json_string(
+                    visual_card_preflight,
+                    "stage",
+                    "tiny-visual-card-preflight",
+                ),
+                "displayText": _required_json_string(
+                    visual_card_preflight,
+                    "displayText",
+                    "tiny-visual-card-preflight",
+                ),
+                "heightDots": _required_json_int(
+                    visual_card_preflight,
+                    "heightDots",
+                    "tiny-visual-card-preflight",
+                ),
+                "rawBytesIncluded": _required_json_bool(
+                    _required_json_object(
+                        visual_card_preflight,
+                        "plannedRaster",
+                        "tiny-visual-card-preflight",
+                    ),
+                    "rawBytesIncluded",
+                    "tiny-visual-card-preflight.plannedRaster",
+                ),
+                "contentSha256": _required_json_string(
+                    _required_json_object(
+                        visual_card_preflight,
+                        "plannedRaster",
+                        "tiny-visual-card-preflight",
+                    ),
+                    "contentSha256",
+                    "tiny-visual-card-preflight.plannedRaster",
+                ),
+            },
+        },
+    }
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
     artifact_files = set(archive.namelist())
     for filename in STAGE_A_ARTIFACT_REQUIRED_FILES:
@@ -367,6 +762,21 @@ def _validate_read_only_safety(
         or safety_report.get("certificationComplete") is not False
     ):
         raise HardwareTestCliError("artifact is not read-only safe")
+
+
+def _macos_bluetooth_report_is_empty(stdout: str) -> bool:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    return lines == ["Bluetooth:"]
+
+
+def _macos_bluetooth_report_has_controller(stdout: str) -> bool:
+    report = stdout.lower()
+    return (
+        "bluetooth controller:" in report
+        or "address:" in report
+        or "state: on" in report
+        or "bluetooth low energy supported: yes" in report
+    )
 
 
 def _required_json_string(
@@ -404,6 +814,39 @@ def _required_json_string_list(
     return list(field_value)
 
 
+def _required_json_int(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> int:
+    field_value = value.get(field)
+    if not isinstance(field_value, int):
+        raise HardwareTestCliError(f"artifact missing required integer: {filename}.{field}")
+    return field_value
+
+
+def _required_json_bool(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> bool:
+    field_value = value.get(field)
+    if not isinstance(field_value, bool):
+        raise HardwareTestCliError(f"artifact missing required boolean: {filename}.{field}")
+    return field_value
+
+
+def _json_list_length(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> int:
+    field_value = value.get(field)
+    if not isinstance(field_value, list):
+        raise HardwareTestCliError(f"artifact missing required list: {filename}.{field}")
+    return len(field_value)
+
+
 def _protocol_command(index: int, name: str, payload: bytes) -> dict[str, object]:
     return {
         "index": index,
@@ -411,6 +854,78 @@ def _protocol_command(index: int, name: str, payload: bytes) -> dict[str, object
         "payloadBytes": len(payload),
         "hex": _hex(payload),
     }
+
+
+def _build_tiny_visual_card_raster(width_dots: int, height_dots: int) -> bytes:
+    row_bytes = width_dots // 8
+    raster = bytearray(row_bytes * height_dots)
+    _draw_text(
+        raster,
+        width_dots=width_dots,
+        text=TINY_VISUAL_CARD_TEXT,
+        x=12,
+        y=18,
+        scale=4,
+    )
+
+    for y in range(58, 126):
+        if y % 4 in (0, 1):
+            for x in range(0, 6):
+                _set_raster_pixel(raster, width_dots, x, y)
+            for x in range(width_dots - 6, width_dots):
+                _set_raster_pixel(raster, width_dots, x, y)
+
+    for y in range(92, 132, 8):
+        for x in range(24, width_dots - 24, 16):
+            block_on = ((x // 16) + (y // 8)) % 2 == 0
+            if block_on:
+                for block_y in range(y, min(y + 4, height_dots)):
+                    for block_x in range(x, min(x + 8, width_dots)):
+                        _set_raster_pixel(raster, width_dots, block_x, block_y)
+
+    for y in (146, 147):
+        for x in range(24, width_dots - 24, 4):
+            _set_raster_pixel(raster, width_dots, x, y)
+
+    return bytes(raster)
+
+
+def _draw_text(
+    raster: bytearray,
+    *,
+    width_dots: int,
+    text: str,
+    x: int,
+    y: int,
+    scale: int,
+) -> None:
+    cursor_x = x
+    for character in text:
+        glyph = _TINY_CARD_FONT[character]
+        for glyph_y, row in enumerate(glyph):
+            for glyph_x, enabled in enumerate(row):
+                if enabled != "1":
+                    continue
+                for scale_y in range(scale):
+                    for scale_x in range(scale):
+                        _set_raster_pixel(
+                            raster,
+                            width_dots,
+                            cursor_x + glyph_x * scale + scale_x,
+                            y + glyph_y * scale + scale_y,
+                        )
+        cursor_x += 6 * scale
+
+
+def _set_raster_pixel(raster: bytearray, width_dots: int, x: int, y: int) -> None:
+    if x < 0 or x >= width_dots or y < 0:
+        return
+    row_bytes = width_dots // 8
+    byte_index = y * row_bytes + x // 8
+    if byte_index >= len(raster):
+        return
+    bit = 7 - (x % 8)
+    raster[byte_index] |= 1 << bit
 
 
 def _hex(payload: bytes) -> str:

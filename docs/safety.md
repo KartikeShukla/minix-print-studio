@@ -31,3 +31,6 @@ Diagnostics exports must not expose approval tokens or raw raster bytes.
 Hardware-test artifacts are shareable validation records after redaction. Stage A
 artifacts must show `printCommandsSent: false`, `rasterBytesIncluded: false`,
 `printingLocked: true`, and `certificationComplete: false`.
+Prefer the Stage A evidence summary for maintainer review before sharing a full
+ZIP. The summary redacts the raw device id, omits artifact paths and raw logs, and
+keeps command payload hex and raster bytes out of the shared data.

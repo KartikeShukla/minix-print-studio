@@ -40,6 +40,16 @@ REQUIRED_DOCS = (
     Path("docs/troubleshooting.md"),
 )
 
+REQUIRED_README_SECTIONS = (
+    "## Project Status",
+    "## Safety Model",
+    "## Supported Printers",
+    "## Development",
+    "## Hardware Certification",
+    "## Agent Integrations",
+    "## Release and Validation",
+)
+
 REQUIRED_GITIGNORE_ENTRIES = (
     ".env",
     ".env.*",
@@ -73,7 +83,13 @@ REQUIRED_PACKAGE_SCRIPTS = {
     "open-source-check": "node scripts/run_python.mjs scripts/validate_open_source_readiness.py",
     "source-package-check": "node scripts/run_python.mjs scripts/validate_source_package.py",
     "release-package-check": "node scripts/run_python.mjs scripts/validate_release_packaging.py",
+    "public-history-check": "node scripts/run_python.mjs scripts/validate_public_history.py",
 }
+
+REQUIRED_PACKAGE_AUTHOR = "MiniX Print Studio Contributors"
+REQUIRED_PACKAGE_REPOSITORY_URL = "https://github.com/KartikeShukla/minix-print-studio.git"
+REQUIRED_PACKAGE_BUGS_URL = "https://github.com/KartikeShukla/minix-print-studio/issues"
+REQUIRED_PACKAGE_HOMEPAGE = "https://github.com/KartikeShukla/minix-print-studio#readme"
 
 REQUIRED_NON_HARDWARE_GATE_COMMANDS = (
     "pnpm lint",
@@ -96,9 +112,18 @@ REQUIRED_GATE_DOCS = (
 
 REQUIRED_WORKFLOW_PERMISSIONS = {
     ".github/workflows/ci.yml": {"contents": "read"},
-    ".github/workflows/codeql.yml": {"contents": "read", "security-events": "write"},
+    ".github/workflows/codeql.yml": {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write",
+    },
     ".github/workflows/release-package.yml": {"contents": "read"},
 }
+REQUIRED_WORKFLOW_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
+REQUIRED_CODEQL_PRIVATE_REPO_GUARD = (
+    "if: ${{ !github.event.repository.private || "
+    "vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}"
+)
 
 REQUIRED_DEPENDABOT_BLOCKS = (
     ("npm", "/"),
@@ -123,10 +148,12 @@ def validate_repository(root: Path) -> list[str]:
     issues: list[str] = []
     issues.extend(_missing_paths(root, REQUIRED_FILES))
     issues.extend(_missing_paths(root, REQUIRED_DOCS))
+    issues.extend(_readme_section_issues(root))
     issues.extend(_missing_gitignore_entries(root))
-    issues.extend(_missing_package_scripts(root))
+    issues.extend(_package_json_issues(root))
     issues.extend(_missing_ci_commands(root))
     issues.extend(_workflow_permission_issues(root))
+    issues.extend(_workflow_node24_runtime_issues(root))
     issues.extend(_codeql_workflow_issues(root))
     issues.extend(_dependabot_config_issues(root))
     issues.extend(_missing_documented_gate_commands(root))
@@ -149,6 +176,18 @@ def _missing_paths(root: Path, paths: tuple[Path, ...]) -> list[str]:
     return [f"missing required file: {path.as_posix()}" for path in paths if not (root / path).is_file()]
 
 
+def _readme_section_issues(root: Path) -> list[str]:
+    readme = root / "README.md"
+    if not readme.is_file():
+        return []
+    text = readme.read_text(encoding="utf-8")
+    return [
+        f"README.md missing required section: {section}"
+        for section in REQUIRED_README_SECTIONS
+        if section not in text
+    ]
+
+
 def _missing_gitignore_entries(root: Path) -> list[str]:
     gitignore = root / ".gitignore"
     if not gitignore.is_file():
@@ -165,15 +204,39 @@ def _missing_gitignore_entries(root: Path) -> list[str]:
     ]
 
 
-def _missing_package_scripts(root: Path) -> list[str]:
+def _package_json_issues(root: Path) -> list[str]:
     package_json = root / "package.json"
     if not package_json.is_file():
         return ["missing required file: package.json"]
     payload = json.loads(package_json.read_text(encoding="utf-8"))
+    issues = validate_package_metadata(payload)
     scripts = payload.get("scripts")
     if not isinstance(scripts, dict):
-        return ["package.json missing scripts object"]
-    return validate_package_scripts(scripts)
+        return [*issues, "package.json missing scripts object"]
+    return [*issues, *validate_package_scripts(scripts)]
+
+
+def validate_package_metadata(payload: dict[str, object]) -> list[str]:
+    issues: list[str] = []
+    if payload.get("author") != REQUIRED_PACKAGE_AUTHOR:
+        issues.append("package.json missing public package author")
+
+    repository = payload.get("repository")
+    repository_url = repository.get("url") if isinstance(repository, dict) else None
+    if repository_url != REQUIRED_PACKAGE_REPOSITORY_URL:
+        issues.append(
+            "package.json missing repository: "
+            f"{REQUIRED_PACKAGE_REPOSITORY_URL}"
+        )
+
+    bugs = payload.get("bugs")
+    bugs_url = bugs.get("url") if isinstance(bugs, dict) else None
+    if bugs_url != REQUIRED_PACKAGE_BUGS_URL:
+        issues.append(f"package.json missing bugs URL: {REQUIRED_PACKAGE_BUGS_URL}")
+
+    if payload.get("homepage") != REQUIRED_PACKAGE_HOMEPAGE:
+        issues.append(f"package.json missing homepage: {REQUIRED_PACKAGE_HOMEPAGE}")
+    return issues
 
 
 def validate_package_scripts(scripts: dict[str, object]) -> list[str]:
@@ -225,6 +288,7 @@ def validate_ci_workflow(text: str) -> list[str]:
             required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/ci.yml"],
         )
     )
+    issues.extend(validate_workflow_node24_runtime_text(label="CI workflow", text=text))
     return issues
 
 
@@ -244,6 +308,12 @@ def validate_workflow_permissions_text(
     return issues
 
 
+def validate_workflow_node24_runtime_text(*, label: str, text: str) -> list[str]:
+    if REQUIRED_WORKFLOW_NODE24_RUNTIME in text:
+        return []
+    return [f"{label} must opt into the Node 24 JavaScript action runtime"]
+
+
 def _workflow_permission_issues(root: Path) -> list[str]:
     issues: list[str] = []
     for relative_path, required_permissions in REQUIRED_WORKFLOW_PERMISSIONS.items():
@@ -260,6 +330,26 @@ def _workflow_permission_issues(root: Path) -> list[str]:
                 label=workflow_path.name.removesuffix(".yml").replace("-", " ") + " workflow",
                 text=workflow_path.read_text(encoding="utf-8"),
                 required_permissions=required_permissions,
+            )
+        )
+    return issues
+
+
+def _workflow_node24_runtime_issues(root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path in REQUIRED_WORKFLOW_PERMISSIONS:
+        workflow_path = root / relative_path
+        if not workflow_path.is_file():
+            continue
+        if relative_path in {
+            ".github/workflows/ci.yml",
+            ".github/workflows/codeql.yml",
+        }:
+            continue
+        issues.extend(
+            validate_workflow_node24_runtime_text(
+                label=workflow_path.name.removesuffix(".yml").replace("-", " ") + " workflow",
+                text=workflow_path.read_text(encoding="utf-8"),
             )
         )
     return issues
@@ -296,6 +386,7 @@ def validate_codeql_workflow_text(text: str) -> list[str]:
             required_permissions=REQUIRED_WORKFLOW_PERMISSIONS[".github/workflows/codeql.yml"],
         )
     )
+    issues.extend(validate_workflow_node24_runtime_text(label="CodeQL workflow", text=text))
     if "javascript-typescript" not in text:
         issues.append("CodeQL workflow missing JavaScript/TypeScript analysis")
     if "python" not in text:
@@ -312,6 +403,11 @@ def validate_codeql_workflow_text(text: str) -> list[str]:
         issues.append("CodeQL workflow must use github/codeql-action/analyze@v4")
     if "security-extended" not in text:
         issues.append("CodeQL workflow must use the security-extended query suite")
+    if REQUIRED_CODEQL_PRIVATE_REPO_GUARD not in text:
+        issues.append(
+            "CodeQL workflow must skip private repositories unless "
+            "MINIX_ENABLE_PRIVATE_CODEQL is true"
+        )
     return issues
 
 

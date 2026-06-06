@@ -37,6 +37,9 @@ mac:
         - arm64
         - x64
   category: public.app-category.utilities
+  extendInfo:
+    NSBluetoothAlwaysUsageDescription: MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer.
+    NSBluetoothPeripheralUsageDescription: MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer.
   identity: null
 
 win:

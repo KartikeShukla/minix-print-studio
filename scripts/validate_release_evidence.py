@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import plistlib
 import sys
 from pathlib import Path
 
@@ -23,6 +24,13 @@ FORBIDDEN_PREFIXES = (
     "previews/",
     "jobs/",
     "hardware-artifacts/",
+)
+MAC_BLUETOOTH_USAGE_DESCRIPTION = (
+    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
+)
+MAC_BLUETOOTH_USAGE_KEYS = (
+    "NSBluetoothAlwaysUsageDescription",
+    "NSBluetoothPeripheralUsageDescription",
 )
 
 
@@ -112,6 +120,7 @@ def validate_macos_artifact(artifact_dir: Path) -> list[str]:
         app_contents / "Resources/sidecars/minix-mcp",
     )
     issues.extend(validate_required_paths(artifact_dir, "macOS", required_paths))
+    issues.extend(validate_macos_info_plist(artifact_dir, app_contents / "Info.plist"))
     issues.extend(validate_checksum_manifest(artifact_dir, "macOS", required_paths))
     return issues
 
@@ -184,6 +193,24 @@ def validate_checksum_manifest(
         if actual_digest != expected_digest:
             issues.append(f"{label} checksum mismatch for {relative_path}")
     return issues
+
+
+def validate_macos_info_plist(artifact_dir: Path, info_plist_path: Path) -> list[str]:
+    path = artifact_dir / info_plist_path
+    if not path.is_file():
+        return []
+
+    try:
+        payload = plistlib.loads(path.read_bytes())
+    except (plistlib.InvalidFileException, ValueError) as exc:
+        return [f"macOS artifact Info.plist is not valid plist: {exc}"]
+
+    if not isinstance(payload, dict):
+        return ["macOS artifact Info.plist is not a dictionary"]
+
+    if any(payload.get(key) != MAC_BLUETOOTH_USAGE_DESCRIPTION for key in MAC_BLUETOOTH_USAGE_KEYS):
+        return ["macOS artifact Info.plist missing Bluetooth usage descriptions"]
+    return []
 
 
 def parse_checksum_manifest(path: Path) -> dict[str, str]:

@@ -17,6 +17,9 @@
 - Printer profile data for `seznik-minix-s1-lyin48d-gy`.
 - CI skeleton.
 - Open-source readiness validator for required public docs, ignored runtime state, CI wiring, and private-path redaction.
+- Open-source readiness validator requires the README to explain project status, safety model, supported printer scope, development setup, hardware certification, agent integrations, and release validation.
+- Open-source readiness validator requires public root package metadata for contributor author, GitHub repository URL, issues URL, and README homepage.
+- Pre-public history validator checks git author and committer metadata for private local-host markers before the repository is made public.
 - Contributor governance docs for contribution flow, conduct expectations, validation gates, and hardware-artifact redaction.
 - Public support matrix and known limitations docs that distinguish mock/development support from hardware-certified support.
 - Source package validator that checks the tracked release source set for required public files and forbidden runtime/build/cache paths.
@@ -32,12 +35,15 @@
 - Root Python-backed pnpm scripts use a cross-platform Node launcher that prefers `MINIX_PYTHON`, the repo virtualenv, then platform Python commands.
 - Community intake templates cover bug reports, feature requests, hardware profile evidence, and pull requests with safety, privacy, reproduction, and validation prompts.
 - Desktop package builds use tracked MiniX Print Studio icon assets instead of the default Electron icon, with a reproducible icon generator plus release/source package validators that require the macOS PNG and Windows ICO assets.
+- macOS package metadata declares Bluetooth usage descriptions for local MiniX printer access, and release validators require those Info.plist keys in both source config and downloaded package evidence.
 - Release package workflow writes a deterministic `SHA256SUMS.txt` manifest for uploaded unsigned package artifacts, excludes electron-builder scratch files, and validators require the checksum script and workflow step.
 - Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Release evidence validator can check a downloaded manual workflow run for successful metadata, platform-named macOS/Windows artifacts, checksum coverage, bundled sidecars, and forbidden runtime/scratch paths before making Windows release claims.
+- Private GitHub remote `KartikeShukla/minix-print-studio` is configured for pre-publication validation, with `main` and `codex/bootstrap-minix-print-studio` pushed.
+- Manual Release Package workflow run `27023526067` on commit `cef9934` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py` with the Bluetooth usage-description gate enabled.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
 - CodeQL workflow scans JavaScript/TypeScript and Python with the `security-extended` query suite on pull requests, pushes to `main`, weekly schedule, and manual dispatch.
-- CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, and open-source readiness validation rejects missing or `write-all` workflow permissions.
+- CodeQL, CI, and release package workflows declare explicit least-privilege GitHub token permissions, opt into GitHub's Node 24 JavaScript action runtime, and open-source readiness validation rejects missing or `write-all` workflow permissions. CodeQL includes `actions: read` for workflow-run metadata plus `security-events: write` for scan uploads, and skips while the repository is private unless `MINIX_ENABLE_PRIVATE_CODEQL=true`.
 
 ### Daemon Core Slice
 
@@ -129,9 +135,14 @@
 - Renderer printer setup exposes `Export read-only artifact` after read-only verification so a hardware tester can capture the Stage A validation record without terminal steps.
 - Electron exposes an offline Stage A artifact inspector from the Printer panel that reuses the shared hardware-test CLI safety checks and shows the Stage B protocol sanity preflight without BLE writes.
 - Non-mock BLE scan now maps host Bluetooth-unavailable failures to a structured `503` response, and the renderer daemon client preserves daemon `detail` text so the UI can show actionable setup errors.
+- `minix-hardware-test host-readiness` reports whether the current host context exposes a Bluetooth controller before Stage A, with macOS `system_profiler SPBluetoothDataType` parsing for the no-controller-visible failure mode.
+- Electron exposes the shared host Bluetooth readiness diagnostic from the Printer panel before Stage A scan attempts.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.
+- `minix-hardware-test tiny-visual-card-preflight` validates a Stage A artifact and emits deterministic Stage C tiny-card metadata for `MINIX TEST 7K4P`, including dimensions, raster byte counts, and a digest without including printable bytes or contacting BLE.
+- `minix-hardware-test evidence-summary` emits a redacted maintainer-shareable Stage A summary with a hashed device fingerprint, redaction flags, protocol preflight counts, and tiny-card digest without artifact paths, raw logs, command payload hex, bearer tokens, raster bytes, or the raw device id.
+- Electron artifact inspection now shows the Stage B protocol sanity preflight, Stage C tiny visual card preflight, and redacted shareable evidence summary while keeping printing locked.
 
 ## Current Verification
 
@@ -147,13 +158,15 @@
 - Release package workflow contract validation for `macos-latest`, `windows-latest`, sidecar Python dependency setup, and `pnpm package:mac` / `pnpm package:win`.
 - Desktop icon generation check via `.venv/bin/python scripts/generate_desktop_icons.py --check`.
 - TDD red/green checks for explicit desktop package icon configuration and tracked icon assets in release/source package validation.
+- TDD red/green checks for macOS Bluetooth usage descriptions in electron-builder config and downloaded release evidence.
 - Unsigned macOS package smoke verified `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/icon.icns` and `CFBundleIconFile => icon.icns`, with no default Electron icon fallback warning.
 - TDD red/green checks for release checksum manifest generation, relative CLI paths, source-package inclusion, and release workflow checksum wiring.
 - TDD red/green checks for release workflow manual dispatch and platform-named artifact evidence uploads.
 - TDD red/green checks for release workflow evidence validation across successful run metadata, Windows package/sidecar presence, checksum manifests, and forbidden artifact paths.
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
-- TDD red/green checks for least-privilege GitHub Actions permissions on CI and release package workflows.
+- TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.
+- GitHub Release Package workflow run `27023526067` on `codex/bootstrap-minix-print-studio` commit `cef9934`: macOS unsigned package completed in 2m03s, Windows unsigned package completed in 4m38s, and downloaded artifacts passed `node scripts/run_python.mjs scripts/validate_release_evidence.py` including bundled sidecars, checksum manifests, forbidden-path exclusions, and macOS Bluetooth usage descriptions.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`
@@ -183,11 +196,18 @@
 - TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
 - TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.
+- TDD red/green checks for host Bluetooth readiness CLI output and macOS no-controller-visible parsing.
+- TDD red/green checks for the Electron host-readiness bridge and renderer Printer panel readiness result.
 - TDD red/green checks for the Stage A hardware-test CLI scan/export flow and daemon error-detail preservation.
 - TDD red/green checks for Stage A hardware-test artifact inspection and read-only safety rejection.
 - TDD red/green checks for Stage B protocol sanity preflight planning and unsafe artifact rejection.
 - TDD red/green checks for the Electron artifact-inspection bridge and renderer Stage B preflight summary from an exported Stage A artifact.
+- TDD red/green checks for Stage C tiny visual card preflight planning, unsafe artifact rejection, Electron bridge propagation, and renderer checklist display.
+- TDD red/green checks for redacted Stage A evidence summary generation, Electron bridge propagation, and renderer summary display.
 - TDD red/green checks for open-source readiness validation and private path rejection.
+- TDD red/green checks for required community README sections in open-source readiness validation.
+- TDD red/green checks for required public package metadata in open-source readiness validation.
+- TDD red/green checks for pre-public git history metadata validation and source package inclusion.
 - TDD red/green checks for source package validation and forbidden tracked path rejection.
 - TDD red/green checks for release packaging scaffold validation, including package scripts, runtime-state exclusions, disabled publishing, and absent signing identity.
 - TDD red/green checks for release packaging rejection of tracked hardware-artifact includes.
@@ -197,7 +217,7 @@
 - TDD red/green checks requiring the release notes template in both open-source readiness and tracked source-package validation.
 - TDD red/green checks requiring community issue and pull request templates in open-source readiness and tracked source-package validation.
 - Unsigned macOS package smoke via `pnpm package:mac`; electron-builder produced `dist/release/mac-arm64` with bundled sidecars and skipped code signing because `identity` is `null`.
-- Earlier unsigned Windows directory package scaffold smoke via `pnpm package:win` produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled before sidecar binaries were added to the package contract. Windows sidecar package validation now requires a Windows runner.
+- Earlier unsigned Windows directory package scaffold smoke via `pnpm package:win` produced `dist/release/win-unpacked` for `arch=x64` with publishing disabled before sidecar binaries were added to the package contract. Current Windows sidecar package validation is covered by Release Package workflow run `27023526067`.
 - TDD red/green checks for daemon project create/list/get/update/delete persistence and hash-addressed image asset upload across app restarts.
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
@@ -206,11 +226,13 @@
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects/session/image-asset changes, the Image import button and Projects panel render, and the browser console only shows the React DevTools hint.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
-- Non-mock Stage A scan probe in this execution context returned `503 {"detail":"Bluetooth unavailable: Bluetooth is unsupported"}`; no physical printer validation was possible from this environment.
+- `scripts/hardware-test.sh host-readiness`
+- `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
+- Non-mock Stage A scan attempt on 2026-06-05 against a separate daemon on `127.0.0.1:39282` returned `Bluetooth unavailable: Bluetooth is unsupported`; `system_profiler SPBluetoothDataType` reported no visible controller, so no physical printer validation was possible from this execution context even with the printer powered on.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 
 ## Next Implementation Slices
 
-1. Trigger the release package workflow and capture the Windows `pnpm package:win` artifact evidence from a Windows runner.
-2. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity preflight output.
-3. After Stage A is confirmed on hardware, implement the physical protocol sanity test and tiny visual test card without unlocking trusted printing until user confirmation exists.
+1. Run Stage A physical hardware validation for read-only model/firmware probing on the actual printer, inspect the exported hardware-test artifact from that run, and review the protocol sanity plus tiny visual card preflight output.
+2. After Stage A is confirmed on hardware, implement the physical protocol sanity executor and physical tiny visual card executor without unlocking trusted printing until user confirmation exists.
+3. After Stage B and visual-card evidence exists, implement trusted-printer confirmation and keep long-print reliability as a separate certification gate.

@@ -24,6 +24,16 @@ pnpm release-package-check
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
+- Host-readiness tests cover the CLI diagnostic that distinguishes local
+  Bluetooth controller visibility failures from printer-level Stage A failures.
+- Desktop and renderer tests cover exposing that host-readiness result in the
+  Printer panel before Stage A scan attempts.
+- Offline certification-preflight tests cover Stage B protocol command metadata
+  and Stage C tiny-card metadata without sending BLE writes or including printable
+  raster bytes.
+- Offline evidence-summary tests cover maintainer-shareable Stage A summaries
+  with hashed device fingerprints and explicit omission of artifact paths, raw
+  logs, command hex payloads, bearer tokens, and raster bytes.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.
@@ -39,6 +49,20 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 
 This validates the successful workflow metadata, macOS and Windows unsigned package
 artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
+The macOS artifact must include Bluetooth usage descriptions in `Info.plist` so
+first-run permission prompts explain local printer access. The current release
+evidence baseline is Release Package workflow run `27023526067`.
+
+## Public History Gate
+
+Before switching the repository from private to public, run:
+
+```bash
+pnpm public-history-check
+```
+
+This checks the `origin/main..HEAD` commit range for private local-host author and
+committer metadata. It is a pre-public gate, not a hardware gate.
 
 ## Dependency Maintenance
 
@@ -51,7 +75,15 @@ above before merge.
 CodeQL runs in GitHub Actions for JavaScript/TypeScript and Python on pull
 requests, pushes to `main`, weekly schedule, and manual dispatch. Local validation
 keeps the workflow present, configured for the `security-extended` query suite,
-and limited to `contents: read` plus `security-events: write` so GitHub can
-receive scan results. CI and release package workflows must keep explicit
+and limited to `actions: read`, `contents: read`, and `security-events: write`
+so GitHub can read workflow-run metadata and receive scan results. CI and
+release package workflows must keep explicit
 read-only `contents` permissions unless a future release step documents and
-validates a narrower write requirement.
+validates a narrower write requirement. Required workflows also opt into the
+Node 24 JavaScript action runtime so GitHub Actions runtime migrations are
+exercised before they become the default.
+
+While the repository remains private, the CodeQL job skips by default because code
+scanning is not enabled on this private repo. Set repository variable
+`MINIX_ENABLE_PRIVATE_CODEQL=true` after enabling private code scanning, or make
+the repository public, to run CodeQL.

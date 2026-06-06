@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import plistlib
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +47,18 @@ def test_release_evidence_check_requires_windows_package_and_sidecars(tmp_path: 
         "Windows checksum manifest missing win-unpacked/MiniX Print Studio.exe",
         "Windows checksum manifest missing win-unpacked/resources/sidecars/minix-mcp.exe",
     ]
+
+
+def test_release_evidence_check_requires_macos_bluetooth_usage_descriptions(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    mac_dir = tmp_path / "minix-print-studio-macos-unsigned"
+    _write_mac_artifact(mac_dir, include_bluetooth_usage=False)
+
+    issues = validator.validate_macos_artifact(mac_dir)
+
+    assert issues == ["macOS artifact Info.plist missing Bluetooth usage descriptions"]
 
 
 def test_release_evidence_check_rejects_failed_run_and_forbidden_artifacts(
@@ -104,9 +117,25 @@ def _write_workflow_run_json(path: Path, *, conclusion: str) -> None:
     )
 
 
-def _write_mac_artifact(path: Path) -> None:
+def _write_mac_artifact(path: Path, *, include_bluetooth_usage: bool = True) -> None:
+    info_plist: dict[str, object] = {
+        "CFBundleName": "MiniX Print Studio",
+    }
+    if include_bluetooth_usage:
+        info_plist.update(
+            {
+                "NSBluetoothAlwaysUsageDescription": (
+                    "MiniX Print Studio uses Bluetooth only to connect to your "
+                    "local MiniX thermal printer."
+                ),
+                "NSBluetoothPeripheralUsageDescription": (
+                    "MiniX Print Studio uses Bluetooth only to connect to your "
+                    "local MiniX thermal printer."
+                ),
+            }
+        )
     files = {
-        "mac-arm64/MiniX Print Studio.app/Contents/Info.plist": b"plist",
+        "mac-arm64/MiniX Print Studio.app/Contents/Info.plist": plistlib.dumps(info_plist),
         "mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd": b"minixd",
         "mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp": b"mcp",
     }

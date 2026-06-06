@@ -7,8 +7,8 @@ physical validation before a stable public release.
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| macOS | Development target | Unsigned local Electron package includes target-host daemon and MCP sidecars; signing and notarization are not complete. |
-| Windows | Planned build target | Release package workflow runs `pnpm package:win` on Windows; artifact evidence, installer packaging, and signing are pending. |
+| macOS | Development target | Unsigned local Electron package includes target-host daemon and MCP sidecars plus Bluetooth usage descriptions; signing and notarization are not complete. |
+| Windows | Unsigned package evidence captured | Release Package workflow run `27023526067` completed `pnpm package:win` on a Windows runner with bundled daemon/MCP sidecars; installer packaging and signing are pending. |
 | Linux | Developer-only | Not a first supported desktop release target. |
 
 ## Printer Profiles
@@ -30,11 +30,14 @@ physical validation before a stable public release.
 
 | Stage | Status | Artifact |
 | --- | --- | --- |
+| Host Bluetooth readiness | Implemented for macOS CLI and Electron diagnostics | `minix-hardware-test host-readiness` / Printer panel |
 | Stage A: read-only verification | Implemented in daemon, renderer, and CLI | `hardware-test-<timestamp>.zip` |
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
+| Stage A shareable evidence summary | Implemented offline and shown in Electron artifact inspection | `minix-hardware-test evidence-summary` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |
 | Stage B physical protocol sanity | Pending hardware run | Future hardware-test artifact |
-| Tiny visual test card | Pending | Future hardware-test artifact |
+| Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
+| Stage C physical tiny visual test card | Pending hardware run | Future hardware-test artifact |
 | Long-print reliability | Pending | Future hardware-test artifact |
 
 Do not treat BLE detection or Stage A alone as permission to print.

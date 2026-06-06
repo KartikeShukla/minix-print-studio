@@ -35,10 +35,103 @@ export type HardwareProtocolPreflight = {
   };
 };
 
+export type HardwareVisualCardPreflight = {
+  status: string;
+  stage: string;
+  deviceId: string;
+  profileId: string;
+  requiredPriorStage: string;
+  displayText: string;
+  widthDots: number;
+  heightDots: number;
+  rowBytes: number;
+  density: string;
+  paperMode: string;
+  printCommandsSent: boolean;
+  rasterBytesIncluded: boolean;
+  plannedRaster: {
+    commandName: string;
+    payloadBytes: number;
+    rasterBytes: number;
+    rawBytesIncluded: boolean;
+    contentSha256: string;
+  };
+  confirmationChecklist: string[];
+  safety: {
+    requiresPhysicalPrinter: boolean;
+    requiresUserConfirmation: boolean;
+    requiresPriorProtocolSanity: boolean;
+    sendsRasterIfExecuted: boolean;
+    unlocksPrinting: boolean;
+    preflightOnly: boolean;
+  };
+};
+
+export type HardwareEvidenceSummary = {
+  status: string;
+  shareable: boolean;
+  artifactStatus: string;
+  profileId: string;
+  nextRequiredStage: string;
+  device: {
+    idRedacted: boolean;
+    fingerprint: string;
+  };
+  redaction: {
+    artifactPathIncluded: boolean;
+    localPathsIncluded: boolean;
+    rawCommandLogIncluded: boolean;
+    rawNotificationLogIncluded: boolean;
+    commandPayloadHexIncluded: boolean;
+    rasterBytesIncluded: boolean;
+    bearerTokensIncluded: boolean;
+  };
+  certification: {
+    stageAReadOnlyVerified: boolean;
+    printingLocked: boolean;
+    certificationComplete: boolean;
+    requiresStageBProtocolSanity: boolean;
+    requiresTinyVisualCard: boolean;
+    requiresLongPrintReliability: boolean;
+  };
+  preflights: {
+    protocolSanity: {
+      status: string;
+      stage: string;
+      commandCount: number;
+      sendsRaster: boolean;
+      unlocksPrinting: boolean;
+    };
+    tinyVisualCard: {
+      status: string;
+      stage: string;
+      displayText: string;
+      heightDots: number;
+      rawBytesIncluded: boolean;
+      contentSha256: string;
+    };
+  };
+};
+
 export type HardwareArtifactInspectionResult = {
   artifactPath: string;
   inspection: HardwareArtifactInspectionSummary;
   preflight: HardwareProtocolPreflight | null;
+  visualCardPreflight: HardwareVisualCardPreflight | null;
+  evidenceSummary: HardwareEvidenceSummary | null;
+};
+
+export type HardwareHostReadiness = {
+  status: string;
+  platform: string;
+  controllerVisible: boolean | null;
+  canAttemptStageA: boolean;
+  detail: string;
+  checks: Array<{
+    name: string;
+    status: string;
+    evidence: string;
+  }>;
 };
 
 export type CommandResult = {
@@ -77,12 +170,46 @@ export async function inspectHardwareArtifact({
           runner
         })
       : null;
+  const visualCardPreflight =
+    inspection.nextRequiredStage === "protocol_sanity_test"
+      ? await runHardwareCliJson<HardwareVisualCardPreflight>({
+          artifactPath,
+          repoRoot,
+          commandName: "tiny-visual-card-preflight",
+          runner
+        })
+      : null;
+  const evidenceSummary =
+    inspection.nextRequiredStage === "protocol_sanity_test"
+      ? await runHardwareCliJson<HardwareEvidenceSummary>({
+          artifactPath,
+          repoRoot,
+          commandName: "evidence-summary",
+          runner
+        })
+      : null;
 
   return {
     artifactPath,
     inspection,
-    preflight
+    preflight,
+    visualCardPreflight,
+    evidenceSummary
   };
+}
+
+export async function checkHostBluetoothReadiness({
+  repoRoot,
+  runner = runCommand
+}: {
+  repoRoot: string;
+  runner?: CommandRunner;
+}): Promise<HardwareHostReadiness> {
+  return runHardwareCliJson<HardwareHostReadiness>({
+    repoRoot,
+    commandName: "host-readiness",
+    runner
+  });
 }
 
 async function runHardwareCliJson<T>({
@@ -91,14 +218,24 @@ async function runHardwareCliJson<T>({
   commandName,
   runner
 }: {
-  artifactPath: string;
+  artifactPath?: string;
   repoRoot: string;
-  commandName: "inspect-artifact" | "protocol-sanity-preflight";
+  commandName:
+    | "host-readiness"
+    | "inspect-artifact"
+    | "protocol-sanity-preflight"
+    | "tiny-visual-card-preflight"
+    | "evidence-summary";
   runner: CommandRunner;
 }): Promise<T> {
   const result = await runner(
     path.join(repoRoot, ".venv", "bin", "python"),
-    ["-m", "minixd.hardware_test_cli", commandName, artifactPath],
+    [
+      "-m",
+      "minixd.hardware_test_cli",
+      commandName,
+      ...(artifactPath ? [artifactPath] : [])
+    ],
     { cwd: repoRoot }
   );
 

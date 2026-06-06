@@ -6,7 +6,10 @@ import type {
   AgentIntegrationPreview,
   AgentIntegrationTargetId
 } from "@/lib/agent-integrations";
-import type { HardwareArtifactInspectionResult } from "@/lib/hardware-artifacts";
+import type {
+  HardwareArtifactInspectionResult,
+  HardwareHostReadiness
+} from "@/lib/hardware-artifacts";
 import type {
   BetaFeedbackDraft,
   BetaFeedbackDraftRequest,
@@ -97,6 +100,7 @@ declare global {
       createBetaFeedbackDraft?: (request?: BetaFeedbackDraftRequest) => Promise<BetaFeedbackDraft>;
       getUpdateChannelState?: () => Promise<UpdateChannelState>;
       setUpdateChannel?: (channel: UpdateChannel) => Promise<UpdateChannelState>;
+      checkHostBluetoothReadiness?: () => Promise<HardwareHostReadiness>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
     };
   }

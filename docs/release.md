@@ -26,6 +26,7 @@ python3 scripts/validate_open_source_readiness.py
 Hardware gates are separate from CI and require the physical printer:
 
 - Stage A read-only verification artifact exported and inspected.
+- Stage A evidence summary generated and reviewed before sharing full artifacts.
 - Stage B protocol sanity preflight reviewed before physical run.
 - Tiny visual test card confirmed by the user.
 - Long-print reliability test completed before stable support claims.
@@ -61,7 +62,23 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 The evidence validator requires a successful manual `Release Package` run,
 platform-named macOS and Windows unsigned artifact directories, matching
 `SHA256SUMS.txt` manifests, bundled daemon/MCP sidecars, and no runtime state,
-diagnostics, hardware artifacts, or electron-builder scratch files.
+diagnostics, hardware artifacts, or electron-builder scratch files. The macOS
+artifact must also include Bluetooth usage descriptions in `Info.plist` explaining
+that Bluetooth is used only to connect to the local MiniX thermal printer.
+
+## Public History Gate
+
+Before making the repository public, verify that the branch history does not expose
+private local-host author or committer metadata:
+
+```bash
+pnpm public-history-check
+```
+
+The default range is `origin/main..HEAD`. Pass an explicit range when auditing a
+different branch or a release tag candidate. If the check reports private metadata,
+rewrite the still-private branch history with a reviewed plan and use
+`--force-with-lease` only for the branch being sanitized.
 
 ## Packaging Targets
 

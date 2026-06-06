@@ -19,6 +19,7 @@ DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
+DESKTOP_TSCONFIG_PATH = Path("apps/desktop/tsconfig.json")
 RELEASE_PACKAGE_WORKFLOW_PATH = Path(".github/workflows/release-package.yml")
 REQUIRED_PACKAGE_ICON_PATHS = (
     Path("apps/desktop/build/icon-source.svg"),
@@ -37,6 +38,13 @@ BUILDER_REQUIRED_SNIPPETS = (
     "signAndEditExecutable: false",
     "publish: null",
 )
+MAC_BLUETOOTH_USAGE_DESCRIPTION = (
+    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
+)
+MAC_BLUETOOTH_USAGE_KEYS = (
+    "NSBluetoothAlwaysUsageDescription",
+    "NSBluetoothPeripheralUsageDescription",
+)
 FORBIDDEN_PACKAGED_PREFIXES = (
     "runtime/",
     "logs/",
@@ -54,6 +62,7 @@ RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS = (
     "!dist/release/builder-debug.yml",
     "!dist/release/.icon-*",
 )
+RELEASE_WORKFLOW_REQUIRED_NODE24_RUNTIME = "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true"
 
 RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES = {
     "minix-print-studio-macos-unsigned": (
@@ -132,6 +141,12 @@ def validate_repository(root: Path) -> list[str]:
         if not (root / icon_path).is_file():
             issues.append(f"missing required package icon asset: {icon_path.as_posix()}")
 
+    desktop_tsconfig = root / DESKTOP_TSCONFIG_PATH
+    if not desktop_tsconfig.is_file():
+        issues.append(f"missing required file: {DESKTOP_TSCONFIG_PATH.as_posix()}")
+    else:
+        issues.extend(validate_desktop_tsconfig_text(desktop_tsconfig.read_text(encoding="utf-8")))
+
     release_workflow = root / RELEASE_PACKAGE_WORKFLOW_PATH
     if not release_workflow.is_file():
         issues.append(f"missing required file: {RELEASE_PACKAGE_WORKFLOW_PATH.as_posix()}")
@@ -176,6 +191,8 @@ def validate_builder_config_text(text: str) -> list[str]:
         issues.append("electron-builder config must set mac icon: build/icon.png")
     if not _windows_icon_configured(text):
         issues.append("electron-builder config must set Windows icon: build/icon.ico")
+    if not _mac_bluetooth_usage_descriptions_configured(text):
+        issues.append("electron-builder config must set macOS Bluetooth usage descriptions")
     for marker in PRIVATE_PATH_MARKERS:
         if marker in text:
             issues.append(f"electron-builder config contains private path marker: {marker}")
@@ -183,10 +200,31 @@ def validate_builder_config_text(text: str) -> list[str]:
     return issues
 
 
+def validate_desktop_tsconfig_text(text: str) -> list[str]:
+    issues: list[str] = []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return ["apps/desktop/tsconfig.json is not valid JSON"]
+
+    compiler_options = payload.get("compilerOptions")
+    paths = compiler_options.get("paths") if isinstance(compiler_options, dict) else None
+    expected_alias = ["../../packages/integration-configs/src/index.ts"]
+    if not isinstance(paths, dict) or paths.get("@minix/integration-configs") != expected_alias:
+        issues.append(
+            "apps/desktop/tsconfig.json must map @minix/integration-configs to source"
+        )
+    return issues
+
+
 def validate_release_package_workflow_text(text: str) -> list[str]:
     issues: list[str] = []
     if "workflow_dispatch:" not in text:
         issues.append("release package workflow must support manual workflow_dispatch")
+    if RELEASE_WORKFLOW_REQUIRED_NODE24_RUNTIME not in text:
+        issues.append(
+            "release package workflow must opt into the Node 24 JavaScript action runtime"
+        )
     if "runs-on: macos-latest" not in text and "os: macos-latest" not in text:
         issues.append("release package workflow missing macOS runner")
     if "runs-on: windows-latest" not in text and "os: windows-latest" not in text:
@@ -259,6 +297,13 @@ def _mac_icon_configured(text: str) -> bool:
 
 def _windows_icon_configured(text: str) -> bool:
     return "icon: build/icon.ico" in text
+
+
+def _mac_bluetooth_usage_descriptions_configured(text: str) -> bool:
+    return all(
+        f"{key}: {MAC_BLUETOOTH_USAGE_DESCRIPTION}" in text
+        for key in MAC_BLUETOOTH_USAGE_KEYS
+    )
 
 
 def _sidecar_resources_included(text: str) -> bool:

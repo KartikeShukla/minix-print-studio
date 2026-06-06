@@ -783,6 +783,54 @@ describe("MiniX Print Studio shell", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:hardware-test");
   });
 
+  it("checks host Bluetooth readiness before Stage A scan", async () => {
+    const check = vi.fn().mockResolvedValue({
+      status: "not_visible",
+      platform: "Darwin",
+      controllerVisible: false,
+      canAttemptStageA: false,
+      detail: "macOS did not report a Bluetooth controller to this process.",
+      checks: [
+        {
+          name: "system_profiler SPBluetoothDataType",
+          status: "not_visible",
+          evidence: "controllerInfo == nil"
+        }
+      ]
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        hardwareReadinessProvider={{ check }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Check host Bluetooth" }));
+
+    await waitFor(() => {
+      expect(check).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText("Host Bluetooth not visible")).toBeInTheDocument();
+    expect(
+      screen.getByText("macOS did not report a Bluetooth controller to this process.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("controllerInfo == nil")).toBeInTheDocument();
+    expect(screen.getByText("Stage A unavailable from this host")).toBeInTheDocument();
+  });
+
   it("inspects an exported Stage A artifact and shows the protocol sanity preflight", async () => {
     const inspect = vi.fn().mockResolvedValue({
       artifactPath: "/tmp/hardware-test-stage-a.zip",
@@ -823,6 +871,89 @@ describe("MiniX Print Studio shell", () => {
           sendsRaster: false,
           unlocksPrinting: false
         }
+      },
+      evidenceSummary: {
+        status: "shareable_stage_a_evidence_ready",
+        shareable: true,
+        artifactStatus: "valid_stage_a_artifact",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        nextRequiredStage: "protocol_sanity_test",
+        device: {
+          idRedacted: true,
+          fingerprint: "sha256:3d90f3ac7a07147e"
+        },
+        redaction: {
+          artifactPathIncluded: false,
+          localPathsIncluded: false,
+          rawCommandLogIncluded: false,
+          rawNotificationLogIncluded: false,
+          commandPayloadHexIncluded: false,
+          rasterBytesIncluded: false,
+          bearerTokensIncluded: false
+        },
+        certification: {
+          stageAReadOnlyVerified: true,
+          printingLocked: true,
+          certificationComplete: false,
+          requiresStageBProtocolSanity: true,
+          requiresTinyVisualCard: true,
+          requiresLongPrintReliability: true
+        },
+        preflights: {
+          protocolSanity: {
+            status: "protocol_sanity_preflight_ready",
+            stage: "protocol_sanity_test",
+            commandCount: 3,
+            sendsRaster: false,
+            unlocksPrinting: false
+          },
+          tinyVisualCard: {
+            status: "tiny_visual_card_preflight_ready",
+            stage: "tiny_visual_test_card",
+            displayText: "MINIX TEST 7K4P",
+            heightDots: 160,
+            rawBytesIncluded: false,
+            contentSha256:
+              "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+          }
+        }
+      },
+      visualCardPreflight: {
+        status: "tiny_visual_card_preflight_ready",
+        stage: "tiny_visual_test_card",
+        deviceId: "mock-minix-0194",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        requiredPriorStage: "protocol_sanity_test",
+        displayText: "MINIX TEST 7K4P",
+        widthDots: 384,
+        heightDots: 160,
+        rowBytes: 48,
+        density: "medium",
+        paperMode: "continuous",
+        printCommandsSent: false,
+        rasterBytesIncluded: false,
+        plannedRaster: {
+          commandName: "raster_test_card",
+          payloadBytes: 7688,
+          rasterBytes: 7680,
+          rawBytesIncluded: false,
+          contentSha256:
+            "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+        },
+        confirmationChecklist: [
+          "Text MINIX TEST 7K4P is readable.",
+          "Left and right edge markers are visible.",
+          "Output is not mirrored or upside down.",
+          "Feed is smooth with no stall, overheat warning, disconnect, or fatal error."
+        ],
+        safety: {
+          requiresPhysicalPrinter: true,
+          requiresUserConfirmation: true,
+          requiresPriorProtocolSanity: true,
+          sendsRasterIfExecuted: true,
+          unlocksPrinting: false,
+          preflightOnly: true
+        }
       }
     });
 
@@ -854,6 +985,20 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("mock-minix-0194")).toBeInTheDocument();
     expect(screen.getByText("wake")).toBeInTheDocument();
     expect(screen.getByText("10 ff 10 00 01")).toBeInTheDocument();
+    expect(screen.getByText("Tiny visual card preflight ready")).toBeInTheDocument();
+    expect(screen.getByText("MINIX TEST 7K4P")).toBeInTheDocument();
+    expect(screen.getByText("160 dots")).toBeInTheDocument();
+    expect(
+      screen.getByText("Visual card still requires Stage B pass")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Text MINIX TEST 7K4P is readable.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Shareable evidence summary ready")).toBeInTheDocument();
+    expect(screen.getByText("sha256:3d90f3ac7a07147e")).toBeInTheDocument();
+    expect(screen.getByText("3 commands planned")).toBeInTheDocument();
+    expect(screen.getByText("Raw bytes omitted")).toBeInTheDocument();
+    expect(screen.getByText("Local paths omitted")).toBeInTheDocument();
     expect(screen.getByText("Printing remains locked")).toBeInTheDocument();
   });
 

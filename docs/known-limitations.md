@@ -18,8 +18,8 @@ not yet a stable public installer.
 - Daemon and MCP sidecar binary production and package inclusion are implemented
   for target-host builds.
 - Windows sidecar package validation must run on a Windows runner because
-  PyInstaller does not cross-compile; the workflow and local evidence validator
-  exist, but artifact evidence from a completed run is still pending.
+  PyInstaller does not cross-compile; Release Package workflow run `27023526067`
+  supplied passing unsigned package artifact evidence.
 - macOS signing and notarization are not configured.
 - Windows installer packaging and signing are not implemented.
 - Linux is not a supported first release target.
@@ -27,7 +27,8 @@ not yet a stable public installer.
 ## Product Surface
 
 - The mock print flow is implemented, but real printer transport remains certification-gated.
-- Hardware diagnostics artifacts must be reviewed and redacted before public sharing.
+- Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
+  use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.
 - The renderer build currently emits a Vite chunk-size warning.
 

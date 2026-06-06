@@ -22,7 +22,8 @@ Check:
 
 This is expected before certification. Detection only means a service or name matched.
 Run Stage A read-only verification, export the hardware-test artifact, inspect it, and
-review the protocol sanity preflight before any physical Stage B test.
+review the protocol sanity preflight before any physical Stage B test. Use the Stage A
+evidence summary when asking maintainers to review the artifact safety state.
 
 ## Agent Integration Not Visible
 

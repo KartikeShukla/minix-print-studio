@@ -62,6 +62,26 @@ def test_open_source_readiness_check_requires_public_support_docs() -> None:
     assert Path("docs/known-limitations.md") in validator.REQUIRED_DOCS
 
 
+def test_open_source_readiness_check_requires_shareable_readme_sections(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _write_minimum_ready_repository(tmp_path, validator)
+    (tmp_path / "README.md").write_text("# MiniX Print Studio\n", encoding="utf-8")
+
+    issues = validator.validate_repository(tmp_path)
+
+    assert issues == [
+        "README.md missing required section: ## Project Status",
+        "README.md missing required section: ## Safety Model",
+        "README.md missing required section: ## Supported Printers",
+        "README.md missing required section: ## Development",
+        "README.md missing required section: ## Hardware Certification",
+        "README.md missing required section: ## Agent Integrations",
+        "README.md missing required section: ## Release and Validation",
+    ]
+
+
 def test_open_source_readiness_check_requires_release_notes_template() -> None:
     validator = _load_validator()
 
@@ -102,8 +122,11 @@ on:
     branches: [main]
   schedule:
     - cron: "21 3 * * 1"
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: github/codeql-action/init@v4
         with:
@@ -114,6 +137,7 @@ jobs:
     )
 
     assert issues == [
+        "CodeQL workflow must declare actions: read permissions",
         "CodeQL workflow must declare contents: read permissions",
         "CodeQL workflow must declare security-events: write permissions",
     ]
@@ -124,7 +148,7 @@ def test_open_source_readiness_check_tracks_codeql_workflow_permissions() -> Non
 
     assert (
         ".github/workflows/codeql.yml",
-        {"contents": "read", "security-events": "write"},
+        {"actions": "read", "contents": "read", "security-events": "write"},
     ) in validator.REQUIRED_WORKFLOW_PERMISSIONS.items()
 
 
@@ -135,10 +159,14 @@ def test_open_source_readiness_check_validates_codeql_workflow() -> None:
         """
 name: CodeQL
 permissions:
+  actions: read
   contents: read
   security-events: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v4
@@ -154,6 +182,23 @@ jobs:
         "CodeQL workflow must run on pushes to main",
         "CodeQL workflow must run on a weekly schedule",
         "CodeQL workflow must use the security-extended query suite",
+    ]
+
+
+def test_open_source_readiness_check_requires_codeql_private_repo_guard() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_codeql_workflow_text(
+        _codeql_workflow_text().replace(
+            "    if: ${{ !github.event.repository.private || "
+            "vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}\n",
+            "",
+        )
+    )
+
+    assert issues == [
+        "CodeQL workflow must skip private repositories unless "
+        "MINIX_ENABLE_PRIVATE_CODEQL is true",
     ]
 
 
@@ -242,6 +287,27 @@ def test_open_source_readiness_check_requires_source_package_script() -> None:
     assert issues == [
         "package.json missing source-package-check script",
         "package.json missing release-package-check script",
+        "package.json missing public-history-check script",
+    ]
+
+
+def test_open_source_readiness_check_requires_public_package_metadata(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _write_minimum_ready_repository(tmp_path, validator)
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": validator.REQUIRED_PACKAGE_SCRIPTS}),
+        encoding="utf-8",
+    )
+
+    issues = validator.validate_repository(tmp_path)
+
+    assert issues == [
+        "package.json missing public package author",
+        "package.json missing repository: https://github.com/KartikeShukla/minix-print-studio.git",
+        "package.json missing bugs URL: https://github.com/KartikeShukla/minix-print-studio/issues",
+        "package.json missing homepage: https://github.com/KartikeShukla/minix-print-studio#readme",
     ]
 
 
@@ -253,6 +319,15 @@ def test_open_source_readiness_check_requires_cross_platform_python_runner() -> 
     )
 
 
+def test_open_source_readiness_check_requires_public_history_script() -> None:
+    validator = _load_validator()
+
+    assert (
+        validator.REQUIRED_PACKAGE_SCRIPTS["public-history-check"]
+        == "node scripts/run_python.mjs scripts/validate_public_history.py"
+    )
+
+
 def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> None:
     validator = _load_validator()
 
@@ -260,6 +335,8 @@ def test_open_source_readiness_check_rejects_pnpm_ci_command_without_setup() -> 
         """
 permissions:
   contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   python:
     steps:
@@ -282,6 +359,8 @@ def test_open_source_readiness_check_requires_ci_workflow_permissions() -> None:
 name: CI
 on:
   pull_request:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   node:
     steps:
@@ -313,6 +392,26 @@ jobs:
     assert issues == [
         "release package workflow must not use write-all permissions",
         "release package workflow must declare contents: read permissions",
+    ]
+
+
+def test_open_source_readiness_check_requires_node24_actions_runtime_opt_in() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_workflow_node24_runtime_text(
+        label="CI workflow",
+        text="""
+permissions:
+  contents: read
+jobs:
+  node:
+    steps:
+      - uses: actions/checkout@v4
+""",
+    )
+
+    assert issues == [
+        "CI workflow must opt into the Node 24 JavaScript action runtime",
     ]
 
 
@@ -361,9 +460,21 @@ def _write_minimum_ready_repository(root: Path, validator: object) -> None:
         encoding="utf-8",
     )
     (root / "package.json").write_text(
-        json.dumps({"scripts": validator.REQUIRED_PACKAGE_SCRIPTS}),
+        json.dumps(
+            {
+                "author": validator.REQUIRED_PACKAGE_AUTHOR,
+                "repository": {
+                    "type": "git",
+                    "url": validator.REQUIRED_PACKAGE_REPOSITORY_URL,
+                },
+                "bugs": {"url": validator.REQUIRED_PACKAGE_BUGS_URL},
+                "homepage": validator.REQUIRED_PACKAGE_HOMEPAGE,
+                "scripts": validator.REQUIRED_PACKAGE_SCRIPTS,
+            }
+        ),
         encoding="utf-8",
     )
+    (root / "README.md").write_text(_readme_text(validator), encoding="utf-8")
     (root / ".github" / "workflows" / "ci.yml").write_text(
         _ci_workflow_text(),
         encoding="utf-8",
@@ -395,8 +506,17 @@ def _gate_doc_text(commands: tuple[str, ...]) -> str:
     return "Run the non-hardware gates:\n\n```bash\n" + "\n".join(commands) + "\n```\n"
 
 
+def _readme_text(validator: object) -> str:
+    return "# MiniX Print Studio\n\n" + "\n".join(
+        f"{section}\n" for section in validator.REQUIRED_README_SECTIONS
+    )
+
+
 def _ci_workflow_text() -> str:
     return """
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 jobs:
@@ -411,6 +531,9 @@ jobs:
 
 def _release_package_workflow_text() -> str:
     return """
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 jobs:
@@ -430,10 +553,14 @@ on:
   schedule:
     - cron: "21 3 * * 1"
 permissions:
+  actions: read
   contents: read
   security-events: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   analyze:
+    if: ${{ !github.event.repository.private || vars.MINIX_ENABLE_PRIVATE_CODEQL == 'true' }}
     steps:
       - uses: github/codeql-action/init@v4
         with:
