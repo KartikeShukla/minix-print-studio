@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import {
   checkHostBluetoothReadiness,
-  inspectHardwareArtifact
+  inspectHardwareArtifact,
+  inspectTrustedPrinterRecord
 } from "../src/main/hardwareArtifacts";
 
 describe("hardware artifact inspection bridge", () => {
@@ -300,5 +304,102 @@ describe("hardware artifact inspection bridge", () => {
         })
       })
     ).rejects.toThrow("artifact is not read-only safe");
+  });
+
+  it("runs the shared hardware-test CLI trusted-printer record inspection", async () => {
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "minix-trusted-record-test-"));
+    const recordPath = path.join(tempDir, "trusted-printer-fa0f77ee9e7e43ea.json");
+
+    try {
+      await writeFile(
+        recordPath,
+        JSON.stringify({
+          status: "trusted_for_manual_continuous_printing",
+          profileId: "seznik-minix-s1-lyin48d-gy",
+          device: {
+            idRedacted: true,
+            fingerprint: "sha256:fa0f77ee9e7e43ea"
+          },
+          trustedFor: ["manual_continuous_printing"],
+          operatorNoteIncluded: false,
+          hardwareEvidence: {
+            stageA: {
+              stage: "read_only_verification",
+              status: "valid_stage_a_artifact",
+              artifactSha256: "a".repeat(64)
+            },
+            protocolSanity: {
+              stage: "protocol_sanity_test",
+              status: "confirmed_complete",
+              artifactSha256: "b".repeat(64)
+            },
+            tinyVisualCard: {
+              stage: "tiny_visual_test_card",
+              status: "confirmed_complete",
+              artifactSha256: "c".repeat(64)
+            }
+          },
+          safety: {
+            manualContinuousPrintingEnabled: true,
+            longPrintReliabilityRequired: true,
+            longPrintPrintingEnabled: false,
+            agentDirectPrintingEnabled: false,
+            stableSupportClaimEnabled: false
+          },
+          nextRequiredStage: "long_print_reliability"
+        })
+      );
+      const result = await inspectTrustedPrinterRecord({
+        recordPath,
+        repoRoot: "/repo/minix",
+        runner: async (command, args, options) => {
+          calls.push({ command, args, cwd: options.cwd });
+          return {
+            stdout: "trusted-printer-record-inspected\n",
+            stderr: "",
+            exitCode: 0
+          };
+        }
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          recordPath,
+          summary: expect.objectContaining({
+            status: "trusted_for_manual_continuous_printing",
+            profileId: "seznik-minix-s1-lyin48d-gy",
+            device: {
+              idRedacted: true,
+              fingerprint: "sha256:fa0f77ee9e7e43ea"
+            },
+            safety: expect.objectContaining({
+              manualContinuousPrintingEnabled: true,
+              longPrintReliabilityRequired: true,
+              longPrintPrintingEnabled: false,
+              agentDirectPrintingEnabled: false,
+              stableSupportClaimEnabled: false
+            })
+          })
+        })
+      );
+      expect(JSON.stringify(result)).not.toContain("mock-minix-0194");
+      expect(JSON.stringify(result)).not.toContain("aaaaaaaa");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toEqual(
+        expect.objectContaining({
+          command: "/repo/minix/.venv/bin/python",
+          args: [
+            "-m",
+            "minixd.hardware_test_cli",
+            "inspect-trusted-printer-record",
+            recordPath
+          ],
+          cwd: "/repo/minix"
+        })
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });

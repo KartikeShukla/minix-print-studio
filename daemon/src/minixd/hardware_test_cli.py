@@ -355,6 +355,10 @@ def run(
             )
             stdout.write("\n")
             return 0
+        if args.command == "inspect-trusted-printer-record":
+            inspect_trusted_printer_record(Path(args.record_path))
+            stdout.write("trusted-printer-record-inspected\n")
+            return 0
         if args.command == "record-protocol-sanity":
             record_protocol_sanity_artifact(
                 stage_a_artifact_path=Path(args.stage_a_artifact),
@@ -484,6 +488,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a Stage A hardware-test ZIP.",
     )
 
+    trusted_inspect_parser = subparsers.add_parser(
+        "inspect-trusted-printer-record",
+        help="Inspect a trusted-printer JSON record without contacting the daemon.",
+    )
+    trusted_inspect_parser.add_argument(
+        "record_path",
+        help="Path to a trusted-printer JSON record.",
+    )
     record_tiny_parser = subparsers.add_parser(
         "record-tiny-visual-card",
         help="Record a confirmed Stage C tiny visual card run as a hardware-test ZIP.",
@@ -1414,6 +1426,150 @@ def record_trusted_printer(
     }
     record_path.write_text(f"{json.dumps(record, indent=2)}\n", encoding="utf-8")
     return record_path
+
+
+def inspect_trusted_printer_record(record_path: Path) -> dict[str, object]:
+    try:
+        decoded = json.loads(record_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("trusted-printer record not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HardwareTestCliError("trusted-printer record is invalid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError("trusted-printer record is not a JSON object")
+    if "deviceId" in decoded or "rawDeviceId" in decoded:
+        raise HardwareTestCliError("trusted-printer record exposes raw device id")
+
+    device = _required_json_object(decoded, "device", "trusted-printer-record")
+    safety = _required_json_object(decoded, "safety", "trusted-printer-record")
+    hardware_evidence = _required_json_object(
+        decoded,
+        "hardwareEvidence",
+        "trusted-printer-record",
+    )
+    if "deviceId" in device or "rawDeviceId" in device:
+        raise HardwareTestCliError("trusted-printer record exposes raw device id")
+    if _required_json_string(decoded, "status", "trusted-printer-record") != (
+        "trusted_for_manual_continuous_printing"
+    ):
+        raise HardwareTestCliError("trusted-printer record has wrong status")
+    if not _required_json_bool(device, "idRedacted", "trusted-printer-record.device"):
+        raise HardwareTestCliError("trusted-printer record exposes raw device id")
+    device_fingerprint = _required_json_string(
+        device,
+        "fingerprint",
+        "trusted-printer-record.device",
+    )
+    if not device_fingerprint.startswith("sha256:"):
+        raise HardwareTestCliError("trusted-printer record has invalid device fingerprint")
+    trusted_for = _required_json_string_list(decoded, "trustedFor", "trusted-printer-record")
+    if "manual_continuous_printing" not in trusted_for:
+        raise HardwareTestCliError("trusted-printer record does not trust manual printing")
+    operator_note_included = _required_json_bool(
+        decoded,
+        "operatorNoteIncluded",
+        "trusted-printer-record",
+    )
+    if operator_note_included:
+        raise HardwareTestCliError("trusted-printer record includes operator free text")
+    if not _required_json_bool(
+        safety,
+        "manualContinuousPrintingEnabled",
+        "trusted-printer-record.safety",
+    ):
+        raise HardwareTestCliError("trusted-printer record does not enable manual printing")
+    if not _required_json_bool(
+        safety,
+        "longPrintReliabilityRequired",
+        "trusted-printer-record.safety",
+    ):
+        raise HardwareTestCliError("trusted-printer record skips long-print reliability")
+    for field in (
+        "longPrintPrintingEnabled",
+        "agentDirectPrintingEnabled",
+        "stableSupportClaimEnabled",
+    ):
+        if _required_json_bool(safety, field, "trusted-printer-record.safety"):
+            raise HardwareTestCliError("trusted-printer record unlocks later-stage support")
+    next_required_stage = _required_json_string(
+        decoded,
+        "nextRequiredStage",
+        "trusted-printer-record",
+    )
+    if next_required_stage != "long_print_reliability":
+        raise HardwareTestCliError("trusted-printer record has wrong next stage")
+
+    return {
+        "status": "trusted_for_manual_continuous_printing",
+        "profileId": _required_json_string(decoded, "profileId", "trusted-printer-record"),
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "trustedFor": trusted_for,
+        "operatorNoteIncluded": False,
+        "hardwareEvidence": {
+            "stageA": _summarize_trusted_record_evidence_stage(
+                hardware_evidence,
+                "stageA",
+                expected_stage="read_only_verification",
+            ),
+            "protocolSanity": _summarize_trusted_record_evidence_stage(
+                hardware_evidence,
+                "protocolSanity",
+                expected_stage="protocol_sanity_test",
+            ),
+            "tinyVisualCard": _summarize_trusted_record_evidence_stage(
+                hardware_evidence,
+                "tinyVisualCard",
+                expected_stage="tiny_visual_test_card",
+            ),
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityRequired": True,
+            "longPrintPrintingEnabled": False,
+            "agentDirectPrintingEnabled": False,
+            "stableSupportClaimEnabled": False,
+        },
+        "nextRequiredStage": next_required_stage,
+    }
+
+
+def _summarize_trusted_record_evidence_stage(
+    hardware_evidence: Mapping[str, object],
+    field: str,
+    *,
+    expected_stage: str,
+) -> dict[str, object]:
+    evidence = _required_json_object(
+        hardware_evidence,
+        field,
+        "trusted-printer-record.hardwareEvidence",
+    )
+    stage = _required_json_string(
+        evidence,
+        "stage",
+        f"trusted-printer-record.hardwareEvidence.{field}",
+    )
+    if stage != expected_stage:
+        raise HardwareTestCliError("trusted-printer record evidence stage mismatch")
+    artifact_sha256 = _required_json_string(
+        evidence,
+        "artifactSha256",
+        f"trusted-printer-record.hardwareEvidence.{field}",
+    )
+    if len(artifact_sha256) != 64:
+        raise HardwareTestCliError("trusted-printer record evidence digest is invalid")
+    return {
+        "stage": stage,
+        "status": _required_json_string(
+            evidence,
+            "status",
+            f"trusted-printer-record.hardwareEvidence.{field}",
+        ),
+        "artifactSha256Included": True,
+    }
 
 
 def print_long_print_reliability_fixture(

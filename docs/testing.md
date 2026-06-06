@@ -55,6 +55,10 @@ pnpm release-package-check
   verify that the generated local trust record enables only manual continuous
   printing while long-print, stable support, and agent direct printing remain
   disabled.
+- Trusted-printer inspection tests cover the offline CLI summary, Electron
+  bridge command wiring, and renderer Printer panel display while rejecting raw
+  device IDs, operator notes, stable support claims, long-print trust, and agent
+  direct printing.
 - Long-print reliability artifact tests cover Stage A/B/C trusted-record chain
   validation, confirmed long-print job validation, redacted device identity,
   omission of operator free text and raster bytes, and stable support plus agent

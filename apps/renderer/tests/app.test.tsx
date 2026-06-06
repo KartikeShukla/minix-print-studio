@@ -1180,6 +1180,84 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Printing remains locked")).toBeInTheDocument();
   });
 
+  it("inspects a local trusted-printer record without enabling later-stage trust", async () => {
+    const inspect = vi.fn().mockResolvedValue({
+      recordPath: "/tmp/trusted-printer-fa0f77ee9e7e43ea.json",
+      summary: {
+        status: "trusted_for_manual_continuous_printing",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        device: {
+          idRedacted: true,
+          fingerprint: "sha256:fa0f77ee9e7e43ea"
+        },
+        trustedFor: ["manual_continuous_printing"],
+        operatorNoteIncluded: false,
+        hardwareEvidence: {
+          stageA: {
+            stage: "read_only_verification",
+            status: "valid_stage_a_artifact",
+            artifactSha256Included: true
+          },
+          protocolSanity: {
+            stage: "protocol_sanity_test",
+            status: "confirmed_complete",
+            artifactSha256Included: true
+          },
+          tinyVisualCard: {
+            stage: "tiny_visual_test_card",
+            status: "confirmed_complete",
+            artifactSha256Included: true
+          }
+        },
+        safety: {
+          manualContinuousPrintingEnabled: true,
+          longPrintReliabilityRequired: true,
+          longPrintPrintingEnabled: false,
+          agentDirectPrintingEnabled: false,
+          stableSupportClaimEnabled: false
+        },
+        nextRequiredStage: "long_print_reliability"
+      }
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn()
+        }}
+        trustedPrinterRecordInspector={{ inspect }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Inspect trusted-printer record" }));
+
+    await waitFor(() => {
+      expect(inspect).toHaveBeenCalledOnce();
+    });
+    expect(
+      await screen.findByText("Trusted for manual continuous printing")
+    ).toBeInTheDocument();
+    expect(screen.getByText("sha256:fa0f77ee9e7e43ea")).toBeInTheDocument();
+    expect(screen.getByText("Stage A evidence recorded")).toBeInTheDocument();
+    expect(screen.getByText("Stage B protocol sanity recorded")).toBeInTheDocument();
+    expect(screen.getByText("Stage C visual card recorded")).toBeInTheDocument();
+    expect(screen.getByText("Manual continuous printing enabled")).toBeInTheDocument();
+    expect(screen.getByText("Long-print reliability still required")).toBeInTheDocument();
+    expect(screen.getByText("Long-print trust disabled")).toBeInTheDocument();
+    expect(screen.getByText("Agent direct printing disabled")).toBeInTheDocument();
+    expect(screen.getByText("Stable support claim disabled")).toBeInTheDocument();
+  });
+
   it("adds a text layer from the canvas tool and persists the document", async () => {
     render(
       <App

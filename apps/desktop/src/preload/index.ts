@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld("minix", {
   getUpdateChannelState: () => ipcRenderer.invoke("updates:get-state"),
   setUpdateChannel: (channel: string) => ipcRenderer.invoke("updates:set-channel", channel),
   checkHostBluetoothReadiness: () => ipcRenderer.invoke("hardware-readiness:check"),
-  inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect")
+  inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect"),
+  inspectTrustedPrinterRecord: () => ipcRenderer.invoke("trusted-printer-records:inspect")
 });

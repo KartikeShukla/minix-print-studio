@@ -118,6 +118,47 @@ export type HardwareArtifactInspectionResult = {
   evidenceSummary: HardwareEvidenceSummary | null;
 };
 
+export type TrustedPrinterRecordSummary = {
+  status: string;
+  profileId: string;
+  device: {
+    idRedacted: boolean;
+    fingerprint: string;
+  };
+  trustedFor: string[];
+  operatorNoteIncluded: boolean;
+  hardwareEvidence: {
+    stageA: {
+      stage: string;
+      status: string;
+      artifactSha256Included: boolean;
+    };
+    protocolSanity: {
+      stage: string;
+      status: string;
+      artifactSha256Included: boolean;
+    };
+    tinyVisualCard: {
+      stage: string;
+      status: string;
+      artifactSha256Included: boolean;
+    };
+  };
+  safety: {
+    manualContinuousPrintingEnabled: boolean;
+    longPrintReliabilityRequired: boolean;
+    longPrintPrintingEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    stableSupportClaimEnabled: boolean;
+  };
+  nextRequiredStage: string;
+};
+
+export type TrustedPrinterRecordInspectionResult = {
+  recordPath: string;
+  summary: TrustedPrinterRecordSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -136,6 +177,10 @@ export type HardwareArtifactInspector = {
   inspect: () => Promise<HardwareArtifactInspectionResult | null>;
 };
 
+export type TrustedPrinterRecordInspector = {
+  inspect: () => Promise<TrustedPrinterRecordInspectionResult | null>;
+};
+
 export type HardwareReadinessProvider = {
   check: () => Promise<HardwareHostReadiness>;
 };
@@ -147,6 +192,16 @@ export const desktopHardwareArtifactInspector: HardwareArtifactInspector = {
       throw new Error("Hardware artifact inspection is unavailable");
     }
     return inspectHardwareArtifact();
+  }
+};
+
+export const desktopTrustedPrinterRecordInspector: TrustedPrinterRecordInspector = {
+  async inspect() {
+    const inspectTrustedPrinterRecord = window.minix?.inspectTrustedPrinterRecord;
+    if (!inspectTrustedPrinterRecord) {
+      throw new Error("Trusted-printer record inspection is unavailable");
+    }
+    return inspectTrustedPrinterRecord();
   }
 };
 
