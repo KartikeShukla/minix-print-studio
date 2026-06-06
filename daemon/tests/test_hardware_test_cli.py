@@ -825,6 +825,237 @@ def test_hardware_test_cli_records_trusted_printer_record_without_long_print_unl
     }
 
 
+def test_hardware_test_cli_records_long_print_reliability_artifact_without_stable_unlock(
+    tmp_path: Path,
+) -> None:
+    stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    protocol_output_dir = tmp_path / "stage-b"
+    tiny_output_dir = tmp_path / "stage-c"
+    trusted_output_dir = tmp_path / "trusted"
+    long_print_output_dir = tmp_path / "stage-d"
+    _write_stage_a_artifact(stage_a_artifact_path)
+    protocol_stdout = io.StringIO()
+    protocol_exit_code = run(
+        [
+            "record-protocol-sanity",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--output-dir",
+            str(protocol_output_dir),
+            "--confirmed-at",
+            "2026-06-06T12:00:00Z",
+            "--operator-note",
+            "Protocol commands completed without paper motion or fatal error.",
+            "--no-paper-moved",
+            "--no-error",
+        ],
+        stdout=protocol_stdout,
+    )
+    protocol_artifact_path = protocol_output_dir / "hardware-test-protocol-sanity.zip"
+    assert protocol_exit_code == 0
+    tiny_stdout = io.StringIO()
+    tiny_exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "record-tiny-visual-card",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--job-id",
+            "job_confirmed",
+            "--output-dir",
+            str(tiny_output_dir),
+        ],
+        stdout=tiny_stdout,
+        transport=_confirmed_tiny_card_transport,
+    )
+    tiny_artifact_path = tiny_output_dir / "hardware-test-tiny-visual-card-job_confirmed.zip"
+    assert tiny_exit_code == 0
+    trusted_stdout = io.StringIO()
+    trusted_exit_code = run(
+        [
+            "record-trusted-printer",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--output-dir",
+            str(trusted_output_dir),
+        ],
+        stdout=trusted_stdout,
+    )
+    device_fingerprint = f"sha256:{hashlib.sha256(b'mock-minix-0194').hexdigest()[:16]}"
+    trusted_record_path = (
+        trusted_output_dir
+        / f"trusted-printer-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    assert trusted_exit_code == 0
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "record-long-print-reliability",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--job-id",
+            "job_long_confirmed",
+            "--output-dir",
+            str(long_print_output_dir),
+        ],
+        stdout=stdout,
+        transport=_confirmed_long_print_transport,
+    )
+
+    artifact_path = (
+        long_print_output_dir
+        / "hardware-test-long-print-reliability-job_long_confirmed.zip"
+    )
+    assert exit_code == 0
+    assert stdout.getvalue().strip() == "long-print-reliability-recorded"
+    with ZipFile(artifact_path) as archive:
+        assert set(archive.namelist()) == {
+            "stage-chain-summary.json",
+            "trusted-printer-summary.json",
+            "long-print-job-summary.json",
+            "print-transfer-manifest.json",
+            "band-manifest.json",
+            "finalizer-result.json",
+            "safety-report.json",
+            "user-confirmation.json",
+            "README.md",
+        }
+        stage_chain = json.loads(archive.read("stage-chain-summary.json"))
+        trusted_summary = json.loads(archive.read("trusted-printer-summary.json"))
+        job_summary = json.loads(archive.read("long-print-job-summary.json"))
+        transfer_manifest = json.loads(archive.read("print-transfer-manifest.json"))
+        band_manifest = json.loads(archive.read("band-manifest.json"))
+        finalizer_result = json.loads(archive.read("finalizer-result.json"))
+        safety_report = json.loads(archive.read("safety-report.json"))
+        user_confirmation = json.loads(archive.read("user-confirmation.json"))
+
+    assert stage_chain == {
+        "stageA": {
+            "stage": "read_only_verification",
+            "status": "valid_stage_a_artifact",
+            "artifactSha256": hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest(),
+        },
+        "protocolSanity": {
+            "stage": "protocol_sanity_test",
+            "status": "confirmed_complete",
+            "artifactSha256": hashlib.sha256(protocol_artifact_path.read_bytes()).hexdigest(),
+        },
+        "tinyVisualCard": {
+            "stage": "tiny_visual_test_card",
+            "status": "confirmed_complete",
+            "artifactSha256": hashlib.sha256(tiny_artifact_path.read_bytes()).hexdigest(),
+        },
+        "trustedPrinter": {
+            "status": "trusted_for_manual_continuous_printing",
+            "artifactSha256": hashlib.sha256(trusted_record_path.read_bytes()).hexdigest(),
+        },
+    }
+    assert trusted_summary == {
+        "status": "trusted_for_manual_continuous_printing",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "trustedFor": ["manual_continuous_printing"],
+    }
+    assert job_summary == {
+        "jobId": "job_long_confirmed",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "state": "confirmed_complete",
+        "completionLevel": "verified",
+        "completionConfidence": "operator_paper_output_confirmed",
+        "requiresUserCheck": False,
+        "rasterBytesIncluded": False,
+        "operatorNoteIncluded": False,
+    }
+    assert transfer_manifest == {
+        "stage": "long_print_reliability",
+        "status": "confirmed_complete",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "jobId": "job_long_confirmed",
+        "requiredPriorStage": "trusted_printer_record",
+        "nextRequiredStage": "maintainer_review_for_stable_support",
+        "printCommandsSent": True,
+        "rasterBytesIncluded": False,
+        "operatorConfirmed": True,
+        "completionLevel": "verified",
+        "longPrintReliabilityPassed": True,
+        "priorStageArtifactSha256": hashlib.sha256(
+            trusted_record_path.read_bytes()
+        ).hexdigest(),
+    }
+    assert band_manifest == {
+        "bandsSent": 32,
+        "totalBands": 32,
+        "rowsSent": 8160,
+        "totalRows": 8160,
+        "bytesSent": 391680,
+        "totalBytes": 391680,
+        "tailBlankRowsDots": 160,
+        "rasterBytesIncluded": False,
+        "requiresLongPrintMode": True,
+    }
+    assert finalizer_result == {
+        "state": "confirmed_complete",
+        "phase": "operator_confirmed",
+        "completionConfidence": "operator_paper_output_confirmed",
+    }
+    assert safety_report == {
+        "stage": "long_print_reliability",
+        "longPrintReliabilityPassed": True,
+        "manualContinuousPrintingAlreadyTrusted": True,
+        "certificationComplete": False,
+        "stableSupportClaimEnabled": False,
+        "agentDirectPrintingEnabled": False,
+        "rasterBytesIncluded": False,
+    }
+    assert user_confirmation == {
+        "confirmedAt": "2026-06-06T12:45:00Z",
+        "printedTextReadable": True,
+        "endMarkerVisible": True,
+        "noOverheat": True,
+        "noDisconnect": True,
+        "outcome": "confirmed_complete",
+        "operatorNoteIncluded": False,
+    }
+    encoded_artifact = json.dumps(
+        {
+            "stage_chain": stage_chain,
+            "trusted_summary": trusted_summary,
+            "job_summary": job_summary,
+            "transfer_manifest": transfer_manifest,
+            "band_manifest": band_manifest,
+            "finalizer_result": finalizer_result,
+            "safety_report": safety_report,
+            "user_confirmation": user_confirmation,
+        },
+        sort_keys=True,
+    )
+    assert "mock-minix-0194" not in encoded_artifact
+    assert "END LP-TEST checksum" not in encoded_artifact
+
+
 def test_hardware_test_cli_writes_shareable_evidence_summary_without_private_artifact_data(
     tmp_path: Path,
 ) -> None:
@@ -981,6 +1212,51 @@ def _confirmed_tiny_card_transport(
                 "bytesSent": 7680,
                 "totalBytes": 7680,
                 "tailBlankRowsDots": 0,
+                "safeActions": ["reprint_on_user_request"],
+            }
+        ).encode("utf-8"),
+    )
+
+
+def _confirmed_long_print_transport(
+    method: str,
+    url: str,
+    body: bytes | None,
+    headers: Mapping[str, str],
+    timeout: float,
+) -> HttpResponse:
+    return HttpResponse(
+        status=200,
+        headers={"content-type": "application/json"},
+        body=json.dumps(
+            {
+                "jobId": "job_long_confirmed",
+                "previewId": "prev_long_print",
+                "planId": "plan_long_print",
+                "deviceId": "mock-minix-0194",
+                "state": "confirmed_complete",
+                "phase": "operator_confirmed",
+                "completionLevel": "verified",
+                "completionConfidence": "operator_paper_output_confirmed",
+                "requiresUserCheck": False,
+                "source": "ui",
+                "copies": 1,
+                "operatorConfirmation": {
+                    "confirmedAt": "2026-06-06T12:45:00Z",
+                    "printedTextReadable": True,
+                    "endMarkerVisible": True,
+                    "noOverheat": True,
+                    "noDisconnect": True,
+                    "operatorNote": "END LP-TEST checksum: 7F3A visible.",
+                    "outcome": "confirmed_complete",
+                },
+                "bandsSent": 32,
+                "totalBands": 32,
+                "rowsSent": 8160,
+                "totalRows": 8160,
+                "bytesSent": 391680,
+                "totalBytes": 391680,
+                "tailBlankRowsDots": 160,
                 "safeActions": ["reprint_on_user_request"],
             }
         ).encode("utf-8"),

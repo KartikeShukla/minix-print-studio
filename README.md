@@ -24,8 +24,10 @@ evidence, community governance docs, Stage A physical read-only verification, an
 an experimental user-initiated BLE transport path with operator confirmation
 recording. Stage B/C hardware-test artifact recording is implemented for reviewed
 physical runs, and reviewed artifacts can produce a local trusted-printer record
-for manual continuous printing. Stable support, long-print trust, and agent
-direct printing remain gated until long-print reliability passes.
+for manual continuous printing. Long-print reliability artifact recording is
+implemented, but physical long-print evidence is still pending. Stable support,
+long-print trust, and agent direct printing remain gated until reviewed
+long-print reliability evidence exists.
 
 ## Safety Model
 
@@ -53,7 +55,8 @@ in the repository, but stable support still requires physical evidence:
 - Stage B physical protocol sanity artifact after the offline preflight passes.
 - Stage C tiny visual test card artifact from a confirmed Stage B artifact and
   operator-verified daemon job.
-- Long-print reliability before stable support claims.
+- Long-print reliability artifact from a confirmed long-print job before stable
+  support claims.
 
 Do not treat BLE discovery, a matching name, a matching service UUID, or an
 unverified transfer result as stable printer certification. See

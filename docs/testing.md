@@ -55,6 +55,10 @@ pnpm release-package-check
   verify that the generated local trust record enables only manual continuous
   printing while long-print, stable support, and agent direct printing remain
   disabled.
+- Long-print reliability artifact tests cover Stage A/B/C trusted-record chain
+  validation, confirmed long-print job validation, redacted device identity,
+  omission of operator free text and raster bytes, and stable support plus agent
+  direct printing remaining disabled.
 - Offline evidence-summary tests cover maintainer-shareable Stage A summaries
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
@@ -91,7 +95,8 @@ daemon on `127.0.0.1:39282` completed:
   `job_86adfffe80f44b2eb919eabf52439070`, and validated the trusted-printer
   record path for manual continuous printing only. The generated record keeps
   long-print, stable support, and agent direct printing disabled; long-print
-  reliability remains pending.
+  reliability physical evidence remains pending, though the Stage D artifact
+  recording command is implemented.
 
 ## Release Evidence Gate
 
