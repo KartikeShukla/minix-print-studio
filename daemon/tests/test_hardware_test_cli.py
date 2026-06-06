@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+import pytest
+
 from minixd.hardware_test_cli import (
     HttpResponse,
     parse_macos_bluetooth_readiness,
@@ -12,7 +14,22 @@ from minixd.hardware_test_cli import (
 )
 
 
-def test_hardware_test_cli_scans_printers_with_auth_header() -> None:
+def test_hardware_test_cli_help_omits_token_argument(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        run(["--help"])
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "--token" not in captured.out
+    assert "MINIX_DAEMON_TOKEN" in captured.out
+
+
+def test_hardware_test_cli_scans_printers_with_auth_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MINIX_DAEMON_TOKEN", "secret-token")
     calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
 
     def transport(
@@ -44,8 +61,6 @@ def test_hardware_test_cli_scans_printers_with_auth_header() -> None:
         [
             "--base-url",
             "http://127.0.0.1:39281/",
-            "--token",
-            "secret-token",
             "--timeout",
             "2.5",
             "scan",
@@ -106,7 +121,7 @@ def test_hardware_test_cli_exports_read_only_artifact_to_output_dir(tmp_path: Pa
     artifact_path = tmp_path / "hardware-test-stage-a.zip"
     assert exit_code == 0
     assert artifact_path.read_bytes() == b"zip-bytes"
-    assert stdout.getvalue().strip() == str(artifact_path)
+    assert stdout.getvalue().strip() == "artifact-exported"
     assert calls[0][0] == "POST"
     assert calls[0][1] == "http://127.0.0.1:39281/v1/diagnostics/hardware-test"
     assert json.loads(calls[0][2] or b"{}") == {
@@ -438,8 +453,10 @@ def test_hardware_test_cli_plans_tiny_visual_card_preflight_from_stage_a_artifac
 
 
 def test_hardware_test_cli_records_tiny_visual_card_artifact_from_confirmed_job(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    monkeypatch.setenv("MINIX_DAEMON_TOKEN", "secret-token")
     stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
     protocol_output_dir = tmp_path / "stage-b"
     output_dir = tmp_path / "stage-c"
@@ -461,8 +478,9 @@ def test_hardware_test_cli_records_tiny_visual_card_artifact_from_confirmed_job(
         ],
         stdout=protocol_stdout,
     )
-    protocol_artifact_path = Path(protocol_stdout.getvalue().strip())
+    protocol_artifact_path = protocol_output_dir / "hardware-test-protocol-sanity.zip"
     assert protocol_exit_code == 0
+    assert protocol_stdout.getvalue().strip() == "protocol-sanity-recorded"
     calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
 
     def transport(
@@ -516,8 +534,6 @@ def test_hardware_test_cli_records_tiny_visual_card_artifact_from_confirmed_job(
         [
             "--base-url",
             "http://127.0.0.1:39281",
-            "--token",
-            "secret-token",
             "record-tiny-visual-card",
             "--stage-a-artifact",
             str(stage_a_artifact_path),
@@ -532,8 +548,9 @@ def test_hardware_test_cli_records_tiny_visual_card_artifact_from_confirmed_job(
         transport=transport,
     )
 
-    artifact_path = Path(stdout.getvalue().strip())
+    artifact_path = output_dir / "hardware-test-tiny-visual-card-job_confirmed.zip"
     assert exit_code == 0
+    assert stdout.getvalue().strip() == "tiny-visual-card-recorded"
     assert calls == [
         (
             "GET",
@@ -636,8 +653,9 @@ def test_hardware_test_cli_records_protocol_sanity_artifact_from_operator_check(
         stdout=stdout,
     )
 
-    artifact_path = Path(stdout.getvalue().strip())
+    artifact_path = output_dir / "hardware-test-protocol-sanity.zip"
     assert exit_code == 0
+    assert stdout.getvalue().strip() == "protocol-sanity-recorded"
     assert artifact_path.parent == output_dir
     assert artifact_path.name == "hardware-test-protocol-sanity.zip"
     with ZipFile(artifact_path) as archive:
@@ -689,6 +707,122 @@ def test_hardware_test_cli_records_protocol_sanity_artifact_from_operator_check(
     assert "wake" in commands_log
     assert "set_density" in commands_log
     assert "set_paper_mode" in commands_log
+
+
+def test_hardware_test_cli_records_trusted_printer_record_without_long_print_unlock(
+    tmp_path: Path,
+) -> None:
+    stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    protocol_output_dir = tmp_path / "stage-b"
+    tiny_output_dir = tmp_path / "stage-c"
+    trusted_output_dir = tmp_path / "trusted"
+    _write_stage_a_artifact(stage_a_artifact_path)
+    protocol_stdout = io.StringIO()
+    protocol_exit_code = run(
+        [
+            "record-protocol-sanity",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--output-dir",
+            str(protocol_output_dir),
+            "--confirmed-at",
+            "2026-06-06T12:00:00Z",
+            "--operator-note",
+            "Protocol commands completed without paper motion or fatal error.",
+            "--no-paper-moved",
+            "--no-error",
+        ],
+        stdout=protocol_stdout,
+    )
+    protocol_artifact_path = protocol_output_dir / "hardware-test-protocol-sanity.zip"
+    assert protocol_exit_code == 0
+    assert protocol_stdout.getvalue().strip() == "protocol-sanity-recorded"
+    tiny_stdout = io.StringIO()
+    tiny_exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "record-tiny-visual-card",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--job-id",
+            "job_confirmed",
+            "--output-dir",
+            str(tiny_output_dir),
+        ],
+        stdout=tiny_stdout,
+        transport=_confirmed_tiny_card_transport,
+    )
+    tiny_artifact_path = tiny_output_dir / "hardware-test-tiny-visual-card-job_confirmed.zip"
+    assert tiny_exit_code == 0
+    assert tiny_stdout.getvalue().strip() == "tiny-visual-card-recorded"
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "record-trusted-printer",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--output-dir",
+            str(trusted_output_dir),
+        ],
+        stdout=stdout,
+    )
+
+    device_fingerprint = f"sha256:{hashlib.sha256(b'mock-minix-0194').hexdigest()[:16]}"
+    record_path = (
+        trusted_output_dir
+        / f"trusted-printer-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    assert exit_code == 0
+    assert stdout.getvalue().strip() == "trusted-printer-recorded"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record.pop("trustedAt").endswith("Z")
+    assert record == {
+        "schemaVersion": 1,
+        "status": "trusted_for_manual_continuous_printing",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "operatorNoteIncluded": False,
+        "trustedFor": ["manual_continuous_printing"],
+        "hardwareEvidence": {
+            "stageA": {
+                "stage": "read_only_verification",
+                "status": "valid_stage_a_artifact",
+                "artifactSha256": hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest(),
+            },
+            "protocolSanity": {
+                "stage": "protocol_sanity_test",
+                "status": "confirmed_complete",
+                "artifactSha256": hashlib.sha256(
+                    protocol_artifact_path.read_bytes()
+                ).hexdigest(),
+            },
+            "tinyVisualCard": {
+                "stage": "tiny_visual_test_card",
+                "status": "confirmed_complete",
+                "jobId": "job_confirmed",
+                "artifactSha256": hashlib.sha256(tiny_artifact_path.read_bytes()).hexdigest(),
+            },
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityRequired": True,
+            "longPrintPrintingEnabled": False,
+            "agentDirectPrintingEnabled": False,
+            "stableSupportClaimEnabled": False,
+        },
+        "nextRequiredStage": "long_print_reliability",
+    }
 
 
 def test_hardware_test_cli_writes_shareable_evidence_summary_without_private_artifact_data(
@@ -806,6 +940,51 @@ def test_hardware_test_cli_rejects_tiny_visual_card_preflight_for_unsafe_artifac
 
     assert exit_code == 2
     assert stderr.getvalue().strip() == "artifact is not read-only safe"
+
+
+def _confirmed_tiny_card_transport(
+    method: str,
+    url: str,
+    body: bytes | None,
+    headers: Mapping[str, str],
+    timeout: float,
+) -> HttpResponse:
+    return HttpResponse(
+        status=200,
+        headers={"content-type": "application/json"},
+        body=json.dumps(
+            {
+                "jobId": "job_confirmed",
+                "previewId": "prev_tiny_card",
+                "planId": "plan_tiny_card",
+                "deviceId": "mock-minix-0194",
+                "state": "confirmed_complete",
+                "phase": "operator_confirmed",
+                "completionLevel": "verified",
+                "completionConfidence": "operator_paper_output_confirmed",
+                "requiresUserCheck": False,
+                "source": "ui",
+                "copies": 1,
+                "operatorConfirmation": {
+                    "confirmedAt": "2026-06-06T12:34:56Z",
+                    "printedTextReadable": True,
+                    "endMarkerVisible": True,
+                    "noOverheat": True,
+                    "noDisconnect": True,
+                    "operatorNote": "MINIX TEST 7K4P readable.",
+                    "outcome": "confirmed_complete",
+                },
+                "bandsSent": 2,
+                "totalBands": 2,
+                "rowsSent": 160,
+                "totalRows": 160,
+                "bytesSent": 7680,
+                "totalBytes": 7680,
+                "tailBlankRowsDots": 0,
+                "safeActions": ["reprint_on_user_request"],
+            }
+        ).encode("utf-8"),
+    )
 
 
 def _write_stage_a_artifact(

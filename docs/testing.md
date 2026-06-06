@@ -51,6 +51,10 @@ pnpm release-package-check
   Stage C tiny-card ZIP creation from a confirmed daemon job, confirmed Stage B
   artifact validation, artifact SHA-256 chaining, and locked-printing safety
   reports.
+- Trusted-printer record tests cover Stage A/B/C artifact chain validation and
+  verify that the generated local trust record enables only manual continuous
+  printing while long-print, stable support, and agent direct printing remain
+  disabled.
 - Offline evidence-summary tests cover maintainer-shareable Stage A summaries
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
@@ -80,8 +84,14 @@ daemon on `127.0.0.1:39282` completed:
   `tiny-visual-card-preflight`, and `evidence-summary`
 - One experimental tiny-card `/v1/jobs/print` transfer that reported
   `completed_unverified`; operator paper-output confirmation recording is
-  implemented, and Stage B/C artifact-recording commands are available, but
-  reviewed Stage B/C artifact evidence remains required.
+  implemented, and Stage B/C artifact-recording commands are available. At that
+  point, reviewed Stage B/C artifact evidence still remained required.
+- A later fresh physical run recorded local untracked Stage A/B/C evidence,
+  confirmed
+  `job_86adfffe80f44b2eb919eabf52439070`, and validated the trusted-printer
+  record path for manual continuous printing only. The generated record keeps
+  long-print, stable support, and agent direct printing disabled; long-print
+  reliability remains pending.
 
 ## Release Evidence Gate
 

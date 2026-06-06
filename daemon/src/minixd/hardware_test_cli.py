@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO, cast
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
@@ -190,7 +191,7 @@ def run(
     args = parser.parse_args(argv)
     client = HardwareTestClient(
         base_url=args.base_url,
-        token=args.token,
+        token=os.environ.get("MINIX_DAEMON_TOKEN", ""),
         timeout=args.timeout,
         transport=transport or urllib_transport,
     )
@@ -212,11 +213,11 @@ def run(
         if args.command == "export-read-only":
             if args.require_host_ready:
                 _require_stage_a_host_ready(host_bluetooth_probe)
-            artifact_path = client.export_read_only_artifact(
+            client.export_read_only_artifact(
                 device_id=args.device_id,
                 output_dir=Path(args.output_dir),
             )
-            stdout.write(f"{artifact_path}\n")
+            stdout.write("artifact-exported\n")
             return 0
         if args.command == "inspect-artifact":
             stdout.write(
@@ -259,7 +260,7 @@ def run(
             stdout.write("\n")
             return 0
         if args.command == "record-protocol-sanity":
-            artifact_path = record_protocol_sanity_artifact(
+            record_protocol_sanity_artifact(
                 stage_a_artifact_path=Path(args.stage_a_artifact),
                 output_dir=Path(args.output_dir),
                 confirmed_at=args.confirmed_at,
@@ -267,23 +268,32 @@ def run(
                 no_paper_moved=args.no_paper_moved,
                 no_error=args.no_error,
             )
-            stdout.write(f"{artifact_path}\n")
+            stdout.write("protocol-sanity-recorded\n")
             return 0
         if args.command == "record-tiny-visual-card":
             job_status = client.get_job_status(job_id=args.job_id)
-            artifact_path = record_tiny_visual_card_artifact(
+            record_tiny_visual_card_artifact(
                 stage_a_artifact_path=Path(args.stage_a_artifact),
                 protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
                 job_status=job_status,
                 output_dir=Path(args.output_dir),
             )
-            stdout.write(f"{artifact_path}\n")
+            stdout.write("tiny-visual-card-recorded\n")
+            return 0
+        if args.command == "record-trusted-printer":
+            record_trusted_printer(
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
+                tiny_visual_card_artifact_path=Path(args.tiny_visual_card_artifact),
+                output_dir=Path(args.output_dir),
+            )
+            stdout.write("trusted-printer-recorded\n")
             return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
 
-    stderr.write(f"unsupported command: {args.command}\n")
+    stderr.write("unsupported command\n")
     return 2
 
 
@@ -294,17 +304,15 @@ def main() -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="minix-hardware-test",
-        description="Run MiniX Print Studio hardware validation helpers against a local daemon.",
+        description=(
+            "Run MiniX Print Studio hardware validation helpers against a local daemon. "
+            "Daemon bearer tokens are read from MINIX_DAEMON_TOKEN."
+        ),
     )
     parser.add_argument(
         "--base-url",
         default=os.environ.get("MINIX_DAEMON_BASE_URL", "http://127.0.0.1:39281"),
         help="Daemon base URL. Defaults to MINIX_DAEMON_BASE_URL or localhost.",
-    )
-    parser.add_argument(
-        "--token",
-        default=os.environ.get("MINIX_DAEMON_TOKEN", ""),
-        help="Daemon bearer token. Defaults to MINIX_DAEMON_TOKEN.",
     )
     parser.add_argument("--timeout", type=float, default=10.0, help="HTTP timeout in seconds.")
 
@@ -416,6 +424,31 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-error",
         action="store_true",
         help="Confirm the printer reported no fatal error during the protocol sanity run.",
+    )
+
+    record_trusted_parser = subparsers.add_parser(
+        "record-trusted-printer",
+        help="Record a local trusted-printer JSON record from reviewed Stage A/B/C artifacts.",
+    )
+    record_trusted_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP for the printer.",
+    )
+    record_trusted_parser.add_argument(
+        "--protocol-sanity-artifact",
+        required=True,
+        help="Path to the confirmed Stage B protocol-sanity hardware-test ZIP.",
+    )
+    record_trusted_parser.add_argument(
+        "--tiny-visual-card-artifact",
+        required=True,
+        help="Path to the confirmed Stage C tiny visual-card hardware-test ZIP.",
+    )
+    record_trusted_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the trusted-printer JSON record.",
     )
     return parser
 
@@ -785,7 +818,7 @@ def build_shareable_evidence_summary(artifact_path: Path) -> dict[str, object]:
         ),
         "device": {
             "idRedacted": True,
-            "fingerprint": f"sha256:{hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:16]}",
+            "fingerprint": _device_fingerprint(device_id),
         },
         "redaction": {
             "artifactPathIncluded": False,
@@ -1112,6 +1145,99 @@ def record_protocol_sanity_artifact(
     return artifact_path
 
 
+def record_trusted_printer(
+    *,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    tiny_visual_card_artifact_path: Path,
+    output_dir: Path,
+) -> Path:
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    protocol_sanity_summary = _inspect_protocol_sanity_artifact(
+        artifact_path=protocol_sanity_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    tiny_visual_card_summary = _inspect_tiny_visual_card_artifact(
+        artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+        protocol_sanity_summary=protocol_sanity_summary,
+    )
+    device_id = _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    device_fingerprint = _device_fingerprint(device_id)
+    record_path = output_dir / f"trusted-printer-{device_fingerprint.removeprefix('sha256:')}.json"
+    record = {
+        "schemaVersion": 1,
+        "status": "trusted_for_manual_continuous_printing",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "profileId": profile_id,
+        "trustedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "operatorNoteIncluded": False,
+        "trustedFor": ["manual_continuous_printing"],
+        "hardwareEvidence": {
+            "stageA": {
+                "stage": "read_only_verification",
+                "status": _required_json_string(
+                    stage_a_summary,
+                    "status",
+                    "print-transfer-manifest.json",
+                ),
+                "artifactSha256": hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest(),
+            },
+            "protocolSanity": {
+                "stage": "protocol_sanity_test",
+                "status": _required_json_string(
+                    protocol_sanity_summary,
+                    "status",
+                    "protocol-sanity-summary",
+                ),
+                "artifactSha256": _required_json_string(
+                    protocol_sanity_summary,
+                    "artifactSha256",
+                    "protocol-sanity-summary",
+                ),
+            },
+            "tinyVisualCard": {
+                "stage": "tiny_visual_test_card",
+                "status": _required_json_string(
+                    tiny_visual_card_summary,
+                    "status",
+                    "tiny-visual-card-summary",
+                ),
+                "jobId": _required_json_string(
+                    tiny_visual_card_summary,
+                    "jobId",
+                    "tiny-visual-card-summary",
+                ),
+                "artifactSha256": _required_json_string(
+                    tiny_visual_card_summary,
+                    "artifactSha256",
+                    "tiny-visual-card-summary",
+                ),
+            },
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityRequired": True,
+            "longPrintPrintingEnabled": False,
+            "agentDirectPrintingEnabled": False,
+            "stableSupportClaimEnabled": False,
+        },
+        "nextRequiredStage": "long_print_reliability",
+    }
+    record_path.write_text(f"{json.dumps(record, indent=2)}\n", encoding="utf-8")
+    return record_path
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
     _require_artifact_files(
         archive,
@@ -1379,6 +1505,186 @@ def _validate_protocol_sanity_artifact(
         raise HardwareTestCliError("protocol sanity operator reported an error")
 
 
+def _inspect_tiny_visual_card_artifact(
+    *,
+    artifact_path: Path,
+    stage_a_summary: Mapping[str, object],
+    protocol_sanity_summary: Mapping[str, object],
+) -> dict[str, object]:
+    try:
+        artifact_sha256 = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        with ZipFile(artifact_path) as archive:
+            _require_artifact_files(
+                archive,
+                (
+                    "print-transfer-manifest.json",
+                    "safety-report.json",
+                    "user-confirmation.json",
+                    "protocol-sanity-summary.json",
+                ),
+                label="tiny visual card artifact",
+            )
+            transfer_manifest = _read_zip_json_object(
+                archive,
+                "print-transfer-manifest.json",
+            )
+            safety_report = _read_zip_json_object(archive, "safety-report.json")
+            user_confirmation = _read_zip_json_object(archive, "user-confirmation.json")
+            artifact_protocol_summary = _read_zip_json_object(
+                archive,
+                "protocol-sanity-summary.json",
+            )
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("tiny visual card artifact not found") from exc
+    except BadZipFile as exc:
+        raise HardwareTestCliError("tiny visual card artifact is not a ZIP file") from exc
+
+    _validate_tiny_visual_card_artifact(
+        transfer_manifest=transfer_manifest,
+        safety_report=safety_report,
+        user_confirmation=user_confirmation,
+        artifact_protocol_summary=artifact_protocol_summary,
+        stage_a_summary=stage_a_summary,
+        protocol_sanity_summary=protocol_sanity_summary,
+    )
+    return {
+        "stage": "tiny_visual_test_card",
+        "status": "confirmed_complete",
+        "jobId": _required_json_string(
+            transfer_manifest,
+            "jobId",
+            "print-transfer-manifest.json",
+        ),
+        "artifactSha256": artifact_sha256,
+    }
+
+
+def _validate_tiny_visual_card_artifact(
+    *,
+    transfer_manifest: Mapping[str, object],
+    safety_report: Mapping[str, object],
+    user_confirmation: Mapping[str, object],
+    artifact_protocol_summary: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+    protocol_sanity_summary: Mapping[str, object],
+) -> None:
+    if (
+        _required_json_string(transfer_manifest, "stage", "print-transfer-manifest.json")
+        != "tiny_visual_test_card"
+    ):
+        raise HardwareTestCliError("tiny visual card artifact has wrong stage")
+    if (
+        _required_json_string(transfer_manifest, "status", "print-transfer-manifest.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("tiny visual card artifact is not confirmed complete")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        )
+        != "long_print_reliability"
+    ):
+        raise HardwareTestCliError("tiny visual card artifact is not ready for trusted record")
+    if (
+        _required_json_string(transfer_manifest, "deviceId", "print-transfer-manifest.json")
+        != _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("tiny visual card artifact device does not match Stage A")
+    if (
+        _required_json_string(transfer_manifest, "profileId", "print-transfer-manifest.json")
+        != _required_json_string(stage_a_summary, "profileId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("tiny visual card artifact profile does not match Stage A")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "requiredPriorStage",
+            "print-transfer-manifest.json",
+        )
+        != "protocol_sanity_test"
+    ):
+        raise HardwareTestCliError("tiny visual card artifact has wrong prior stage")
+    if not _required_json_bool(
+        transfer_manifest,
+        "printCommandsSent",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("tiny visual card artifact did not send print commands")
+    if _required_json_bool(
+        transfer_manifest,
+        "rasterBytesIncluded",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("tiny visual card artifact unexpectedly includes raster bytes")
+    if not _required_json_bool(
+        transfer_manifest,
+        "operatorConfirmed",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("tiny visual card artifact lacks operator confirmation")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "completionLevel",
+            "print-transfer-manifest.json",
+        )
+        != "verified"
+    ):
+        raise HardwareTestCliError("tiny visual card artifact is not verified")
+
+    prior_sha = _required_json_string(
+        protocol_sanity_summary,
+        "artifactSha256",
+        "protocol-sanity-summary",
+    )
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "priorStageArtifactSha256",
+            "print-transfer-manifest.json",
+        )
+        != prior_sha
+        or _required_json_string(
+            artifact_protocol_summary,
+            "artifactSha256",
+            "protocol-sanity-summary.json",
+        )
+        != prior_sha
+    ):
+        raise HardwareTestCliError("tiny visual card artifact is not chained to Stage B")
+
+    if not _required_json_bool(safety_report, "printingLocked", "safety-report.json"):
+        raise HardwareTestCliError("tiny visual card artifact safety unlocked printing")
+    if _required_json_bool(safety_report, "certificationComplete", "safety-report.json"):
+        raise HardwareTestCliError("tiny visual card artifact prematurely completed certification")
+    if _required_json_bool(safety_report, "unlocksPrinting", "safety-report.json"):
+        raise HardwareTestCliError("tiny visual card artifact unlocks printing")
+    if not _required_json_bool(
+        safety_report,
+        "requiresLongPrintReliability",
+        "safety-report.json",
+    ):
+        raise HardwareTestCliError("tiny visual card artifact skips long-print reliability")
+    if _required_json_bool(safety_report, "rasterBytesIncluded", "safety-report.json"):
+        raise HardwareTestCliError("tiny visual card safety report includes raster bytes")
+
+    if (
+        _required_json_string(user_confirmation, "outcome", "user-confirmation.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("tiny visual card operator confirmation is incomplete")
+    for field in (
+        "printedTextReadable",
+        "endMarkerVisible",
+        "noOverheat",
+        "noDisconnect",
+    ):
+        if not _required_json_bool(user_confirmation, field, "user-confirmation.json"):
+            raise HardwareTestCliError("tiny visual card operator checklist did not pass")
+
+
 def _validate_confirmed_tiny_visual_job(
     *,
     job_status: Mapping[str, object],
@@ -1412,6 +1718,10 @@ def _validate_confirmed_tiny_visual_job(
     ):
         if not _required_json_bool(confirmation, field, "job-status.operatorConfirmation"):
             raise HardwareTestCliError("tiny visual card operator checklist did not pass")
+
+
+def _device_fingerprint(device_id: str) -> str:
+    return f"sha256:{hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:16]}"
 
 
 def _safe_filename_part(value: str) -> str:
