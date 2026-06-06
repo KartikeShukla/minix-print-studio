@@ -8,7 +8,8 @@ import type {
 } from "@/lib/agent-integrations";
 import type {
   HardwareArtifactInspectionResult,
-  HardwareHostReadiness
+  HardwareHostReadiness,
+  TrustedPrinterRecordInspectionResult
 } from "@/lib/hardware-artifacts";
 import type {
   BetaFeedbackDraft,
@@ -107,6 +108,7 @@ declare global {
       setUpdateChannel?: (channel: UpdateChannel) => Promise<UpdateChannelState>;
       checkHostBluetoothReadiness?: () => Promise<HardwareHostReadiness>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
+      inspectTrustedPrinterRecord?: () => Promise<TrustedPrinterRecordInspectionResult | null>;
     };
   }
 }

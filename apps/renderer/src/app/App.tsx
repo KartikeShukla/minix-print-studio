@@ -107,10 +107,13 @@ import {
 import {
   desktopHardwareArtifactInspector,
   desktopHardwareReadinessProvider,
+  desktopTrustedPrinterRecordInspector,
   type HardwareArtifactInspectionResult,
   type HardwareArtifactInspector,
   type HardwareHostReadiness,
-  type HardwareReadinessProvider
+  type HardwareReadinessProvider,
+  type TrustedPrinterRecordInspectionResult,
+  type TrustedPrinterRecordInspector
 } from "@/lib/hardware-artifacts";
 import {
   desktopSupportBundleExporter,
@@ -161,6 +164,7 @@ export type AppProps = {
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
+  trustedPrinterRecordInspector?: TrustedPrinterRecordInspector;
   hardwareReadinessProvider?: HardwareReadinessProvider;
   supportBundleExporter?: SupportBundleExporter;
   updateChannelProvider?: UpdateChannelProvider;
@@ -229,6 +233,12 @@ type HardwarePreflightWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "ready"; result: HardwareArtifactInspectionResult }
+  | { status: "error"; message: string };
+
+type TrustedPrinterRecordWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: TrustedPrinterRecordInspectionResult }
   | { status: "error"; message: string };
 
 type HardwareReadinessWorkflow =
@@ -329,6 +339,7 @@ export function App({
   agentIntegrationProvider,
   agentIntegrationInstaller,
   hardwareArtifactInspector,
+  trustedPrinterRecordInspector,
   hardwareReadinessProvider,
   supportBundleExporter,
   updateChannelProvider
@@ -345,6 +356,10 @@ export function App({
   const artifactInspector = useMemo(
     () => hardwareArtifactInspector ?? desktopHardwareArtifactInspector,
     [hardwareArtifactInspector]
+  );
+  const trustedRecordInspector = useMemo(
+    () => trustedPrinterRecordInspector ?? desktopTrustedPrinterRecordInspector,
+    [trustedPrinterRecordInspector]
   );
   const readinessProvider = useMemo(
     () => hardwareReadinessProvider ?? desktopHardwareReadinessProvider,
@@ -396,6 +411,8 @@ export function App({
     });
   const [hardwarePreflightWorkflow, setHardwarePreflightWorkflow] =
     useState<HardwarePreflightWorkflow>({ status: "idle" });
+  const [trustedPrinterRecordWorkflow, setTrustedPrinterRecordWorkflow] =
+    useState<TrustedPrinterRecordWorkflow>({ status: "idle" });
   const [hardwareReadinessWorkflow, setHardwareReadinessWorkflow] =
     useState<HardwareReadinessWorkflow>({ status: "idle" });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
@@ -1328,6 +1345,20 @@ export function App({
     }
   }, [artifactInspector]);
 
+  const inspectTrustedPrinterRecord = useCallback(async () => {
+    setTrustedPrinterRecordWorkflow({ status: "running" });
+    try {
+      const result = await trustedRecordInspector.inspect();
+      setTrustedPrinterRecordWorkflow(result ? { status: "ready", result } : { status: "idle" });
+    } catch (error: unknown) {
+      setTrustedPrinterRecordWorkflow({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Trusted-printer record inspection failed"
+      });
+    }
+  }, [trustedRecordInspector]);
+
   const copyAgentIntegrationConfig = useCallback(async (target: AgentIntegrationPreviewTarget) => {
     try {
       if (!navigator.clipboard?.writeText) {
@@ -1642,6 +1673,7 @@ export function App({
                 printerWorkflow={printerWorkflow}
                 hardwareArtifactWorkflow={hardwareArtifactWorkflow}
                 hardwarePreflightWorkflow={hardwarePreflightWorkflow}
+                trustedPrinterRecordWorkflow={trustedPrinterRecordWorkflow}
                 agentIntegrationWorkflow={agentIntegrationWorkflow}
                 onDismiss={dismissSetupChecklist}
               />
@@ -1665,10 +1697,12 @@ export function App({
               hardwareReadinessWorkflow={hardwareReadinessWorkflow}
               hardwareArtifactWorkflow={hardwareArtifactWorkflow}
               hardwarePreflightWorkflow={hardwarePreflightWorkflow}
+              trustedPrinterRecordWorkflow={trustedPrinterRecordWorkflow}
               onCheckHostBluetooth={checkHostBluetoothReadiness}
               onVerify={runReadOnlyVerify}
               onExportHardwareArtifact={runHardwareArtifactExport}
               onInspectHardwareArtifact={inspectHardwareArtifact}
+              onInspectTrustedPrinterRecord={inspectTrustedPrinterRecord}
             />
             <ElementInspector element={selectedElement} onUpdate={updateDocumentElement} />
 
@@ -2060,6 +2094,7 @@ function SetupChecklistPanel({
   printerWorkflow,
   hardwareArtifactWorkflow,
   hardwarePreflightWorkflow,
+  trustedPrinterRecordWorkflow,
   agentIntegrationWorkflow,
   onDismiss
 }: {
@@ -2067,6 +2102,7 @@ function SetupChecklistPanel({
   printerWorkflow: PrinterWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   hardwarePreflightWorkflow: HardwarePreflightWorkflow;
+  trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
   agentIntegrationWorkflow: AgentIntegrationWorkflow;
   onDismiss: () => void;
 }) {
@@ -2084,6 +2120,10 @@ function SetupChecklistPanel({
       ready:
         hardwareArtifactWorkflow.status === "exported" ||
         hardwarePreflightWorkflow.status === "ready"
+    },
+    {
+      label: "Trusted printer record",
+      ready: trustedPrinterRecordWorkflow.status === "ready"
     },
     {
       label: "Agent integrations",
@@ -3452,19 +3492,23 @@ function PrinterPanel({
   hardwareReadinessWorkflow,
   hardwareArtifactWorkflow,
   hardwarePreflightWorkflow,
+  trustedPrinterRecordWorkflow,
   onCheckHostBluetooth,
   onVerify,
   onExportHardwareArtifact,
-  onInspectHardwareArtifact
+  onInspectHardwareArtifact,
+  onInspectTrustedPrinterRecord
 }: {
   workflow: PrinterWorkflow;
   hardwareReadinessWorkflow: HardwareReadinessWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   hardwarePreflightWorkflow: HardwarePreflightWorkflow;
+  trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
   onCheckHostBluetooth: () => void;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
   onExportHardwareArtifact: (deviceId: string) => void;
   onInspectHardwareArtifact: () => void;
+  onInspectTrustedPrinterRecord: () => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
@@ -3518,7 +3562,104 @@ function PrinterPanel({
         workflow={hardwarePreflightWorkflow}
         onInspect={onInspectHardwareArtifact}
       />
+      <TrustedPrinterRecordStatus
+        workflow={trustedPrinterRecordWorkflow}
+        onInspect={onInspectTrustedPrinterRecord}
+      />
     </section>
+  );
+}
+
+function TrustedPrinterRecordStatus({
+  workflow,
+  onInspect
+}: {
+  workflow: TrustedPrinterRecordWorkflow;
+  onInspect: () => void;
+}) {
+  const summary = workflow.status === "ready" ? workflow.result.summary : null;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onInspect}
+        disabled={workflow.status === "running"}
+      >
+        <ShieldCheck className="size-4" aria-hidden="true" />
+        {workflow.status === "running"
+          ? "Inspecting trusted record"
+          : "Inspect trusted-printer record"}
+      </Button>
+      {summary ? (
+        <div className="space-y-3 rounded-md border border-success/30 bg-success/10 p-3">
+          <div>
+            <div className="font-medium text-success">
+              Trusted for manual continuous printing
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Profile</span>
+              <span className="text-right">{summary.profileId}</span>
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Fingerprint</span>
+              <span className="break-words text-right font-mono text-xs">
+                {summary.device.fingerprint}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <TrustedEvidenceRow
+              label="Stage A evidence recorded"
+              ready={summary.hardwareEvidence.stageA.artifactSha256Included}
+            />
+            <TrustedEvidenceRow
+              label="Stage B protocol sanity recorded"
+              ready={summary.hardwareEvidence.protocolSanity.artifactSha256Included}
+            />
+            <TrustedEvidenceRow
+              label="Stage C visual card recorded"
+              ready={summary.hardwareEvidence.tinyVisualCard.artifactSha256Included}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {summary.safety.manualContinuousPrintingEnabled ? (
+              <Badge variant="success">Manual continuous printing enabled</Badge>
+            ) : null}
+            {summary.safety.longPrintReliabilityRequired ? (
+              <Badge variant="warning">Long-print reliability still required</Badge>
+            ) : null}
+            {!summary.safety.longPrintPrintingEnabled ? (
+              <Badge variant="warning">Long-print trust disabled</Badge>
+            ) : null}
+            {!summary.safety.agentDirectPrintingEnabled ? (
+              <Badge variant="warning">Agent direct printing disabled</Badge>
+            ) : null}
+            {!summary.safety.stableSupportClaimEnabled ? (
+              <Badge variant="warning">Stable support claim disabled</Badge>
+            ) : null}
+          </div>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TrustedEvidenceRow({ label, ready }: { label: string; ready: boolean }) {
+  return (
+    <div className="flex items-center gap-2 rounded-sm bg-background/70 px-2 py-1">
+      <CheckCircle2
+        className={ready ? "size-4 text-success" : "size-4 text-muted-foreground"}
+        aria-hidden="true"
+      />
+      <span>{label}</span>
+    </div>
   );
 }
 

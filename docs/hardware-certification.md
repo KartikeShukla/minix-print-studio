@@ -223,6 +223,18 @@ This writes `trusted-printer-<device-fingerprint>.json`. The record enables only
 `manual_continuous_printing`, stores a redacted device fingerprint plus SHA-256
 digests for the Stage A/B/C evidence chain, and keeps long-print, stable support
 claims, and agent direct printing disabled until long-print reliability passes.
+Inspect the record before sharing or relying on it:
+
+```bash
+scripts/hardware-test.sh inspect-trusted-printer-record <trusted-printer-device-fingerprint.json>
+```
+
+The CLI inspection runs offline and prints only a status line to stdout. It
+rejects records that expose a raw device id, include operator free text, skip
+long-print reliability, or enable long-print trust, stable support claims, or
+agent direct printing. In the desktop app, use `Inspect trusted-printer record`
+in the Printer panel to validate the selected JSON through the same CLI path and
+show the redacted manual-continuous trust state in the setup flow.
 
 ## Stage D Long-Print Reliability Artifact
 

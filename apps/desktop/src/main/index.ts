@@ -19,7 +19,11 @@ import {
 } from "./integrationInstaller";
 import { ensureMcpShim } from "./mcpShim";
 import { exportClaudeDesktopMcpb } from "./mcpbExport";
-import { checkHostBluetoothReadiness, inspectHardwareArtifact } from "./hardwareArtifacts";
+import {
+  checkHostBluetoothReadiness,
+  inspectHardwareArtifact,
+  inspectTrustedPrinterRecord
+} from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
@@ -171,6 +175,24 @@ ipcMain.handle("hardware-artifacts:inspect", async () => {
   }
   return inspectHardwareArtifact({
     artifactPath,
+    repoRoot: getRepoRoot()
+  });
+});
+ipcMain.handle("trusted-printer-records:inspect", async () => {
+  const options: OpenDialogOptions = {
+    title: "Inspect trusted-printer record",
+    properties: ["openFile"],
+    filters: [{ name: "Trusted-printer JSON", extensions: ["json"] }]
+  };
+  const selection = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  const recordPath = selection.filePaths[0];
+  if (selection.canceled || !recordPath) {
+    return null;
+  }
+  return inspectTrustedPrinterRecord({
+    recordPath,
     repoRoot: getRepoRoot()
   });
 });

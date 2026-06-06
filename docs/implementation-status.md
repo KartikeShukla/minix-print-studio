@@ -203,6 +203,14 @@ Public development is on `main`; implementation slices use short-lived
 - `minix-hardware-test tiny-visual-card-preflight` validates a Stage A artifact and emits deterministic Stage C tiny-card metadata for `MINIX TEST 7K4P`, including dimensions, raster byte counts, and a digest without including printable bytes or contacting BLE.
 - `minix-hardware-test evidence-summary` emits a redacted maintainer-shareable Stage A summary with a hashed device fingerprint, redaction flags, protocol preflight counts, and tiny-card digest without artifact paths, raw logs, command payload hex, bearer tokens, raster bytes, or the raw device id.
 - Electron artifact inspection now shows the Stage B protocol sanity preflight, Stage C tiny visual card preflight, and redacted shareable evidence summary while keeping printing locked.
+- `minix-hardware-test inspect-trusted-printer-record` validates a local
+  trusted-printer JSON record offline, keeps stdout status-only, rejects raw
+  device IDs/operator notes/later-stage unlocks, and does not contact the
+  daemon.
+- Electron exposes trusted-printer record inspection from the Printer setup flow,
+  validates the selected JSON through the same CLI path, and shows manual
+  continuous-print trust separately from long-print trust, stable-support
+  claims, and agent direct printing, which remain disabled.
 - `minix-hardware-test record-long-print-reliability` records a Stage D
   long-print reliability ZIP from a confirmed long-print daemon job, validates
   the Stage A/B/C/trusted-record chain, redacts device identity, excludes
@@ -303,6 +311,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for trusted-printer JSON record creation from reviewed
   Stage A/B/C artifacts while keeping long-print, stable support, and agent
   direct printing disabled.
+- TDD red/green checks for trusted-printer JSON record inspection through the
+  hardware-test CLI, Electron bridge, and renderer Printer panel while keeping
+  long-print trust, stable support, and agent direct printing disabled.
 - TDD red/green checks for Stage D long-print reliability artifact recording
   from a confirmed long-print job while keeping stable support and agent direct
   printing disabled.
@@ -382,8 +393,6 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Surface the local trusted-printer record in the desktop setup flow without
-   enabling agent direct printing or long-print trust.
-2. Gate stable support claims on reviewed Stage D evidence without enabling
+1. Gate stable support claims on reviewed Stage D evidence without enabling
    agent direct printing by default.
-3. Surface the reviewed Stage D result in the desktop setup/support flow.
+2. Surface the reviewed Stage D result in the desktop setup/support flow.

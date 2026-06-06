@@ -826,6 +826,25 @@ def test_hardware_test_cli_records_trusted_printer_record_without_long_print_unl
     }
 
 
+def test_hardware_test_cli_inspects_trusted_printer_record_without_later_stage_unlock(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    stdout = io.StringIO()
+
+    exit_code = run(
+        ["inspect-trusted-printer-record", str(chain["trusted_printer"])],
+        stdout=stdout,
+    )
+
+    raw_stdout = stdout.getvalue()
+    device_fingerprint = f"sha256:{hashlib.sha256(b'mock-minix-0194').hexdigest()[:16]}"
+    assert exit_code == 0
+    assert raw_stdout.strip() == "trusted-printer-record-inspected"
+    assert "mock-minix-0194" not in raw_stdout
+    assert device_fingerprint not in raw_stdout
+
+
 def test_hardware_test_cli_records_long_print_reliability_artifact_without_stable_unlock(
     tmp_path: Path,
 ) -> None:
