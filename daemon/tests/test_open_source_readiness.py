@@ -82,6 +82,25 @@ def test_open_source_readiness_check_requires_shareable_readme_sections(
     ]
 
 
+def test_open_source_readiness_check_rejects_stale_private_readme_claim(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    _write_minimum_ready_repository(tmp_path, validator)
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        _readme_text(validator)
+        + "\nThe repository stays private during pre-publication validation.\n",
+        encoding="utf-8",
+    )
+
+    issues = validator.validate_repository(tmp_path)
+
+    assert issues == [
+        "README.md must not claim the repository stays private after publication",
+    ]
+
+
 def test_open_source_readiness_check_requires_release_notes_template() -> None:
     validator = _load_validator()
 

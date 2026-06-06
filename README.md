@@ -145,8 +145,8 @@ Use the release docs for package evidence capture:
 - [docs/testing.md](docs/testing.md)
 - [docs/known-limitations.md](docs/known-limitations.md)
 
-The repository stays private during pre-publication validation. Before public release,
-the branch needs passing non-hardware gates, reviewed release package evidence, and the
-hardware certification evidence described above. Run `pnpm public-history-check`
-before making the repository public so branch history does not expose private
-local-host author or committer metadata.
+This repository is public. Before publishing release branches, tags, or installer
+artifacts, run `pnpm public-history-check` against the candidate range so public
+history does not expose private local-host author or committer metadata. Stable
+release claims also require passing non-hardware gates, reviewed release package
+evidence, and the hardware certification evidence described above.
