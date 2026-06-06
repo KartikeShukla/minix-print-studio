@@ -1,6 +1,7 @@
 from minix_mcp.daemon_client import DaemonUnavailable, JsonObject
 from minix_mcp.tools import (
     get_daemon_status_tool,
+    get_job_status_tool,
     preview_document_tool,
     print_note_tool,
 )
@@ -44,6 +45,24 @@ class StubDaemonClient:
                 "metrics": {"totalBlackCoverage": 0.08, "maxBandCoverage64": 0.12},
             },
             "expiresAt": "2026-06-04T00:10:00.000Z",
+        }
+
+    def get_job_status(self, job_id: str) -> JsonObject:
+        if self.fail:
+            raise DaemonUnavailable("daemon unavailable")
+        return {
+            "jobId": job_id,
+            "state": "completed_unverified",
+            "phase": "waiting_for_final_status",
+            "completionLevel": "unverified",
+            "completionConfidence": "mock_data_sent_final_ack_missing",
+            "requiresUserCheck": True,
+            "bandsSent": 2,
+            "totalBands": 2,
+            "safeActions": ["confirm_complete", "feed_paper", "reprint_from_start"],
+            "approvalToken": "secret-approval-token",
+            "raster": "raw-raster-bytes",
+            "segments": [{"payload": "raw-segment"}],
         }
 
 
@@ -149,6 +168,27 @@ def test_print_note_explains_agent_direct_policy_without_leaking_token() -> None
     assert "approvalToken" not in str(response)
 
 
+def test_get_job_status_returns_structured_daemon_job_without_raw_segments() -> None:
+    response = get_job_status_tool(StubDaemonClient(), job_id="job_123")
+
+    assert response == {
+        "status": "ok",
+        "job": {
+            "jobId": "job_123",
+            "state": "completed_unverified",
+            "phase": "waiting_for_final_status",
+            "completionLevel": "unverified",
+            "completionConfidence": "mock_data_sent_final_ack_missing",
+            "requiresUserCheck": True,
+            "bandsSent": 2,
+            "totalBands": 2,
+            "safeActions": ["confirm_complete", "feed_paper", "reprint_from_start"],
+        },
+    }
+    assert "approvalToken" not in str(response)
+    assert "raster" not in str(response)
+
+
 def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:
     client = StubDaemonClient(fail=True)
 
@@ -158,3 +198,4 @@ def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:
         == "app_not_running"
     )
     assert print_note_tool(client, text="hello")["status"] == "app_not_running"
+    assert get_job_status_tool(client, job_id="job_123")["status"] == "app_not_running"

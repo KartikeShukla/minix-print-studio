@@ -34,6 +34,15 @@ class StubDaemonClient:
             "expiresAt": "2026-06-04T00:10:00.000Z",
         }
 
+    def get_job_status(self, job_id: str) -> JsonObject:
+        return {
+            "jobId": job_id,
+            "state": "completed_unverified",
+            "completionLevel": "unverified",
+            "requiresUserCheck": True,
+            "safeActions": ["confirm_complete"],
+        }
+
 
 @pytest.fixture
 def anyio_backend() -> str:
@@ -56,6 +65,7 @@ async def test_mcp_server_lists_minix_tools(client_session: ClientSession) -> No
 
     assert {tool.name for tool in tools.tools} == {
         "get_daemon_status",
+        "get_job_status",
         "preview_document",
         "print_note",
     }
@@ -89,3 +99,15 @@ async def test_mcp_server_calls_preview_document_without_exposing_token(
     assert result.structuredContent["status"] == "approval_required"
     assert result.structuredContent["previewId"] == "prev_stdio"
     assert "approvalToken" not in result.structuredContent
+
+
+@pytest.mark.anyio
+async def test_mcp_server_calls_get_job_status_tool(
+    client_session: ClientSession,
+) -> None:
+    result = await client_session.call_tool("get_job_status", {"job_id": "job_123"})
+
+    assert result.structuredContent is not None
+    assert result.structuredContent["status"] == "ok"
+    assert result.structuredContent["job"]["jobId"] == "job_123"
+    assert result.structuredContent["job"]["completionLevel"] == "unverified"

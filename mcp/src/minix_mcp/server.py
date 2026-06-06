@@ -10,6 +10,7 @@ from minix_mcp.runtime import resolve_daemon_runtime
 from minix_mcp.tools import (
     DaemonClient,
     get_daemon_status_tool,
+    get_job_status_tool,
     preview_document_tool,
     print_note_tool,
 )
@@ -34,6 +35,11 @@ def build_mcp_server(
     def get_daemon_status() -> dict[str, Any]:
         """Check whether the MiniX Print Studio daemon is reachable."""
         return get_daemon_status_tool(factory())
+
+    @server.tool()
+    def get_job_status(job_id: str) -> dict[str, Any]:
+        """Fetch a redacted daemon print job status by job id."""
+        return get_job_status_tool(factory(), job_id=job_id)
 
     @server.tool()
     def preview_document(

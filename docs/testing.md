@@ -45,7 +45,8 @@ pnpm release-package-check
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
 - MCP tool tests cover approval-required print-note policy decisions, safety
-  metric propagation, and approval-token redaction.
+  metric propagation, approval-token redaction, and redacted job-status lookup
+  through the stdio server.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.
@@ -95,7 +96,7 @@ validates a narrower write requirement. Required workflows also opt into the
 Node 24 JavaScript action runtime so GitHub Actions runtime migrations are
 exercised before they become the default.
 
-While the repository remains private, the CodeQL job skips by default because code
-scanning is not enabled on this private repo. Set repository variable
-`MINIX_ENABLE_PRIVATE_CODEQL=true` after enabling private code scanning, or make
-the repository public, to run CodeQL.
+On the public repository, CodeQL runs on pull requests, pushes to `main`, weekly
+schedule, and manual dispatch. If the repository is temporarily made private
+again, CodeQL skips by default unless repository variable
+`MINIX_ENABLE_PRIVATE_CODEQL=true` is set after enabling private code scanning.
