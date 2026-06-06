@@ -790,6 +790,10 @@ describe("MiniX Print Studio shell", () => {
       controllerVisible: false,
       canAttemptStageA: false,
       detail: "macOS did not report a Bluetooth controller to this process.",
+      recommendedActions: [
+        "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+      ],
       checks: [
         {
           name: "system_profiler SPBluetoothDataType",
@@ -828,6 +832,15 @@ describe("MiniX Print Studio shell", () => {
       screen.getByText("macOS did not report a Bluetooth controller to this process.")
     ).toBeInTheDocument();
     expect(screen.getByText("controllerInfo == nil")).toBeInTheDocument();
+    expect(screen.getByText("Recommended actions")).toBeInTheDocument();
+    expect(
+      screen.getByText("Open macOS System Settings > Bluetooth and confirm Bluetooth is on.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText("Stage A unavailable from this host")).toBeInTheDocument();
   });
 

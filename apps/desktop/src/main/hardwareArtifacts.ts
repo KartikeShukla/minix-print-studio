@@ -127,6 +127,7 @@ export type HardwareHostReadiness = {
   controllerVisible: boolean | null;
   canAttemptStageA: boolean;
   detail: string;
+  recommendedActions: string[];
   checks: Array<{
     name: string;
     status: string;

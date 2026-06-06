@@ -38,6 +38,29 @@ class HardwareTestCliError(RuntimeError):
     """Raised when the hardware-test CLI cannot complete the requested operation."""
 
 
+_MACOS_BLUETOOTH_NOT_VISIBLE_ACTIONS = [
+    "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+    (
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed "
+        "local session with Bluetooth access."
+    ),
+    (
+        "Reconnect any Bluetooth adapter or restart Bluetooth services, then rerun "
+        "host-readiness before Stage A."
+    ),
+]
+_MACOS_BLUETOOTH_UNKNOWN_ACTIONS = [
+    "Review system_profiler SPBluetoothDataType output from an unsandboxed terminal.",
+    "Confirm macOS Bluetooth permissions and adapter visibility before retrying Stage A.",
+]
+_MACOS_BLUETOOTH_READY_ACTIONS = [
+    "Continue with scripts/hardware-test.sh scan while the printer is powered on and nearby.",
+]
+_UNSUPPORTED_BLUETOOTH_PLATFORM_ACTIONS = [
+    "Run Stage A host-readiness and scan from macOS until this platform is certified.",
+]
+
+
 STAGE_A_ARTIFACT_REQUIRED_FILES = (
     "device.json",
     "profile.json",
@@ -359,6 +382,7 @@ def collect_host_bluetooth_readiness() -> dict[str, object]:
                 "controllerVisible": None,
                 "canAttemptStageA": False,
                 "detail": f"Could not run macOS Bluetooth readiness probe: {exc}",
+                "recommendedActions": _MACOS_BLUETOOTH_UNKNOWN_ACTIONS,
                 "checks": [
                     {
                         "name": "system_profiler SPBluetoothDataType",
@@ -379,6 +403,7 @@ def collect_host_bluetooth_readiness() -> dict[str, object]:
         "controllerVisible": None,
         "canAttemptStageA": False,
         "detail": "Bluetooth host-readiness probing is currently implemented for macOS only.",
+        "recommendedActions": _UNSUPPORTED_BLUETOOTH_PLATFORM_ACTIONS,
         "checks": [
             {
                 "name": "platform",
@@ -403,6 +428,7 @@ def parse_macos_bluetooth_readiness(
             "controllerVisible": False,
             "canAttemptStageA": False,
             "detail": "macOS did not report a Bluetooth controller to this process.",
+            "recommendedActions": _MACOS_BLUETOOTH_NOT_VISIBLE_ACTIONS,
             "checks": [
                 {
                     "name": "system_profiler SPBluetoothDataType",
@@ -423,6 +449,7 @@ def parse_macos_bluetooth_readiness(
             "controllerVisible": True,
             "canAttemptStageA": True,
             "detail": "macOS reports a Bluetooth controller to this process.",
+            "recommendedActions": _MACOS_BLUETOOTH_READY_ACTIONS,
             "checks": [
                 {
                     "name": "system_profiler SPBluetoothDataType",
@@ -438,6 +465,7 @@ def parse_macos_bluetooth_readiness(
         "controllerVisible": None,
         "canAttemptStageA": False,
         "detail": "macOS Bluetooth readiness could not be determined from system_profiler.",
+        "recommendedActions": _MACOS_BLUETOOTH_UNKNOWN_ACTIONS,
         "checks": [
             {
                 "name": "system_profiler SPBluetoothDataType",

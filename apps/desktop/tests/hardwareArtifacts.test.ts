@@ -19,6 +19,10 @@ describe("hardware artifact inspection bridge", () => {
             controllerVisible: false,
             canAttemptStageA: false,
             detail: "macOS did not report a Bluetooth controller to this process.",
+            recommendedActions: [
+              "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+              "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+            ],
             checks: [
               {
                 name: "system_profiler SPBluetoothDataType",
@@ -39,6 +43,10 @@ describe("hardware artifact inspection bridge", () => {
       controllerVisible: false,
       canAttemptStageA: false,
       detail: "macOS did not report a Bluetooth controller to this process.",
+      recommendedActions: [
+        "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+      ],
       checks: [
         {
           name: "system_profiler SPBluetoothDataType",
