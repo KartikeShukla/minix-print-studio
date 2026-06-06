@@ -220,6 +220,14 @@ package:win-installer`, the Release Package workflow, and the release
   gate from reviewed Stage A/B/C/trusted-record/Stage D evidence, enables stable
   support claims plus long-print continuous trust, keeps stdout status-only, and
   leaves agent direct printing disabled by default.
+- `minix-hardware-test inspect-stable-support-gate` validates a local
+  stable-support gate JSON record offline, keeps stdout status-only, rejects raw
+  device IDs/operator notes/raster bytes/agent-direct unlocks, and does not
+  contact the daemon.
+- Electron exposes stable-support gate inspection from the Printer setup flow,
+  validates the selected JSON through the same CLI path, and shows the reviewed
+  Stage D evidence, long-print trust, stable-support claim, and agent-direct
+  disabled state.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -324,6 +332,9 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for stable-support gate recording from reviewed Stage D
   evidence while enabling stable support claims and long-print trust without
   enabling agent direct printing.
+- TDD red/green checks for stable-support gate inspection through the
+  hardware-test CLI, Electron bridge, renderer setup checklist, and renderer
+  Printer panel while keeping agent direct printing disabled.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -403,4 +414,5 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Surface the reviewed Stage D result in the desktop setup/support flow.
+1. Define the agent direct printing policy-review gate without enabling agent
+   direct printing by default.

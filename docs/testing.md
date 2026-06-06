@@ -67,6 +67,9 @@ pnpm release-package-check
   Stage A/B/C/trusted-record digest chaining, stable support plus long-print
   trust enablement, status-only stdout, and agent direct printing remaining
   disabled by default.
+- Stable-support gate inspection tests cover the offline CLI status-only
+  validator, Electron bridge command wiring, renderer setup checklist item, and
+  renderer Printer panel display while keeping agent direct printing disabled.
 - Long-print reliability print-execution tests cover trusted-record chain
   validation, deterministic marker fixture submission through daemon preview and
   print APIs, status-only stdout, omission of raster payloads from stdout, and

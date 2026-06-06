@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { createDefaultDocument } from "@minix/design-model";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app/App";
@@ -20,19 +26,23 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
-    expect(screen.getByRole("heading", { name: "MiniX Print Studio" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Scan printers" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "MiniX Print Studio" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Scan printers" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Print" })).toBeDisabled();
 
@@ -49,27 +59,30 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     expect(await screen.findByText("Setup")).toBeInTheDocument();
     expect(screen.getByText("Daemon")).toBeInTheDocument();
     expect(screen.getByText("Printer verification")).toBeInTheDocument();
+    expect(screen.getByText("Stable support gate")).toBeInTheDocument();
     expect(screen.getByText("Agent integrations")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss setup checklist" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss setup checklist" }),
+    );
 
     expect(screen.queryByText("Setup")).not.toBeInTheDocument();
     expect(localStorage.getItem("minix.printStudio.setupChecklist.v1")).toBe(
-      JSON.stringify({ dismissed: true })
+      JSON.stringify({ dismissed: true }),
     );
 
     unmount();
@@ -80,15 +93,15 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     expect(screen.queryByText("Setup")).not.toBeInTheDocument();
@@ -102,8 +115,9 @@ describe("MiniX Print Studio shell", () => {
       appVersion: "0.1.0",
       autoUpdate: {
         enabled: false,
-        reason: "Auto-updates are disabled until signed release publishing is configured."
-      }
+        reason:
+          "Auto-updates are disabled until signed release publishing is configured.",
+      },
     });
     const updateChannelProvider: UpdateChannelProvider = {
       getState: async () => ({
@@ -113,10 +127,11 @@ describe("MiniX Print Studio shell", () => {
         appVersion: "0.1.0",
         autoUpdate: {
           enabled: false,
-          reason: "Auto-updates are disabled until signed release publishing is configured."
-        }
+          reason:
+            "Auto-updates are disabled until signed release publishing is configured.",
+        },
       }),
-      setChannel
+      setChannel,
     };
 
     render(
@@ -126,35 +141,39 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         updateChannelProvider={updateChannelProvider}
-      />
+      />,
     );
 
     expect(await screen.findByText("Updates")).toBeInTheDocument();
     expect(screen.getByText("Stable")).toBeInTheDocument();
     expect(screen.getByText(/Auto-updates are disabled/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Use beta update channel" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use beta update channel" }),
+    );
 
     await waitFor(() => {
       expect(setChannel).toHaveBeenCalledWith("beta");
     });
-    expect(await screen.findByText("Beta channel selected")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Beta channel selected"),
+    ).toBeInTheDocument();
   });
 
   it("shows copyable agent integration config previews without exposing daemon tokens", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { writeText }
+      value: { writeText },
     });
 
     render(
@@ -164,13 +183,13 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         agentIntegrationProvider={async () => ({
           shimPath:
@@ -184,23 +203,27 @@ describe("MiniX Print Studio shell", () => {
               configPath: "~/.codex/config.toml",
               format: "toml",
               content:
-                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n[mcp_servers.minix_print.env]\nMINIX_DAEMON_RUNTIME_FILE = \"/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json\"\n"
-            }
-          ]
+                '[mcp_servers.minix_print]\ncommand = "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"\n[mcp_servers.minix_print.env]\nMINIX_DAEMON_RUNTIME_FILE = "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json"\n',
+            },
+          ],
         })}
-      />
+      />,
     );
 
     expect(await screen.findByText("Agent Integrations")).toBeInTheDocument();
     expect(screen.getByText("Codex")).toBeInTheDocument();
     expect(screen.getByText("~/.codex/config.toml")).toBeInTheDocument();
     expect(screen.getByText(/MINIX_DAEMON_RUNTIME_FILE/)).toBeInTheDocument();
-    expect(screen.queryByText(/secret-token|token_123/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/secret-token|token_123/),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy Codex config" }));
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("MINIX_DAEMON_RUNTIME_FILE"));
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining("MINIX_DAEMON_RUNTIME_FILE"),
+      );
     });
     expect(await screen.findByText("Copied Codex config")).toBeInTheDocument();
   });
@@ -212,11 +235,12 @@ describe("MiniX Print Studio shell", () => {
       operation: "install",
       targetId: "codex",
       targetPath: "/Users/example/.codex/config.toml",
-      backupPath: "/Users/example/Library/Application Support/MiniX Print Studio/backups/codex.bak",
+      backupPath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/backups/codex.bak",
       manifestPath:
         "/Users/example/Library/Application Support/MiniX Print Studio/backups/codex.json",
       existed: true,
-      createdAt: "2026-06-05T00:00:00.000Z"
+      createdAt: "2026-06-05T00:00:00.000Z",
     });
 
     render(
@@ -226,16 +250,17 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         agentIntegrationProvider={async () => ({
-          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          shimPath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
           runtimeFilePath:
             "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
           targets: [
@@ -246,25 +271,31 @@ describe("MiniX Print Studio shell", () => {
               format: "toml",
               installable: true,
               content:
-                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n"
-            }
-          ]
+                '[mcp_servers.minix_print]\ncommand = "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"\n',
+            },
+          ],
         })}
         agentIntegrationInstaller={{
           install,
           uninstall: vi.fn(),
-          testConnection: vi.fn()
+          testConnection: vi.fn(),
         }}
-      />
+      />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Install Codex config" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Install Codex config" }),
+    );
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("~/.codex/config.toml"));
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining("~/.codex/config.toml"),
+    );
     await waitFor(() => {
       expect(install).toHaveBeenCalledWith("codex");
     });
-    expect(await screen.findByText("Installed Codex config")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Installed Codex config"),
+    ).toBeInTheDocument();
 
     confirm.mockRestore();
   });
@@ -273,12 +304,13 @@ describe("MiniX Print Studio shell", () => {
     const testConnection = vi.fn().mockResolvedValue({
       ok: true,
       targetId: "codex",
-      shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+      shimPath:
+        "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
       runtimeFilePath:
         "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
       checkedAt: "2026-06-05T00:00:00.000Z",
       message: "Codex integration prerequisites are ready",
-      missing: []
+      missing: [],
     });
 
     render(
@@ -288,16 +320,17 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         agentIntegrationProvider={async () => ({
-          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          shimPath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
           runtimeFilePath:
             "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
           targets: [
@@ -308,24 +341,28 @@ describe("MiniX Print Studio shell", () => {
               format: "toml",
               installable: true,
               content:
-                "[mcp_servers.minix_print]\ncommand = \"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp\"\n"
-            }
-          ]
+                '[mcp_servers.minix_print]\ncommand = "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"\n',
+            },
+          ],
         })}
         agentIntegrationInstaller={{
           install: vi.fn(),
           uninstall: vi.fn(),
-          testConnection
+          testConnection,
         }}
-      />
+      />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Test Codex connection" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Test Codex connection" }),
+    );
 
     await waitFor(() => {
       expect(testConnection).toHaveBeenCalledWith("codex");
     });
-    expect(await screen.findByText("Codex integration prerequisites are ready")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Codex integration prerequisites are ready"),
+    ).toBeInTheDocument();
   });
 
   it("exports a Claude Desktop MCPB bundle from the target card", async () => {
@@ -334,7 +371,7 @@ describe("MiniX Print Studio shell", () => {
       targetPath:
         "/Users/example/Library/Application Support/MiniX Print Studio/agent-integrations/minix-print-studio-claude-desktop.mcpb",
       createdAt: "2026-06-05T00:02:00.000Z",
-      entries: ["manifest.json", "server/minix-mcp-bridge", "README.md"]
+      entries: ["manifest.json", "server/minix-mcp-bridge", "README.md"],
     });
 
     render(
@@ -344,16 +381,17 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         agentIntegrationProvider={async () => ({
-          shimPath: "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
+          shimPath:
+            "/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp",
           runtimeFilePath:
             "/Users/example/Library/Application Support/MiniX Print Studio/runtime/runtime.json",
           targets: [
@@ -366,26 +404,34 @@ describe("MiniX Print Studio shell", () => {
               installable: true,
               exportable: true,
               content:
-                '{"mcpServers":{"minix-print":{"command":"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"}}}'
-            }
-          ]
+                '{"mcpServers":{"minix-print":{"command":"/Users/example/Library/Application Support/MiniX Print Studio/bin/minix-mcp"}}}',
+            },
+          ],
         })}
         agentIntegrationInstaller={{
           install: vi.fn(),
           uninstall: vi.fn(),
           testConnection: vi.fn(),
-          exportBundle
+          exportBundle,
         }}
-      />
+      />,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Export Claude Desktop .mcpb" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Export Claude Desktop .mcpb",
+      }),
+    );
 
     await waitFor(() => {
       expect(exportBundle).toHaveBeenCalledWith("claude-desktop");
     });
-    expect(await screen.findByText("Exported Claude Desktop .mcpb")).toBeInTheDocument();
-    expect(screen.getByText(/minix-print-studio-claude-desktop\.mcpb/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("Exported Claude Desktop .mcpb"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/minix-print-studio-claude-desktop\.mcpb/),
+    ).toBeInTheDocument();
   });
 
   it("exports a redacted desktop support bundle from the sidebar", async () => {
@@ -393,7 +439,12 @@ describe("MiniX Print Studio shell", () => {
       targetPath:
         "/Users/example/Library/Application Support/MiniX Print Studio/support/minix-print-studio-support-2026-06-05T00-03-00-000Z.zip",
       createdAt: "2026-06-05T00:03:00.000Z",
-      entries: ["support.json", "logs/main.log", "crash-reports/last-crash.json", "README.md"]
+      entries: [
+        "support.json",
+        "logs/main.log",
+        "crash-reports/last-crash.json",
+        "README.md",
+      ],
     });
 
     render(
@@ -403,27 +454,33 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         supportBundleExporter={{ exportBundle }}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Export support bundle" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Export support bundle" }),
+    );
 
     await waitFor(() => {
       expect(exportBundle).toHaveBeenCalledTimes(1);
     });
-    expect(await screen.findByText("Support bundle exported")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Support bundle exported"),
+    ).toBeInTheDocument();
     expect(screen.getByText("4 files in bundle")).toBeInTheDocument();
     expect(
-      screen.getByText(/minix-print-studio-support-2026-06-05T00-03-00-000Z\.zip/)
+      screen.getByText(
+        /minix-print-studio-support-2026-06-05T00-03-00-000Z\.zip/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -431,14 +488,14 @@ describe("MiniX Print Studio shell", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { writeText }
+      value: { writeText },
     });
     const createFeedbackDraft = vi.fn().mockResolvedValue({
       targetUrl:
         "https://github.com/minix-print-studio/minix-print-studio/issues/new?template=beta_feedback.yml",
       title: "Beta feedback: MiniX Print Studio 0.1.0 on darwin",
       body: "## Environment\n- App version: 0.1.0\n",
-      createdAt: "2026-06-05T00:04:00.000Z"
+      createdAt: "2026-06-05T00:04:00.000Z",
     });
 
     render(
@@ -448,28 +505,34 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         supportBundleExporter={{
           exportBundle: vi.fn(),
-          createFeedbackDraft
+          createFeedbackDraft,
         }}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy beta feedback link" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy beta feedback link" }),
+    );
 
     await waitFor(() => {
       expect(createFeedbackDraft).toHaveBeenCalledTimes(1);
     });
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("beta_feedback.yml"));
-    expect(await screen.findByText("Beta feedback link copied")).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("beta_feedback.yml"),
+    );
+    expect(
+      await screen.findByText("Beta feedback link copied"),
+    ).toBeInTheDocument();
   });
 
   it("requests a daemon preview and print plan before enabling print", async () => {
@@ -482,9 +545,13 @@ describe("MiniX Print Studio shell", () => {
       profileId: "seznik-minix-s1-lyin48d-gy",
       widthDots: 384,
       heightDots: 900,
-      safety: { allowed: true, warnings: [], metrics: { totalBlackCoverage: 0 } },
+      safety: {
+        allowed: true,
+        warnings: [],
+        metrics: { totalBlackCoverage: 0 },
+      },
       createdAt: "2026-06-04T00:00:00.000Z",
-      expiresAt: "2026-06-04T00:10:00.000Z"
+      expiresAt: "2026-06-04T00:10:00.000Z",
     });
     const planApprovedPreview = vi.fn().mockResolvedValue({
       plan: {
@@ -502,10 +569,10 @@ describe("MiniX Print Studio shell", () => {
         transferHeightDots: 1060,
         rowBytes: 48,
         totalRasterBytes: 50880,
-        requiresLongPrintMode: false
+        requiresLongPrintMode: false,
       },
       totalBands: 5,
-      bands: []
+      bands: [],
     });
     const printApprovedPreview = vi.fn();
 
@@ -516,15 +583,15 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview,
           planApprovedPreview,
           printApprovedPreview,
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -539,10 +606,10 @@ describe("MiniX Print Studio shell", () => {
         target: expect.objectContaining({
           profileId: "seznik-minix-s1-lyin48d-gy",
           paperMode: "continuous",
-          density: "medium"
-        })
+          density: "medium",
+        }),
       }),
-      { threshold: 128, dither: "none" }
+      { threshold: 128, dither: "none" },
     );
     expect(planApprovedPreview).toHaveBeenCalledWith({
       jobId: "job_preview",
@@ -552,7 +619,7 @@ describe("MiniX Print Studio shell", () => {
       renderSettingsHash: "sha256:settings",
       profileId: "seznik-minix-s1-lyin48d-gy",
       paperMode: "continuous",
-      density: "medium"
+      density: "medium",
     });
     expect(printApprovedPreview).not.toHaveBeenCalled();
   });
@@ -572,23 +639,27 @@ describe("MiniX Print Studio shell", () => {
         warnings: [
           {
             code: "total_black_coverage_high",
-            message: "Total black coverage is 91%, above the 35% warning limit."
-          }
+            message:
+              "Total black coverage is 91%, above the 35% warning limit.",
+          },
         ],
         errors: [
           {
             code: "band_coverage_blocked",
-            message: "A 64-dot band is 100% black, above the 70% thermal safety limit."
-          }
+            message:
+              "A 64-dot band is 100% black, above the 70% thermal safety limit.",
+          },
         ],
-        metrics: { totalBlackCoverage: 0.91, maxBandCoverage64: 1 }
+        metrics: { totalBlackCoverage: 0.91, maxBandCoverage64: 1 },
       },
       createdAt: "2026-06-04T00:00:00.000Z",
-      expiresAt: "2026-06-04T00:10:00.000Z"
+      expiresAt: "2026-06-04T00:10:00.000Z",
     });
     const planApprovedPreview = vi
       .fn()
-      .mockRejectedValue(new Error("preview safety blocked printing: band_coverage_blocked"));
+      .mockRejectedValue(
+        new Error("preview safety blocked printing: band_coverage_blocked"),
+      );
 
     render(
       <App
@@ -597,26 +668,32 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview,
           planApprovedPreview,
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
-    expect(await screen.findByText("Preview blocked by safety")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Preview blocked by safety"),
+    ).toBeInTheDocument();
     expect(screen.getByText("91%")).toBeInTheDocument();
     expect(
-      screen.getByText("Total black coverage is 91%, above the 35% warning limit.")
+      screen.getByText(
+        "Total black coverage is 91%, above the 35% warning limit.",
+      ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("A 64-dot band is 100% black, above the 70% thermal safety limit.")
+      screen.getByText(
+        "A 64-dot band is 100% black, above the 70% thermal safety limit.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("prev_blocked")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Print" })).toBeDisabled();
@@ -632,9 +709,13 @@ describe("MiniX Print Studio shell", () => {
       profileId: "seznik-minix-s1-lyin48d-gy",
       widthDots: 384,
       heightDots: 900,
-      safety: { allowed: true, warnings: [], metrics: { totalBlackCoverage: 0 } },
+      safety: {
+        allowed: true,
+        warnings: [],
+        metrics: { totalBlackCoverage: 0 },
+      },
       createdAt: "2026-06-04T00:00:00.000Z",
-      expiresAt: "2026-06-04T00:10:00.000Z"
+      expiresAt: "2026-06-04T00:10:00.000Z",
     });
     const planApprovedPreview = vi.fn().mockResolvedValue({
       plan: {
@@ -652,10 +733,10 @@ describe("MiniX Print Studio shell", () => {
         transferHeightDots: 1060,
         rowBytes: 48,
         totalRasterBytes: 50880,
-        requiresLongPrintMode: false
+        requiresLongPrintMode: false,
       },
       totalBands: 5,
-      bands: []
+      bands: [],
     });
     const printApprovedPreview = vi.fn().mockResolvedValue({
       jobId: "job_print",
@@ -676,7 +757,7 @@ describe("MiniX Print Studio shell", () => {
       bytesSent: 50880,
       totalBytes: 50880,
       tailBlankRowsDots: 160,
-      safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"]
+      safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"],
     });
     const confirmJobOutput = vi.fn().mockResolvedValue({
       jobId: "job_print",
@@ -697,7 +778,7 @@ describe("MiniX Print Studio shell", () => {
         noOverheat: true,
         noDisconnect: true,
         operatorNote: "Confirmed from MiniX Print Studio.",
-        outcome: "confirmed_complete"
+        outcome: "confirmed_complete",
       },
       bandsSent: 5,
       totalBands: 5,
@@ -706,7 +787,7 @@ describe("MiniX Print Studio shell", () => {
       bytesSent: 50880,
       totalBytes: 50880,
       tailBlankRowsDots: 160,
-      safeActions: ["reprint_on_user_request"]
+      safeActions: ["reprint_on_user_request"],
     });
     const exportDiagnostics = vi.fn().mockResolvedValue({
       schemaVersion: 1,
@@ -714,19 +795,19 @@ describe("MiniX Print Studio shell", () => {
       redaction: {
         projectContentIncluded: false,
         rawImagesIncluded: false,
-        tokensIncluded: false
+        tokensIncluded: false,
       },
       daemon: {
         version: "0.1.0",
         profileRegistryVersion: "2026.06.04",
         mock: true,
         os: "Darwin",
-        python: "3.13.12"
+        python: "3.13.12",
       },
       profiles: [{ id: "seznik-minix-s1-lyin48d-gy" }],
       jobs: [{ jobId: "job_print", segments: [] }],
       recentErrors: [],
-      recentMcpCalls: []
+      recentMcpCalls: [],
     });
     const scanPrinters = vi.fn().mockResolvedValue({
       printers: [
@@ -739,9 +820,9 @@ describe("MiniX Print Studio shell", () => {
           candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
           printable: false,
           nextRequiredStage: "read_only_verification",
-          reason: "Service UUID and name match; model query required."
-        }
-      ]
+          reason: "Service UUID and name match; model query required.",
+        },
+      ],
     });
     const readOnlyVerify = vi.fn().mockResolvedValue({
       status: "read_only_verified",
@@ -752,15 +833,16 @@ describe("MiniX Print Studio shell", () => {
       firmware: "V1.9.11",
       printable: false,
       nextRequiredStage: "protocol_sanity_test",
-      reason: "Model and firmware match profile; protocol sanity test required.",
+      reason:
+        "Model and firmware match profile; protocol sanity test required.",
       services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
       writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
       notifyCharacteristics: [
         "0000ff01-0000-1000-8000-00805f9b34fb",
-        "0000ff03-0000-1000-8000-00805f9b34fb"
+        "0000ff03-0000-1000-8000-00805f9b34fb",
       ],
       rawNotifications: [],
-      timingEvents: []
+      timingEvents: [],
     });
 
     render(
@@ -770,7 +852,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview,
           planApprovedPreview,
@@ -778,14 +860,16 @@ describe("MiniX Print Studio shell", () => {
           confirmJobOutput,
           exportDiagnostics,
           scanPrinters,
-          readOnlyVerify
+          readOnlyVerify,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Scan printers" }));
     await screen.findByText("Seznik MiniX_0194_LE");
-    fireEvent.click(screen.getByRole("button", { name: "Verify printer identity" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Verify printer identity" }),
+    );
     await screen.findByText("Read-only verified");
 
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -807,10 +891,12 @@ describe("MiniX Print Studio shell", () => {
       density: "medium",
       copies: 1,
       source: "ui",
-      deviceId: "mock-minix-0194"
+      deviceId: "mock-minix-0194",
     });
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]");
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]",
+      );
       expect(stored).toEqual([
         expect.objectContaining({
           jobId: "job_print",
@@ -818,8 +904,8 @@ describe("MiniX Print Studio shell", () => {
           completionLevel: "unverified",
           source: "ui",
           totalBands: 5,
-          printedAt: expect.any(String)
-        })
+          printedAt: expect.any(String),
+        }),
       ]);
     });
 
@@ -827,26 +913,30 @@ describe("MiniX Print Studio shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm output" }));
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining("END marker is visible")
+      expect.stringContaining("END marker is visible"),
     );
     await waitFor(() => {
-      expect(screen.getAllByText("confirmed_complete").length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText("confirmed_complete").length,
+      ).toBeGreaterThanOrEqual(1);
     });
     expect(confirmJobOutput).toHaveBeenCalledWith("job_print", {
       printedTextReadable: true,
       endMarkerVisible: true,
       noOverheat: true,
       noDisconnect: true,
-      operatorNote: "Confirmed from MiniX Print Studio."
+      operatorNote: "Confirmed from MiniX Print Studio.",
     });
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]");
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]",
+      );
       expect(stored[0]).toEqual(
         expect.objectContaining({
           jobId: "job_print",
           state: "confirmed_complete",
-          completionLevel: "verified"
-        })
+          completionLevel: "verified",
+        }),
       );
     });
     confirm.mockRestore();
@@ -857,7 +947,7 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("1 job in bundle")).toBeInTheDocument();
     expect(exportDiagnostics).toHaveBeenCalledWith({
       includeProjectContent: false,
-      includeRawImages: false
+      includeRawImages: false,
     });
   });
 
@@ -873,9 +963,9 @@ describe("MiniX Print Studio shell", () => {
           candidateProfileIds: ["seznik-minix-s1-lyin48d-gy"],
           printable: false,
           nextRequiredStage: "read_only_verification",
-          reason: "Service UUID and name match; model query required."
-        }
-      ]
+          reason: "Service UUID and name match; model query required.",
+        },
+      ],
     });
     const readOnlyVerify = vi.fn().mockResolvedValue({
       status: "read_only_verified",
@@ -886,18 +976,21 @@ describe("MiniX Print Studio shell", () => {
       firmware: "V1.9.11",
       printable: false,
       nextRequiredStage: "protocol_sanity_test",
-      reason: "Model and firmware match profile; protocol sanity test required.",
+      reason:
+        "Model and firmware match profile; protocol sanity test required.",
       services: ["0000ff00-0000-1000-8000-00805f9b34fb"],
       writeCharacteristics: ["0000ff02-0000-1000-8000-00805f9b34fb"],
       notifyCharacteristics: [
         "0000ff01-0000-1000-8000-00805f9b34fb",
-        "0000ff03-0000-1000-8000-00805f9b34fb"
+        "0000ff03-0000-1000-8000-00805f9b34fb",
       ],
-      rawNotifications: []
+      rawNotifications: [],
     });
     const exportHardwareTest = vi
       .fn()
-      .mockResolvedValue(new Blob(["hardware-test"], { type: "application/zip" }));
+      .mockResolvedValue(
+        new Blob(["hardware-test"], { type: "application/zip" }),
+      );
     const createObjectURL = vi.fn(() => "blob:hardware-test");
     const revokeObjectURL = vi.fn();
     vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
@@ -912,36 +1005,48 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters,
           readOnlyVerify,
-          exportHardwareTest
+          exportHardwareTest,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Scan printers" }));
 
     expect(await screen.findByText("Seznik MiniX_0194_LE")).toBeInTheDocument();
-    expect(screen.getByText("Read-only verification required")).toBeInTheDocument();
+    expect(
+      screen.getByText("Read-only verification required"),
+    ).toBeInTheDocument();
     expect(scanPrinters).toHaveBeenCalledOnce();
 
-    fireEvent.click(screen.getByRole("button", { name: "Verify printer identity" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Verify printer identity" }),
+    );
 
     expect(await screen.findByText("Read-only verified")).toBeInTheDocument();
     expect(screen.getByText("S1_LYiN48D_GY")).toBeInTheDocument();
-    expect(screen.getByText("Protocol sanity test required")).toBeInTheDocument();
+    expect(
+      screen.getByText("Protocol sanity test required"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Printing still locked")).toBeInTheDocument();
     expect(readOnlyVerify).toHaveBeenCalledWith("mock-minix-0194");
 
-    fireEvent.click(screen.getByRole("button", { name: "Export read-only artifact" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Export read-only artifact" }),
+    );
 
-    expect(await screen.findByText("Hardware artifact exported")).toBeInTheDocument();
-    expect(screen.getByText("Ready for physical validation record")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Hardware artifact exported"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ready for physical validation record"),
+    ).toBeInTheDocument();
     expect(exportHardwareTest).toHaveBeenCalledWith("mock-minix-0194");
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(clickDownload).toHaveBeenCalledOnce();
@@ -957,15 +1062,15 @@ describe("MiniX Print Studio shell", () => {
       detail: "macOS did not report a Bluetooth controller to this process.",
       recommendedActions: [
         "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
-        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access.",
       ],
       checks: [
         {
           name: "system_profiler SPBluetoothDataType",
           status: "not_visible",
-          evidence: "controllerInfo == nil"
-        }
-      ]
+          evidence: "controllerInfo == nil",
+        },
+      ],
     });
 
     render(
@@ -975,38 +1080,48 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         hardwareReadinessProvider={{ check }}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Check host Bluetooth" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check host Bluetooth" }),
+    );
 
     await waitFor(() => {
       expect(check).toHaveBeenCalledOnce();
     });
-    expect(await screen.findByText("Host Bluetooth not visible")).toBeInTheDocument();
     expect(
-      screen.getByText("macOS did not report a Bluetooth controller to this process.")
+      await screen.findByText("Host Bluetooth not visible"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "macOS did not report a Bluetooth controller to this process.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("controllerInfo == nil")).toBeInTheDocument();
     expect(screen.getByText("Recommended actions")).toBeInTheDocument();
     expect(
-      screen.getByText("Open macOS System Settings > Bluetooth and confirm Bluetooth is on.")
+      screen.getByText(
+        "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
-      )
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access.",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByText("Stage A unavailable from this host")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage A unavailable from this host"),
+    ).toBeInTheDocument();
   });
 
   it("inspects an exported Stage A artifact and shows the protocol sanity preflight", async () => {
@@ -1016,7 +1131,7 @@ describe("MiniX Print Studio shell", () => {
         status: "valid_stage_a_artifact",
         deviceId: "mock-minix-0194",
         profileId: "seznik-minix-s1-lyin48d-gy",
-        nextRequiredStage: "protocol_sanity_test"
+        nextRequiredStage: "protocol_sanity_test",
       },
       preflight: {
         status: "protocol_sanity_preflight_ready",
@@ -1034,21 +1149,21 @@ describe("MiniX Print Studio shell", () => {
             index: 0,
             name: "wake",
             payloadBytes: 12,
-            hex: "00 00 00 00 00 00 00 00 00 00 00 00"
+            hex: "00 00 00 00 00 00 00 00 00 00 00 00",
           },
           {
             index: 1,
             name: "set_density",
             payloadBytes: 5,
-            hex: "10 ff 10 00 01"
-          }
+            hex: "10 ff 10 00 01",
+          },
         ],
         safety: {
           requiresPhysicalPrinter: true,
           requiresUserConfirmation: true,
           sendsRaster: false,
-          unlocksPrinting: false
-        }
+          unlocksPrinting: false,
+        },
       },
       evidenceSummary: {
         status: "shareable_stage_a_evidence_ready",
@@ -1058,7 +1173,7 @@ describe("MiniX Print Studio shell", () => {
         nextRequiredStage: "protocol_sanity_test",
         device: {
           idRedacted: true,
-          fingerprint: "sha256:3d90f3ac7a07147e"
+          fingerprint: "sha256:3d90f3ac7a07147e",
         },
         redaction: {
           artifactPathIncluded: false,
@@ -1067,7 +1182,7 @@ describe("MiniX Print Studio shell", () => {
           rawNotificationLogIncluded: false,
           commandPayloadHexIncluded: false,
           rasterBytesIncluded: false,
-          bearerTokensIncluded: false
+          bearerTokensIncluded: false,
         },
         certification: {
           stageAReadOnlyVerified: true,
@@ -1075,7 +1190,7 @@ describe("MiniX Print Studio shell", () => {
           certificationComplete: false,
           requiresStageBProtocolSanity: true,
           requiresTinyVisualCard: true,
-          requiresLongPrintReliability: true
+          requiresLongPrintReliability: true,
         },
         preflights: {
           protocolSanity: {
@@ -1083,7 +1198,7 @@ describe("MiniX Print Studio shell", () => {
             stage: "protocol_sanity_test",
             commandCount: 3,
             sendsRaster: false,
-            unlocksPrinting: false
+            unlocksPrinting: false,
           },
           tinyVisualCard: {
             status: "tiny_visual_card_preflight_ready",
@@ -1092,9 +1207,9 @@ describe("MiniX Print Studio shell", () => {
             heightDots: 160,
             rawBytesIncluded: false,
             contentSha256:
-              "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
-          }
-        }
+              "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31",
+          },
+        },
       },
       visualCardPreflight: {
         status: "tiny_visual_card_preflight_ready",
@@ -1116,13 +1231,13 @@ describe("MiniX Print Studio shell", () => {
           rasterBytes: 7680,
           rawBytesIncluded: false,
           contentSha256:
-            "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+            "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31",
         },
         confirmationChecklist: [
           "Text MINIX TEST 7K4P is readable.",
           "Left and right edge markers are visible.",
           "Output is not mirrored or upside down.",
-          "Feed is smooth with no stall, overheat warning, disconnect, or fatal error."
+          "Feed is smooth with no stall, overheat warning, disconnect, or fatal error.",
         ],
         safety: {
           requiresPhysicalPrinter: true,
@@ -1130,9 +1245,9 @@ describe("MiniX Print Studio shell", () => {
           requiresPriorProtocolSanity: true,
           sendsRasterIfExecuted: true,
           unlocksPrinting: false,
-          preflightOnly: true
-        }
-      }
+          preflightOnly: true,
+        },
+      },
     });
 
     render(
@@ -1142,37 +1257,45 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         hardwareArtifactInspector={{ inspect }}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Inspect Stage A artifact" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect Stage A artifact" }),
+    );
 
     await waitFor(() => {
       expect(inspect).toHaveBeenCalledOnce();
     });
-    expect(await screen.findByText("Protocol sanity preflight ready")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Protocol sanity preflight ready"),
+    ).toBeInTheDocument();
     expect(screen.getByText("mock-minix-0194")).toBeInTheDocument();
     expect(screen.getByText("wake")).toBeInTheDocument();
     expect(screen.getByText("10 ff 10 00 01")).toBeInTheDocument();
-    expect(screen.getByText("Tiny visual card preflight ready")).toBeInTheDocument();
+    expect(
+      screen.getByText("Tiny visual card preflight ready"),
+    ).toBeInTheDocument();
     expect(screen.getByText("MINIX TEST 7K4P")).toBeInTheDocument();
     expect(screen.getByText("160 dots")).toBeInTheDocument();
     expect(
-      screen.getByText("Visual card still requires Stage B pass")
+      screen.getByText("Visual card still requires Stage B pass"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Text MINIX TEST 7K4P is readable.")
+      screen.getByText("Text MINIX TEST 7K4P is readable."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Shareable evidence summary ready")).toBeInTheDocument();
+    expect(
+      screen.getByText("Shareable evidence summary ready"),
+    ).toBeInTheDocument();
     expect(screen.getByText("sha256:3d90f3ac7a07147e")).toBeInTheDocument();
     expect(screen.getByText("3 commands planned")).toBeInTheDocument();
     expect(screen.getByText("Raw bytes omitted")).toBeInTheDocument();
@@ -1188,7 +1311,7 @@ describe("MiniX Print Studio shell", () => {
         profileId: "seznik-minix-s1-lyin48d-gy",
         device: {
           idRedacted: true,
-          fingerprint: "sha256:fa0f77ee9e7e43ea"
+          fingerprint: "sha256:fa0f77ee9e7e43ea",
         },
         trustedFor: ["manual_continuous_printing"],
         operatorNoteIncluded: false,
@@ -1196,28 +1319,28 @@ describe("MiniX Print Studio shell", () => {
           stageA: {
             stage: "read_only_verification",
             status: "valid_stage_a_artifact",
-            artifactSha256Included: true
+            artifactSha256Included: true,
           },
           protocolSanity: {
             stage: "protocol_sanity_test",
             status: "confirmed_complete",
-            artifactSha256Included: true
+            artifactSha256Included: true,
           },
           tinyVisualCard: {
             stage: "tiny_visual_test_card",
             status: "confirmed_complete",
-            artifactSha256Included: true
-          }
+            artifactSha256Included: true,
+          },
         },
         safety: {
           manualContinuousPrintingEnabled: true,
           longPrintReliabilityRequired: true,
           longPrintPrintingEnabled: false,
           agentDirectPrintingEnabled: false,
-          stableSupportClaimEnabled: false
+          stableSupportClaimEnabled: false,
         },
-        nextRequiredStage: "long_print_reliability"
-      }
+        nextRequiredStage: "long_print_reliability",
+      },
     });
 
     render(
@@ -1227,35 +1350,160 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
         trustedPrinterRecordInspector={{ inspect }}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Inspect trusted-printer record" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect trusted-printer record" }),
+    );
 
     await waitFor(() => {
       expect(inspect).toHaveBeenCalledOnce();
     });
     expect(
-      await screen.findByText("Trusted for manual continuous printing")
+      await screen.findByText("Trusted for manual continuous printing"),
     ).toBeInTheDocument();
     expect(screen.getByText("sha256:fa0f77ee9e7e43ea")).toBeInTheDocument();
     expect(screen.getByText("Stage A evidence recorded")).toBeInTheDocument();
-    expect(screen.getByText("Stage B protocol sanity recorded")).toBeInTheDocument();
-    expect(screen.getByText("Stage C visual card recorded")).toBeInTheDocument();
-    expect(screen.getByText("Manual continuous printing enabled")).toBeInTheDocument();
-    expect(screen.getByText("Long-print reliability still required")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage B protocol sanity recorded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage C visual card recorded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Manual continuous printing enabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Long-print reliability still required"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Long-print trust disabled")).toBeInTheDocument();
-    expect(screen.getByText("Agent direct printing disabled")).toBeInTheDocument();
-    expect(screen.getByText("Stable support claim disabled")).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent direct printing disabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Stable support claim disabled"),
+    ).toBeInTheDocument();
+  });
+
+  it("inspects a local stable-support gate while keeping agent direct printing disabled", async () => {
+    const inspect = vi.fn().mockResolvedValue({
+      recordPath: "/tmp/stable-support-gate-fa0f77ee9e7e43ea.json",
+      summary: {
+        status: "stable_support_claims_enabled",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        device: {
+          idRedacted: true,
+          fingerprint: "sha256:fa0f77ee9e7e43ea",
+        },
+        trustedFor: [
+          "manual_continuous_printing",
+          "long_print_continuous_printing",
+          "stable_support_claims",
+        ],
+        operatorNoteIncluded: false,
+        rasterBytesIncluded: false,
+        hardwareEvidence: {
+          stageA: {
+            stage: "read_only_verification",
+            status: "valid_stage_a_artifact",
+            artifactSha256Included: true,
+          },
+          protocolSanity: {
+            stage: "protocol_sanity_test",
+            status: "confirmed_complete",
+            artifactSha256Included: true,
+          },
+          tinyVisualCard: {
+            stage: "tiny_visual_test_card",
+            status: "confirmed_complete",
+            artifactSha256Included: true,
+          },
+          trustedPrinter: {
+            stage: "trusted_printer_record",
+            status: "trusted_for_manual_continuous_printing",
+            artifactSha256Included: true,
+          },
+          longPrintReliability: {
+            stage: "long_print_reliability",
+            status: "confirmed_complete",
+            artifactSha256Included: true,
+          },
+        },
+        safety: {
+          manualContinuousPrintingEnabled: true,
+          longPrintReliabilityPassed: true,
+          longPrintPrintingEnabled: true,
+          stableSupportClaimEnabled: true,
+          agentDirectPrintingEnabled: false,
+          agentDirectPrintingDefault: "approval_required",
+        },
+        nextRequiredStage: "agent_direct_printing_policy_review",
+      },
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+        stableSupportGateInspector={{ inspect }}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect stable-support gate" }),
+    );
+
+    await waitFor(() => {
+      expect(inspect).toHaveBeenCalledOnce();
+    });
+    expect(
+      await screen.findByText("Stable support claims enabled"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("sha256:fa0f77ee9e7e43ea")).toBeInTheDocument();
+    expect(screen.getByText("Stage A evidence recorded")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage B protocol sanity recorded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage C visual card recorded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Trusted printer record recorded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Stage D long-print reliability recorded"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Long-print trust enabled")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stable support claim enabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent direct printing disabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent direct default: approval required"),
+    ).toBeInTheDocument();
   });
 
   it("adds a text layer from the canvas tool and persists the document", async () => {
@@ -1266,15 +1514,15 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Text" }));
@@ -1283,7 +1531,7 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Text 1")).toBeInTheDocument();
 
     const stored = JSON.parse(
-      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
     );
     expect(stored.elements).toEqual([
       expect.objectContaining({
@@ -1291,8 +1539,8 @@ describe("MiniX Print Studio shell", () => {
         name: "Text 1",
         text: "Double-click to edit",
         x: 24,
-        y: 56
-      })
+        y: 56,
+      }),
     ]);
   });
 
@@ -1304,56 +1552,64 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Text" }));
 
     await screen.findAllByText("Double-click to edit");
-    const canvasText = container.querySelector('[data-konva-node="Text"][data-testid^="el_"]');
+    const canvasText = container.querySelector(
+      '[data-konva-node="Text"][data-testid^="el_"]',
+    );
     expect(canvasText).toBeInstanceOf(HTMLElement);
 
     fireEvent.doubleClick(canvasText as HTMLElement);
 
-    const inlineEditor = await screen.findByRole("textbox", { name: "Inline text" });
-    fireEvent.change(inlineEditor, { target: { value: "Fresh thermal label" } });
+    const inlineEditor = await screen.findByRole("textbox", {
+      name: "Inline text",
+    });
+    fireEvent.change(inlineEditor, {
+      target: { value: "Fresh thermal label" },
+    });
     fireEvent.blur(inlineEditor);
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
           type: "text",
           name: "Text 1",
-          text: "Fresh thermal label"
-        })
+          text: "Fresh thermal label",
+        }),
       ]);
     });
-    expect(screen.queryByRole("textbox", { name: "Inline text" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Inline text" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
           type: "text",
           name: "Text 1",
-          text: "Double-click to edit"
-        })
+          text: "Double-click to edit",
+        }),
       ]);
     });
   });
@@ -1366,21 +1622,23 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Text" }));
     await screen.findAllByText("Double-click to edit");
 
-    const initialStored = localStorage.getItem("minix.printStudio.currentDocument.v1");
+    const initialStored = localStorage.getItem(
+      "minix.printStudio.currentDocument.v1",
+    );
     expect(initialStored).toBeTruthy();
     expect(screen.getByText("Zoom 100%")).toBeInTheDocument();
 
@@ -1396,7 +1654,9 @@ describe("MiniX Print Studio shell", () => {
     expect(stage).toHaveAttribute("data-scale-x", "1.25");
     expect(stage).toHaveAttribute("data-scale-y", "1.25");
     expect(stage).toHaveAttribute("data-width", "480");
-    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(
+      initialStored,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Reset zoom" }));
     expect(screen.getByText("Zoom 100%")).toBeInTheDocument();
@@ -1406,7 +1666,9 @@ describe("MiniX Print Studio shell", () => {
     stage = container.querySelector('[data-konva-node="Stage"]');
     expect(stage).toHaveAttribute("data-scale-x", "0.75");
     expect(stage).toHaveAttribute("data-width", "288");
-    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(
+      initialStored,
+    );
   });
 
   it("pans the canvas viewport from footer controls without changing the print document", async () => {
@@ -1417,24 +1679,28 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Text" }));
     await screen.findAllByText("Double-click to edit");
 
-    const initialStored = localStorage.getItem("minix.printStudio.currentDocument.v1");
+    const initialStored = localStorage.getItem(
+      "minix.printStudio.currentDocument.v1",
+    );
     expect(initialStored).toBeTruthy();
 
-    const viewport = container.querySelector('[data-testid="canvas-pan-viewport"]');
+    const viewport = container.querySelector(
+      '[data-testid="canvas-pan-viewport"]',
+    );
     expect(viewport).toHaveStyle({ transform: "translate(0px, 0px)" });
 
     fireEvent.click(screen.getByRole("button", { name: "Pan right" }));
@@ -1442,11 +1708,15 @@ describe("MiniX Print Studio shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Pan down" }));
     expect(viewport).toHaveStyle({ transform: "translate(48px, 48px)" });
-    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(
+      initialStored,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Reset pan" }));
     expect(viewport).toHaveStyle({ transform: "translate(0px, 0px)" });
-    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(initialStored);
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(
+      initialStored,
+    );
   });
 
   it("shows transformer handles for a selected layer and persists resize rotate edits", async () => {
@@ -1457,26 +1727,32 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
     expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
 
-    const transformer = container.querySelector('[data-konva-node="Transformer"]');
+    const transformer = container.querySelector(
+      '[data-konva-node="Transformer"]',
+    );
     expect(transformer).toBeInstanceOf(HTMLElement);
     expect(transformer).toHaveAttribute("data-rotate-enabled", "true");
-    expect(transformer?.getAttribute("data-enabled-anchors")).toContain("bottom-right");
+    expect(transformer?.getAttribute("data-enabled-anchors")).toContain(
+      "bottom-right",
+    );
 
-    const rectNode = container.querySelector('[data-konva-node="Rect"][data-testid^="el_"]');
+    const rectNode = container.querySelector(
+      '[data-konva-node="Rect"][data-testid^="el_"]',
+    );
     expect(rectNode).toBeInstanceOf(HTMLElement);
     rectNode?.dispatchEvent(
       new CustomEvent("konva-transform-end", {
@@ -1488,14 +1764,14 @@ describe("MiniX Print Studio shell", () => {
           height: 96,
           rotation: 15,
           scaleX: 1,
-          scaleY: 1
-        }
-      })
+          scaleY: 1,
+        },
+      }),
     );
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -1505,8 +1781,8 @@ describe("MiniX Print Studio shell", () => {
           y: 176,
           width: 280,
           height: 96,
-          rotation: 15
-        })
+          rotation: 15,
+        }),
       ]);
     });
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
@@ -1515,7 +1791,7 @@ describe("MiniX Print Studio shell", () => {
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -1525,8 +1801,8 @@ describe("MiniX Print Studio shell", () => {
           y: 144,
           width: 320,
           height: 72,
-          rotation: 0
-        })
+          rotation: 0,
+        }),
       ]);
     });
   });
@@ -1539,33 +1815,35 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
 
-    expect(await screen.findByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Inspector" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Rectangle 1")).not.toHaveLength(0);
 
     fireEvent.change(screen.getByRole("spinbutton", { name: "X" }), {
-      target: { value: "48" }
+      target: { value: "48" },
     });
     fireEvent.change(screen.getByRole("spinbutton", { name: "Width" }), {
-      target: { value: "280" }
+      target: { value: "280" },
     });
     fireEvent.click(screen.getByRole("button", { name: "White fill" }));
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -1573,8 +1851,8 @@ describe("MiniX Print Studio shell", () => {
           name: "Rectangle 1",
           x: 48,
           width: 280,
-          fill: "#ffffff"
-        })
+          fill: "#ffffff",
+        }),
       ]);
     });
     expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
@@ -1588,30 +1866,32 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "QR" }));
 
     expect(await screen.findByText("QR 1")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Inspector" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("QR")).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("textbox", { name: "QR Payload" }), {
-      target: { value: "https://minix.local/setup" }
+      target: { value: "https://minix.local/setup" },
     });
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -1620,8 +1900,8 @@ describe("MiniX Print Studio shell", () => {
           payload: "https://minix.local/setup",
           width: 128,
           height: 128,
-          errorCorrectionLevel: "M"
-        })
+          errorCorrectionLevel: "M",
+        }),
       ]);
     });
   });
@@ -1634,36 +1914,42 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     const pngBase64 =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
     const imageFile = new File(
-      [Uint8Array.from(atob(pngBase64), (character) => character.charCodeAt(0))],
+      [
+        Uint8Array.from(atob(pngBase64), (character) =>
+          character.charCodeAt(0),
+        ),
+      ],
       "logo.png",
-      { type: "image/png" }
+      { type: "image/png" },
     );
 
     fireEvent.change(screen.getByLabelText("Import image"), {
-      target: { files: [imageFile] }
+      target: { files: [imageFile] },
     });
 
     expect(await screen.findByText("Image 1")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Inspector" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Inspector" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Image")).not.toHaveLength(0);
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -1674,14 +1960,16 @@ describe("MiniX Print Studio shell", () => {
           fit: "contain",
           processing: {
             threshold: 128,
-            invert: false
+            invert: false,
           },
           source: expect.objectContaining({
             kind: "embedded_data_url",
             mimeType: "image/png",
-            dataUrl: expect.stringMatching(new RegExp("^data:image/png;base64,"))
-          })
-        })
+            dataUrl: expect.stringMatching(
+              new RegExp("^data:image/png;base64,"),
+            ),
+          }),
+        }),
       ]);
     });
   });
@@ -1694,15 +1982,15 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     const undo = screen.getByRole("button", { name: "Undo" });
@@ -1716,7 +2004,9 @@ describe("MiniX Print Studio shell", () => {
     expect(undo).toBeEnabled();
     expect(redo).toBeDisabled();
 
-    let stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    let stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+    );
     expect(stored.elements).toEqual([
       expect.objectContaining({
         type: "rect",
@@ -1724,8 +2014,8 @@ describe("MiniX Print Studio shell", () => {
         x: 32,
         y: 144,
         width: 320,
-        height: 72
-      })
+        height: 72,
+      }),
     ]);
 
     fireEvent.click(undo);
@@ -1735,7 +2025,9 @@ describe("MiniX Print Studio shell", () => {
     });
     expect(undo).toBeDisabled();
     expect(redo).toBeEnabled();
-    stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+    );
     expect(stored.elements).toEqual([]);
 
     fireEvent.click(redo);
@@ -1753,48 +2045,56 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
-          readOnlyVerify: vi.fn()
+          readOnlyVerify: vi.fn(),
         }}
-      />
+      />,
     );
 
     const undo = screen.getByRole("button", { name: "Undo" });
     expect(undo).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Insert long-print test markers" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Insert long-print test markers" }),
+    );
 
-    expect(await screen.findAllByText("END LP-TEST checksum: 7F3A")).not.toHaveLength(0);
+    expect(
+      await screen.findAllByText("END LP-TEST checksum: 7F3A"),
+    ).not.toHaveLength(0);
     expect(screen.getAllByText("25% marker")).not.toHaveLength(0);
     expect(undo).toBeEnabled();
 
-    let stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+    let stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+    );
     expect(stored.target.heightDots).toBe(8000);
     expect(stored.elements).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: "lp_test_marker_start",
           type: "text",
-          text: "START LP-TEST job_fixture"
+          text: "START LP-TEST job_fixture",
         }),
         expect.objectContaining({
           id: "lp_test_marker_end",
           type: "text",
           text: "END LP-TEST checksum: 7F3A",
-          y: 7904
-        })
-      ])
+          y: 7904,
+        }),
+      ]),
     );
 
     fireEvent.click(undo);
 
     await waitFor(() => {
-      stored = JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}");
+      stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+      );
       expect(stored.target.heightDots).toBe(900);
       expect(stored.elements).toEqual([]);
     });
@@ -1807,18 +2107,18 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_saved",
           name: "Saved checklist",
           documentId: "doc_saved",
-          updatedAt: "2026-06-05T00:00:00Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:00:00Z",
+        },
+      ],
     });
     const createProject = vi.fn().mockResolvedValue({
       projectId: "prj_new",
       name: "Untitled print",
       document: {
-        id: "doc_new"
+        id: "doc_new",
       },
       createdAt: "2026-06-05T00:01:00Z",
-      updatedAt: "2026-06-05T00:01:00Z"
+      updatedAt: "2026-06-05T00:01:00Z",
     });
 
     render(
@@ -1828,7 +2128,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -1836,9 +2136,9 @@ describe("MiniX Print Studio shell", () => {
           scanPrinters: vi.fn(),
           readOnlyVerify: vi.fn(),
           listProjects,
-          createProject
+          createProject,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
@@ -1854,21 +2154,25 @@ describe("MiniX Print Studio shell", () => {
         document: expect.objectContaining({
           title: "Untitled print",
           target: expect.objectContaining({
-            profileId: "seznik-minix-s1-lyin48d-gy"
-          })
-        })
+            profileId: "seznik-minix-s1-lyin48d-gy",
+          }),
+        }),
       });
     });
-    expect(await screen.findByText("Saved project prj_new")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
-      { activeProjectId: "prj_new" }
-    );
+    expect(
+      await screen.findByText("Saved project prj_new"),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}",
+      ),
+    ).toEqual({ activeProjectId: "prj_new" });
   });
 
   it("opens a saved daemon project into the editor", async () => {
     const loadedDocument = createDefaultDocument({
       title: "Loaded checklist",
-      now: new Date("2026-06-05T00:02:00.000Z")
+      now: new Date("2026-06-05T00:02:00.000Z"),
     });
     const listProjects = vi.fn().mockResolvedValue({
       projects: [
@@ -1876,16 +2180,16 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_loaded",
           name: "Loaded checklist",
           documentId: loadedDocument.id,
-          updatedAt: "2026-06-05T00:02:00Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:02:00Z",
+        },
+      ],
     });
     const getProject = vi.fn().mockResolvedValue({
       projectId: "prj_loaded",
       name: "Loaded checklist",
       document: loadedDocument,
       createdAt: "2026-06-05T00:02:00Z",
-      updatedAt: "2026-06-05T00:02:00Z"
+      updatedAt: "2026-06-05T00:02:00Z",
     });
 
     render(
@@ -1895,7 +2199,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -1903,52 +2207,62 @@ describe("MiniX Print Studio shell", () => {
           scanPrinters: vi.fn(),
           readOnlyVerify: vi.fn(),
           listProjects,
-          getProject
+          getProject,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
     expect(await screen.findByText("Loaded checklist")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Loaded checklist project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Loaded checklist project" }),
+    );
 
     await waitFor(() => {
       expect(getProject).toHaveBeenCalledWith("prj_loaded");
     });
-    expect(await screen.findByText("Opened project prj_loaded")).toBeInTheDocument();
-    expect(screen.getByText("Loaded checklist - continuous paper")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
-      loadedDocument
-    );
-    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
-      { activeProjectId: "prj_loaded" }
-    );
+    expect(
+      await screen.findByText("Opened project prj_loaded"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Loaded checklist - continuous paper"),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+      ),
+    ).toEqual(loadedDocument);
+    expect(
+      JSON.parse(
+        localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}",
+      ),
+    ).toEqual({ activeProjectId: "prj_loaded" });
   });
 
   it("restores the last opened daemon project before using the local document cache", async () => {
     const staleLocalDocument = createDefaultDocument({
       title: "Stale local draft",
-      now: new Date("2026-06-05T00:02:30.000Z")
+      now: new Date("2026-06-05T00:02:30.000Z"),
     });
     const daemonDocument = createDefaultDocument({
       title: "Daemon session",
-      now: new Date("2026-06-05T00:02:31.000Z")
+      now: new Date("2026-06-05T00:02:31.000Z"),
     });
     const getProject = vi.fn().mockResolvedValue({
       projectId: "prj_session",
       name: "Daemon session",
       document: daemonDocument,
       createdAt: "2026-06-05T00:02:31Z",
-      updatedAt: "2026-06-05T00:02:31Z"
+      updatedAt: "2026-06-05T00:02:31Z",
     });
     localStorage.setItem(
       "minix.printStudio.currentDocument.v1",
-      JSON.stringify(staleLocalDocument)
+      JSON.stringify(staleLocalDocument),
     );
     localStorage.setItem(
       "minix.printStudio.projectSession.v1",
-      JSON.stringify({ activeProjectId: "prj_session" })
+      JSON.stringify({ activeProjectId: "prj_session" }),
     );
 
     render(
@@ -1958,33 +2272,41 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
           printApprovedPreview: vi.fn(),
           scanPrinters: vi.fn(),
           readOnlyVerify: vi.fn(),
-          getProject
+          getProject,
         }}
-      />
+      />,
     );
 
     await waitFor(() => {
       expect(getProject).toHaveBeenCalledWith("prj_session");
     });
-    expect(await screen.findByText("Opened project prj_session")).toBeInTheDocument();
-    expect(screen.getByText("Daemon session - continuous paper")).toBeInTheDocument();
-    expect(screen.queryByText("Stale local draft - continuous paper")).not.toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}")).toEqual(
-      daemonDocument
-    );
+    expect(
+      await screen.findByText("Opened project prj_session"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Daemon session - continuous paper"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Stale local draft - continuous paper"),
+    ).not.toBeInTheDocument();
+    expect(
+      JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+      ),
+    ).toEqual(daemonDocument);
   });
 
   it("updates the opened daemon project when saving document changes", async () => {
     const loadedDocument = createDefaultDocument({
       title: "Loaded checklist",
-      now: new Date("2026-06-05T00:03:00.000Z")
+      now: new Date("2026-06-05T00:03:00.000Z"),
     });
     const listProjects = vi.fn().mockResolvedValue({
       projects: [
@@ -1992,23 +2314,23 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_loaded",
           name: "Loaded checklist",
           documentId: loadedDocument.id,
-          updatedAt: "2026-06-05T00:03:00Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:03:00Z",
+        },
+      ],
     });
     const getProject = vi.fn().mockResolvedValue({
       projectId: "prj_loaded",
       name: "Loaded checklist",
       document: loadedDocument,
       createdAt: "2026-06-05T00:03:00Z",
-      updatedAt: "2026-06-05T00:03:00Z"
+      updatedAt: "2026-06-05T00:03:00Z",
     });
     const createProject = vi.fn().mockResolvedValue({
       projectId: "prj_duplicate",
       name: "Loaded checklist",
       document: loadedDocument,
       createdAt: "2026-06-05T00:04:00Z",
-      updatedAt: "2026-06-05T00:04:00Z"
+      updatedAt: "2026-06-05T00:04:00Z",
     });
     const updateProject = vi.fn(
       async (_projectId: string, request: ProjectMutationRequest) => ({
@@ -2016,8 +2338,8 @@ describe("MiniX Print Studio shell", () => {
         name: request.name,
         document: request.document as unknown as Record<string, unknown>,
         createdAt: "2026-06-05T00:03:00Z",
-        updatedAt: "2026-06-05T00:05:00Z"
-      })
+        updatedAt: "2026-06-05T00:05:00Z",
+      }),
     );
 
     render(
@@ -2027,7 +2349,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -2037,15 +2359,19 @@ describe("MiniX Print Studio shell", () => {
           listProjects,
           createProject,
           getProject,
-          updateProject
+          updateProject,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
     expect(await screen.findByText("Loaded checklist")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open Loaded checklist project" }));
-    expect(await screen.findByText("Opened project prj_loaded")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Loaded checklist project" }),
+    );
+    expect(
+      await screen.findByText("Opened project prj_loaded"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
     expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
@@ -2059,17 +2385,21 @@ describe("MiniX Print Studio shell", () => {
           document: expect.objectContaining({
             title: "Loaded checklist",
             elements: expect.arrayContaining([
-              expect.objectContaining({ name: "Rectangle 1", type: "rect" })
-            ])
-          })
-        })
+              expect.objectContaining({ name: "Rectangle 1", type: "rect" }),
+            ]),
+          }),
+        }),
       );
     });
     expect(createProject).not.toHaveBeenCalled();
-    expect(await screen.findByText("Saved project prj_loaded")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}")).toEqual(
-      { activeProjectId: "prj_loaded" }
-    );
+    expect(
+      await screen.findByText("Saved project prj_loaded"),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        localStorage.getItem("minix.printStudio.projectSession.v1") ?? "{}",
+      ),
+    ).toEqual({ activeProjectId: "prj_loaded" });
   });
 
   it("confirms and deletes a saved daemon project from the project list", async () => {
@@ -2080,9 +2410,9 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_delete",
           name: "Delete checklist",
           documentId: "doc_delete",
-          updatedAt: "2026-06-05T00:06:00Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:06:00Z",
+        },
+      ],
     });
     const deleteProject = vi.fn().mockResolvedValue(undefined);
 
@@ -2093,7 +2423,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -2101,21 +2431,27 @@ describe("MiniX Print Studio shell", () => {
           scanPrinters: vi.fn(),
           readOnlyVerify: vi.fn(),
           listProjects,
-          deleteProject
+          deleteProject,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
     expect(await screen.findByText("Delete checklist")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Delete checklist project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Delete checklist project" }),
+    );
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Delete checklist"));
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining("Delete checklist"),
+    );
     await waitFor(() => {
       expect(deleteProject).toHaveBeenCalledWith("prj_delete");
     });
-    expect(await screen.findByText("Deleted project prj_delete")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Deleted project prj_delete"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Delete checklist")).not.toBeInTheDocument();
 
     confirm.mockRestore();
@@ -2125,7 +2461,7 @@ describe("MiniX Print Studio shell", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const openedDocument = createDefaultDocument({
       title: "Session cleanup",
-      now: new Date("2026-06-05T00:06:30.000Z")
+      now: new Date("2026-06-05T00:06:30.000Z"),
     });
     const listProjects = vi.fn().mockResolvedValue({
       projects: [
@@ -2133,16 +2469,16 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_cleanup",
           name: "Session cleanup",
           documentId: openedDocument.id,
-          updatedAt: "2026-06-05T00:06:30Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:06:30Z",
+        },
+      ],
     });
     const getProject = vi.fn().mockResolvedValue({
       projectId: "prj_cleanup",
       name: "Session cleanup",
       document: openedDocument,
       createdAt: "2026-06-05T00:06:30Z",
-      updatedAt: "2026-06-05T00:06:30Z"
+      updatedAt: "2026-06-05T00:06:30Z",
     });
     const deleteProject = vi.fn().mockResolvedValue(undefined);
 
@@ -2153,7 +2489,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -2162,22 +2498,30 @@ describe("MiniX Print Studio shell", () => {
           readOnlyVerify: vi.fn(),
           listProjects,
           getProject,
-          deleteProject
+          deleteProject,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
     expect(await screen.findByText("Session cleanup")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open Session cleanup project" }));
-    expect(await screen.findByText("Opened project prj_cleanup")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Session cleanup project" }),
+    );
+    expect(
+      await screen.findByText("Opened project prj_cleanup"),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Session cleanup project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Session cleanup project" }),
+    );
 
     await waitFor(() => {
       expect(deleteProject).toHaveBeenCalledWith("prj_cleanup");
     });
-    expect(localStorage.getItem("minix.printStudio.projectSession.v1")).toBeNull();
+    expect(
+      localStorage.getItem("minix.printStudio.projectSession.v1"),
+    ).toBeNull();
 
     confirm.mockRestore();
   });
@@ -2185,7 +2529,7 @@ describe("MiniX Print Studio shell", () => {
   it("uploads imported images to the opened daemon project asset store", async () => {
     const loadedDocument = createDefaultDocument({
       title: "Asset-backed checklist",
-      now: new Date("2026-06-05T00:07:00.000Z")
+      now: new Date("2026-06-05T00:07:00.000Z"),
     });
     const listProjects = vi.fn().mockResolvedValue({
       projects: [
@@ -2193,30 +2537,34 @@ describe("MiniX Print Studio shell", () => {
           projectId: "prj_assets",
           name: "Asset-backed checklist",
           documentId: loadedDocument.id,
-          updatedAt: "2026-06-05T00:07:00Z"
-        }
-      ]
+          updatedAt: "2026-06-05T00:07:00Z",
+        },
+      ],
     });
     const getProject = vi.fn().mockResolvedValue({
       projectId: "prj_assets",
       name: "Asset-backed checklist",
       document: loadedDocument,
       createdAt: "2026-06-05T00:07:00Z",
-      updatedAt: "2026-06-05T00:07:00Z"
+      updatedAt: "2026-06-05T00:07:00Z",
     });
     const uploadProjectAsset = vi.fn().mockResolvedValue({
       assetId: "sha256-uploaded",
       sha256: "uploaded",
       fileName: "logo.png",
       mimeType: "image/png",
-      byteLength: 68
+      byteLength: 68,
     });
     const pngBase64 =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
     const imageFile = new File(
-      [Uint8Array.from(atob(pngBase64), (character) => character.charCodeAt(0))],
+      [
+        Uint8Array.from(atob(pngBase64), (character) =>
+          character.charCodeAt(0),
+        ),
+      ],
       "logo.png",
-      { type: "image/png" }
+      { type: "image/png" },
     );
 
     render(
@@ -2226,7 +2574,7 @@ describe("MiniX Print Studio shell", () => {
             ok: true,
             version: "0.1.0",
             profileRegistryVersion: "2026.06.04",
-            mock: true
+            mock: true,
           }),
           createDocumentPreview: vi.fn(),
           planApprovedPreview: vi.fn(),
@@ -2235,32 +2583,40 @@ describe("MiniX Print Studio shell", () => {
           readOnlyVerify: vi.fn(),
           listProjects,
           getProject,
-          uploadProjectAsset
+          uploadProjectAsset,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Load projects" }));
-    expect(await screen.findByText("Asset-backed checklist")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open Asset-backed checklist project" }));
-    expect(await screen.findByText("Opened project prj_assets")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Asset-backed checklist"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Open Asset-backed checklist project",
+      }),
+    );
+    expect(
+      await screen.findByText("Opened project prj_assets"),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Import image"), {
-      target: { files: [imageFile] }
+      target: { files: [imageFile] },
     });
 
     await waitFor(() => {
       expect(uploadProjectAsset).toHaveBeenCalledWith("prj_assets", {
         fileName: "logo.png",
         mimeType: "image/png",
-        dataBase64: pngBase64
+        dataBase64: pngBase64,
       });
     });
     expect(await screen.findByText("Image 1")).toBeInTheDocument();
 
     await waitFor(() => {
       const stored = JSON.parse(
-        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}"
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
       );
       expect(stored.assets).toEqual([
         expect.objectContaining({
@@ -2269,8 +2625,8 @@ describe("MiniX Print Studio shell", () => {
           assetId: "sha256-uploaded",
           fileName: "logo.png",
           mimeType: "image/png",
-          byteLength: 68
-        })
+          byteLength: 68,
+        }),
       ]);
       expect(stored.elements).toEqual([
         expect.objectContaining({
@@ -2278,10 +2634,10 @@ describe("MiniX Print Studio shell", () => {
           source: expect.objectContaining({
             projectAsset: expect.objectContaining({
               projectId: "prj_assets",
-              assetId: "sha256-uploaded"
-            })
-          })
-        })
+              assetId: "sha256-uploaded",
+            }),
+          }),
+        }),
       ]);
     });
   });

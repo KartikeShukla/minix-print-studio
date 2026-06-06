@@ -4,17 +4,18 @@ import type {
   AgentIntegrationExportResult,
   AgentIntegrationInstallResult,
   AgentIntegrationPreview,
-  AgentIntegrationTargetId
+  AgentIntegrationTargetId,
 } from "@/lib/agent-integrations";
 import type {
   HardwareArtifactInspectionResult,
   HardwareHostReadiness,
-  TrustedPrinterRecordInspectionResult
+  StableSupportGateInspectionResult,
+  TrustedPrinterRecordInspectionResult,
 } from "@/lib/hardware-artifacts";
 import type {
   BetaFeedbackDraft,
   BetaFeedbackDraftRequest,
-  SupportBundleExportResult
+  SupportBundleExportResult,
 } from "@/lib/support-bundle";
 import type { UpdateChannel, UpdateChannelState } from "@/lib/update-channel";
 import {
@@ -44,7 +45,7 @@ import {
   type PrintPreviewRequest,
   type PrinterScanResponse,
   type ReadOnlyVerification,
-  type RenderSettings
+  type RenderSettings,
 } from "@minix/shared-api";
 
 export type DaemonRuntime = {
@@ -56,26 +57,35 @@ export type DaemonClient = {
   getHealth: () => Promise<HealthResponse>;
   createDocumentPreview: (
     document: PrintDocument,
-    renderSettings: RenderSettings
+    renderSettings: RenderSettings,
   ) => Promise<DocumentPreviewResponse>;
-  planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
-  printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
+  planApprovedPreview: (
+    request: PrintPlanRequest,
+  ) => Promise<PrintPlanResponse>;
+  printApprovedPreview: (
+    request: PrintPreviewRequest,
+  ) => Promise<PrintJobResponse>;
   confirmJobOutput: (
     jobId: string,
-    request: OperatorConfirmationRequest
+    request: OperatorConfirmationRequest,
   ) => Promise<PrintJobResponse>;
-  exportDiagnostics?: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResponse>;
+  exportDiagnostics?: (
+    request: DiagnosticsExportRequest,
+  ) => Promise<DiagnosticsExportResponse>;
   exportHardwareTest?: (deviceId: string) => Promise<Blob>;
   scanPrinters: () => Promise<PrinterScanResponse>;
   readOnlyVerify: (deviceId: string) => Promise<ReadOnlyVerification>;
   listProjects: () => Promise<ProjectListResponse>;
   createProject: (request: ProjectMutationRequest) => Promise<ProjectResponse>;
   getProject: (projectId: string) => Promise<ProjectResponse>;
-  updateProject: (projectId: string, request: ProjectMutationRequest) => Promise<ProjectResponse>;
+  updateProject: (
+    projectId: string,
+    request: ProjectMutationRequest,
+  ) => Promise<ProjectResponse>;
   deleteProject: (projectId: string) => Promise<void>;
   uploadProjectAsset: (
     projectId: string,
-    request: ProjectAssetUploadRequest
+    request: ProjectAssetUploadRequest,
   ) => Promise<ProjectAssetResponse>;
 };
 
@@ -91,24 +101,29 @@ declare global {
       getAppVersion: () => Promise<string>;
       getAgentIntegrationPreview?: () => Promise<AgentIntegrationPreview>;
       installAgentIntegrationConfig?: (
-        targetId: AgentIntegrationTargetId
+        targetId: AgentIntegrationTargetId,
       ) => Promise<AgentIntegrationInstallResult>;
       uninstallAgentIntegrationConfig?: (
-        targetId: AgentIntegrationTargetId
+        targetId: AgentIntegrationTargetId,
       ) => Promise<AgentIntegrationInstallResult>;
       testAgentIntegrationConnection?: (
-        targetId: AgentIntegrationTargetId
+        targetId: AgentIntegrationTargetId,
       ) => Promise<AgentIntegrationConnectionTestResult>;
       exportAgentIntegrationBundle?: (
-        targetId: AgentIntegrationTargetId
+        targetId: AgentIntegrationTargetId,
       ) => Promise<AgentIntegrationExportResult>;
       exportSupportBundle?: () => Promise<SupportBundleExportResult>;
-      createBetaFeedbackDraft?: (request?: BetaFeedbackDraftRequest) => Promise<BetaFeedbackDraft>;
+      createBetaFeedbackDraft?: (
+        request?: BetaFeedbackDraftRequest,
+      ) => Promise<BetaFeedbackDraft>;
       getUpdateChannelState?: () => Promise<UpdateChannelState>;
-      setUpdateChannel?: (channel: UpdateChannel) => Promise<UpdateChannelState>;
+      setUpdateChannel?: (
+        channel: UpdateChannel,
+      ) => Promise<UpdateChannelState>;
       checkHostBluetoothReadiness?: () => Promise<HardwareHostReadiness>;
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
       inspectTrustedPrinterRecord?: () => Promise<TrustedPrinterRecordInspectionResult | null>;
+      inspectStableSupportGate?: () => Promise<StableSupportGateInspectionResult | null>;
     };
   }
 }
@@ -116,17 +131,22 @@ declare global {
 export function createDaemonClient(): DaemonClient {
   return {
     async getHealth() {
-      return requestDaemon("/v1/health", {}, healthResponseSchema.parse, "Daemon health");
+      return requestDaemon(
+        "/v1/health",
+        {},
+        healthResponseSchema.parse,
+        "Daemon health",
+      );
     },
     async createDocumentPreview(document, renderSettings) {
       return requestDaemon(
         "/v1/render/document-preview",
         {
           method: "POST",
-          body: { document, renderSettings }
+          body: { document, renderSettings },
         },
         documentPreviewResponseSchema.parse,
-        "Daemon document preview"
+        "Daemon document preview",
       );
     },
     async planApprovedPreview(request) {
@@ -134,10 +154,10 @@ export function createDaemonClient(): DaemonClient {
         "/v1/jobs/plan",
         {
           method: "POST",
-          body: request
+          body: request,
         },
         printPlanResponseSchema.parse,
-        "Daemon print plan"
+        "Daemon print plan",
       );
     },
     async printApprovedPreview(request) {
@@ -145,10 +165,10 @@ export function createDaemonClient(): DaemonClient {
         "/v1/jobs/print",
         {
           method: "POST",
-          body: request
+          body: request,
         },
         printJobResponseSchema.parse,
-        "Daemon print job"
+        "Daemon print job",
       );
     },
     async confirmJobOutput(jobId, request) {
@@ -156,10 +176,10 @@ export function createDaemonClient(): DaemonClient {
         `/v1/jobs/${encodeURIComponent(jobId)}/operator-confirmation`,
         {
           method: "POST",
-          body: request
+          body: request,
         },
         printJobResponseSchema.parse,
-        "Daemon operator confirmation"
+        "Daemon operator confirmation",
       );
     },
     async exportDiagnostics(request) {
@@ -167,34 +187,34 @@ export function createDaemonClient(): DaemonClient {
         "/v1/diagnostics/export",
         {
           method: "POST",
-          body: request
+          body: request,
         },
         diagnosticsExportResponseSchema.parse,
-        "Daemon diagnostics export"
+        "Daemon diagnostics export",
       );
     },
     async exportHardwareTest(deviceId) {
       const request: HardwareTestExportRequest = {
         deviceId,
-        stage: "read_only_verification"
+        stage: "read_only_verification",
       };
       return requestDaemonBlob(
         "/v1/diagnostics/hardware-test",
         {
           method: "POST",
-          body: request
+          body: request,
         },
-        "Daemon hardware-test export"
+        "Daemon hardware-test export",
       );
     },
     async scanPrinters() {
       return requestDaemon(
         "/v1/printers/scan",
         {
-          method: "POST"
+          method: "POST",
         },
         printerScanResponseSchema.parse,
-        "Daemon printer scan"
+        "Daemon printer scan",
       );
     },
     async readOnlyVerify(deviceId) {
@@ -202,10 +222,10 @@ export function createDaemonClient(): DaemonClient {
         "/v1/printers/read-only-verify",
         {
           method: "POST",
-          body: { deviceId }
+          body: { deviceId },
         },
         readOnlyVerificationSchema.parse,
-        "Daemon read-only printer verification"
+        "Daemon read-only printer verification",
       );
     },
     async listProjects() {
@@ -213,7 +233,7 @@ export function createDaemonClient(): DaemonClient {
         "/v1/projects",
         {},
         projectListResponseSchema.parse,
-        "Daemon project list"
+        "Daemon project list",
       );
     },
     async createProject(request) {
@@ -221,10 +241,10 @@ export function createDaemonClient(): DaemonClient {
         "/v1/projects",
         {
           method: "POST",
-          body: request
+          body: request,
         },
         projectResponseSchema.parse,
-        "Daemon project create"
+        "Daemon project create",
       );
     },
     async getProject(projectId) {
@@ -232,7 +252,7 @@ export function createDaemonClient(): DaemonClient {
         `/v1/projects/${encodeURIComponent(projectId)}`,
         {},
         projectResponseSchema.parse,
-        "Daemon project get"
+        "Daemon project get",
       );
     },
     async updateProject(projectId, request) {
@@ -240,19 +260,19 @@ export function createDaemonClient(): DaemonClient {
         `/v1/projects/${encodeURIComponent(projectId)}`,
         {
           method: "PUT",
-          body: request
+          body: request,
         },
         projectResponseSchema.parse,
-        "Daemon project update"
+        "Daemon project update",
       );
     },
     async deleteProject(projectId) {
       return requestDaemonVoid(
         `/v1/projects/${encodeURIComponent(projectId)}`,
         {
-          method: "DELETE"
+          method: "DELETE",
         },
-        "Daemon project delete"
+        "Daemon project delete",
       );
     },
     async uploadProjectAsset(projectId, request) {
@@ -260,12 +280,12 @@ export function createDaemonClient(): DaemonClient {
         `/v1/projects/${encodeURIComponent(projectId)}/assets`,
         {
           method: "POST",
-          body: request
+          body: request,
         },
         projectAssetResponseSchema.parse,
-        "Daemon project asset upload"
+        "Daemon project asset upload",
       );
-    }
+    },
   };
 }
 
@@ -273,15 +293,15 @@ async function requestDaemon<T>(
   path: string,
   options: { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: object },
   parse: (value: unknown) => T,
-  label: string
+  label: string,
 ): Promise<T> {
   const runtime = await getRuntime();
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${runtime.token}`
+    Authorization: `Bearer ${runtime.token}`,
   };
   const init: RequestInit = {
     method: options.method ?? "GET",
-    headers
+    headers,
   };
 
   if (options.body) {
@@ -301,15 +321,15 @@ async function requestDaemon<T>(
 async function requestDaemonVoid(
   path: string,
   options: { method: "DELETE" },
-  label: string
+  label: string,
 ): Promise<void> {
   const runtime = await getRuntime();
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${runtime.token}`
+    Authorization: `Bearer ${runtime.token}`,
   };
   const response = await fetch(`${runtime.baseUrl}${path}`, {
     method: options.method,
-    headers
+    headers,
   });
 
   if (!response.ok) {
@@ -320,15 +340,15 @@ async function requestDaemonVoid(
 async function requestDaemonBlob(
   path: string,
   options: { method?: "GET" | "POST"; body?: object },
-  label: string
+  label: string,
 ): Promise<Blob> {
   const runtime = await getRuntime();
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${runtime.token}`
+    Authorization: `Bearer ${runtime.token}`,
   };
   const init: RequestInit = {
     method: options.method ?? "GET",
-    headers
+    headers,
   };
 
   if (options.body) {
@@ -345,12 +365,17 @@ async function requestDaemonBlob(
   return response.blob();
 }
 
-async function formatDaemonError(response: Response, label: string): Promise<string> {
+async function formatDaemonError(
+  response: Response,
+  label: string,
+): Promise<string> {
   const detail = await readDaemonErrorDetail(response);
   return `${label} failed with ${response.status}${detail ? `: ${detail}` : ""}`;
 }
 
-async function readDaemonErrorDetail(response: Response): Promise<string | null> {
+async function readDaemonErrorDetail(
+  response: Response,
+): Promise<string | null> {
   try {
     const body = await response.json();
     if (
@@ -374,6 +399,6 @@ async function getRuntime(): Promise<DaemonRuntime> {
 
   return {
     baseUrl: "http://127.0.0.1:39281",
-    token: "dev-token"
+    token: "dev-token",
   };
 }
