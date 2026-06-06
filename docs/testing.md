@@ -51,7 +51,7 @@ This validates the successful workflow metadata, macOS and Windows unsigned pack
 artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
 The macOS artifact must include Bluetooth usage descriptions in `Info.plist` so
 first-run permission prompts explain local printer access. The current release
-evidence baseline is Release Package workflow run `27023526067`.
+evidence baseline is Release Package workflow run `27053365446`.
 
 ## Public History Gate
 

@@ -50,6 +50,12 @@ REQUIRED_README_SECTIONS = (
     "## Release and Validation",
 )
 
+FORBIDDEN_README_PHRASES = {
+    "The repository stays private during pre-publication validation.": (
+        "README.md must not claim the repository stays private after publication"
+    ),
+}
+
 REQUIRED_GITIGNORE_ENTRIES = (
     ".env",
     ".env.*",
@@ -149,6 +155,7 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(_missing_paths(root, REQUIRED_FILES))
     issues.extend(_missing_paths(root, REQUIRED_DOCS))
     issues.extend(_readme_section_issues(root))
+    issues.extend(_readme_publication_status_issues(root))
     issues.extend(_missing_gitignore_entries(root))
     issues.extend(_package_json_issues(root))
     issues.extend(_missing_ci_commands(root))
@@ -185,6 +192,18 @@ def _readme_section_issues(root: Path) -> list[str]:
         f"README.md missing required section: {section}"
         for section in REQUIRED_README_SECTIONS
         if section not in text
+    ]
+
+
+def _readme_publication_status_issues(root: Path) -> list[str]:
+    readme = root / "README.md"
+    if not readme.is_file():
+        return []
+    text = readme.read_text(encoding="utf-8")
+    return [
+        issue
+        for phrase, issue in FORBIDDEN_README_PHRASES.items()
+        if phrase in text
     ]
 
 
