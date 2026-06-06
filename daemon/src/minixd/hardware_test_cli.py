@@ -87,6 +87,9 @@ TINY_VISUAL_CARD_CONFIRMATION_CHECKLIST = (
     "Output is not mirrored or upside down.",
     "Feed is smooth with no stall, overheat warning, disconnect, or fatal error.",
 )
+LONG_PRINT_RELIABILITY_MIN_ROWS = 2000
+LONG_PRINT_RELIABILITY_MIN_BANDS = 4
+LONG_PRINT_RELIABILITY_MIN_TAIL_ROWS = 160
 _TINY_CARD_FONT: dict[str, tuple[str, ...]] = {
     " ": ("00000", "00000", "00000", "00000", "00000", "00000", "00000"),
     "4": ("10010", "10010", "10010", "11111", "00010", "00010", "00010"),
@@ -289,6 +292,18 @@ def run(
             )
             stdout.write("trusted-printer-recorded\n")
             return 0
+        if args.command == "record-long-print-reliability":
+            job_status = client.get_job_status(job_id=args.job_id)
+            record_long_print_reliability_artifact(
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
+                tiny_visual_card_artifact_path=Path(args.tiny_visual_card_artifact),
+                trusted_printer_record_path=Path(args.trusted_printer_record),
+                job_status=job_status,
+                output_dir=Path(args.output_dir),
+            )
+            stdout.write("long-print-reliability-recorded\n")
+            return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
@@ -449,6 +464,41 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=".",
         help="Directory for the trusted-printer JSON record.",
+    )
+
+    record_long_print_parser = subparsers.add_parser(
+        "record-long-print-reliability",
+        help="Record a confirmed Stage D long-print reliability run as a hardware-test ZIP.",
+    )
+    record_long_print_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP for the printer.",
+    )
+    record_long_print_parser.add_argument(
+        "--protocol-sanity-artifact",
+        required=True,
+        help="Path to the confirmed Stage B protocol-sanity hardware-test ZIP.",
+    )
+    record_long_print_parser.add_argument(
+        "--tiny-visual-card-artifact",
+        required=True,
+        help="Path to the confirmed Stage C tiny visual-card hardware-test ZIP.",
+    )
+    record_long_print_parser.add_argument(
+        "--trusted-printer-record",
+        required=True,
+        help="Path to the local trusted-printer JSON record.",
+    )
+    record_long_print_parser.add_argument(
+        "--job-id",
+        required=True,
+        help="Confirmed daemon print job id for the long-print reliability run.",
+    )
+    record_long_print_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the Stage D hardware-test ZIP artifact.",
     )
     return parser
 
@@ -1238,6 +1288,292 @@ def record_trusted_printer(
     return record_path
 
 
+def record_long_print_reliability_artifact(
+    *,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    tiny_visual_card_artifact_path: Path,
+    trusted_printer_record_path: Path,
+    job_status: Mapping[str, object],
+    output_dir: Path,
+) -> Path:
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    protocol_sanity_summary = _inspect_protocol_sanity_artifact(
+        artifact_path=protocol_sanity_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    tiny_visual_card_summary = _inspect_tiny_visual_card_artifact(
+        artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+        protocol_sanity_summary=protocol_sanity_summary,
+    )
+    trusted_printer_summary = _inspect_trusted_printer_record(
+        record_path=trusted_printer_record_path,
+        stage_a_artifact_path=stage_a_artifact_path,
+        protocol_sanity_artifact_path=protocol_sanity_artifact_path,
+        tiny_visual_card_artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    _validate_confirmed_long_print_job(
+        job_status=job_status,
+        stage_a_summary=stage_a_summary,
+    )
+
+    job_id = _required_json_string(job_status, "jobId", "job-status")
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    device_fingerprint = _device_fingerprint(
+        _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    )
+    trusted_sha = _required_json_string(
+        trusted_printer_summary,
+        "artifactSha256",
+        "trusted-printer-record",
+    )
+    operator_confirmation = _required_json_object(
+        job_status,
+        "operatorConfirmation",
+        "job-status",
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = output_dir / (
+        f"hardware-test-long-print-reliability-{_safe_filename_part(job_id)}.zip"
+    )
+    with ZipFile(artifact_path, "w", ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "stage-chain-summary.json",
+            json.dumps(
+                {
+                    "stageA": {
+                        "stage": "read_only_verification",
+                        "status": _required_json_string(
+                            stage_a_summary,
+                            "status",
+                            "print-transfer-manifest.json",
+                        ),
+                        "artifactSha256": hashlib.sha256(
+                            stage_a_artifact_path.read_bytes()
+                        ).hexdigest(),
+                    },
+                    "protocolSanity": {
+                        "stage": "protocol_sanity_test",
+                        "status": _required_json_string(
+                            protocol_sanity_summary,
+                            "status",
+                            "protocol-sanity-summary",
+                        ),
+                        "artifactSha256": _required_json_string(
+                            protocol_sanity_summary,
+                            "artifactSha256",
+                            "protocol-sanity-summary",
+                        ),
+                    },
+                    "tinyVisualCard": {
+                        "stage": "tiny_visual_test_card",
+                        "status": _required_json_string(
+                            tiny_visual_card_summary,
+                            "status",
+                            "tiny-visual-card-summary",
+                        ),
+                        "artifactSha256": _required_json_string(
+                            tiny_visual_card_summary,
+                            "artifactSha256",
+                            "tiny-visual-card-summary",
+                        ),
+                    },
+                    "trustedPrinter": {
+                        "status": _required_json_string(
+                            trusted_printer_summary,
+                            "status",
+                            "trusted-printer-record",
+                        ),
+                        "artifactSha256": trusted_sha,
+                    },
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "trusted-printer-summary.json",
+            json.dumps(
+                {
+                    "status": _required_json_string(
+                        trusted_printer_summary,
+                        "status",
+                        "trusted-printer-record",
+                    ),
+                    "device": {
+                        "idRedacted": True,
+                        "fingerprint": device_fingerprint,
+                    },
+                    "profileId": profile_id,
+                    "trustedFor": _required_json_string_list(
+                        trusted_printer_summary,
+                        "trustedFor",
+                        "trusted-printer-record",
+                    ),
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "long-print-job-summary.json",
+            json.dumps(
+                {
+                    "jobId": job_id,
+                    "profileId": profile_id,
+                    "device": {
+                        "idRedacted": True,
+                        "fingerprint": device_fingerprint,
+                    },
+                    "state": _required_json_string(job_status, "state", "job-status"),
+                    "completionLevel": _required_json_string(
+                        job_status,
+                        "completionLevel",
+                        "job-status",
+                    ),
+                    "completionConfidence": _required_json_string(
+                        job_status,
+                        "completionConfidence",
+                        "job-status",
+                    ),
+                    "requiresUserCheck": _required_json_bool(
+                        job_status,
+                        "requiresUserCheck",
+                        "job-status",
+                    ),
+                    "rasterBytesIncluded": False,
+                    "operatorNoteIncluded": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "print-transfer-manifest.json",
+            json.dumps(
+                {
+                    "stage": "long_print_reliability",
+                    "status": "confirmed_complete",
+                    "profileId": profile_id,
+                    "jobId": job_id,
+                    "requiredPriorStage": "trusted_printer_record",
+                    "nextRequiredStage": "maintainer_review_for_stable_support",
+                    "printCommandsSent": True,
+                    "rasterBytesIncluded": False,
+                    "operatorConfirmed": True,
+                    "completionLevel": "verified",
+                    "longPrintReliabilityPassed": True,
+                    "priorStageArtifactSha256": trusted_sha,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "band-manifest.json",
+            json.dumps(
+                {
+                    "bandsSent": _required_json_int(job_status, "bandsSent", "job-status"),
+                    "totalBands": _required_json_int(job_status, "totalBands", "job-status"),
+                    "rowsSent": _required_json_int(job_status, "rowsSent", "job-status"),
+                    "totalRows": _required_json_int(job_status, "totalRows", "job-status"),
+                    "bytesSent": _required_json_int(job_status, "bytesSent", "job-status"),
+                    "totalBytes": _required_json_int(job_status, "totalBytes", "job-status"),
+                    "tailBlankRowsDots": _required_json_int(
+                        job_status,
+                        "tailBlankRowsDots",
+                        "job-status",
+                    ),
+                    "rasterBytesIncluded": False,
+                    "requiresLongPrintMode": True,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "finalizer-result.json",
+            json.dumps(
+                {
+                    "state": _required_json_string(job_status, "state", "job-status"),
+                    "phase": _required_json_string(job_status, "phase", "job-status"),
+                    "completionConfidence": _required_json_string(
+                        job_status,
+                        "completionConfidence",
+                        "job-status",
+                    ),
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "safety-report.json",
+            json.dumps(
+                {
+                    "stage": "long_print_reliability",
+                    "longPrintReliabilityPassed": True,
+                    "manualContinuousPrintingAlreadyTrusted": True,
+                    "certificationComplete": False,
+                    "stableSupportClaimEnabled": False,
+                    "agentDirectPrintingEnabled": False,
+                    "rasterBytesIncluded": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "user-confirmation.json",
+            json.dumps(
+                {
+                    "confirmedAt": _required_json_string(
+                        operator_confirmation,
+                        "confirmedAt",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "printedTextReadable": _required_json_bool(
+                        operator_confirmation,
+                        "printedTextReadable",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "endMarkerVisible": _required_json_bool(
+                        operator_confirmation,
+                        "endMarkerVisible",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "noOverheat": _required_json_bool(
+                        operator_confirmation,
+                        "noOverheat",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "noDisconnect": _required_json_bool(
+                        operator_confirmation,
+                        "noDisconnect",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "outcome": _required_json_string(
+                        operator_confirmation,
+                        "outcome",
+                        "job-status.operatorConfirmation",
+                    ),
+                    "operatorNoteIncluded": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "README.md",
+            (
+                "MiniX Print Studio Stage D long-print reliability hardware-test "
+                "artifact. This archive records a reviewed long-print job summary, "
+                "redacts device identity, excludes operator free text and raster bytes, "
+                "and does not enable stable support or agent direct printing.\n"
+            ),
+        )
+    return artifact_path
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
     _require_artifact_files(
         archive,
@@ -1685,6 +2021,121 @@ def _validate_tiny_visual_card_artifact(
             raise HardwareTestCliError("tiny visual card operator checklist did not pass")
 
 
+def _inspect_trusted_printer_record(
+    *,
+    record_path: Path,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    tiny_visual_card_artifact_path: Path,
+    stage_a_summary: Mapping[str, object],
+) -> dict[str, object]:
+    try:
+        artifact_sha256 = hashlib.sha256(record_path.read_bytes()).hexdigest()
+        decoded = json.loads(record_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("trusted-printer record not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HardwareTestCliError("trusted-printer record is invalid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError("trusted-printer record is not a JSON object")
+
+    device_id = _required_json_string(
+        stage_a_summary,
+        "deviceId",
+        "print-transfer-manifest.json",
+    )
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    device = _required_json_object(decoded, "device", "trusted-printer-record")
+    safety = _required_json_object(decoded, "safety", "trusted-printer-record")
+    hardware_evidence = _required_json_object(
+        decoded,
+        "hardwareEvidence",
+        "trusted-printer-record",
+    )
+
+    if _required_json_string(decoded, "status", "trusted-printer-record") != (
+        "trusted_for_manual_continuous_printing"
+    ):
+        raise HardwareTestCliError("trusted-printer record has wrong status")
+    if not _required_json_bool(device, "idRedacted", "trusted-printer-record.device"):
+        raise HardwareTestCliError("trusted-printer record exposes raw device id")
+    if _required_json_string(device, "fingerprint", "trusted-printer-record.device") != (
+        _device_fingerprint(device_id)
+    ):
+        raise HardwareTestCliError("trusted-printer record device does not match Stage A")
+    if _required_json_string(decoded, "profileId", "trusted-printer-record") != profile_id:
+        raise HardwareTestCliError("trusted-printer record profile does not match Stage A")
+    if "manual_continuous_printing" not in _required_json_string_list(
+        decoded,
+        "trustedFor",
+        "trusted-printer-record",
+    ):
+        raise HardwareTestCliError("trusted-printer record does not trust manual printing")
+    if not _required_json_bool(
+        safety,
+        "manualContinuousPrintingEnabled",
+        "trusted-printer-record.safety",
+    ):
+        raise HardwareTestCliError("trusted-printer record does not enable manual printing")
+    if not _required_json_bool(
+        safety,
+        "longPrintReliabilityRequired",
+        "trusted-printer-record.safety",
+    ):
+        raise HardwareTestCliError("trusted-printer record skips long-print reliability")
+    for field in (
+        "longPrintPrintingEnabled",
+        "agentDirectPrintingEnabled",
+        "stableSupportClaimEnabled",
+    ):
+        if _required_json_bool(safety, field, "trusted-printer-record.safety"):
+            raise HardwareTestCliError("trusted-printer record unlocks later-stage support")
+    if _required_json_string(decoded, "nextRequiredStage", "trusted-printer-record") != (
+        "long_print_reliability"
+    ):
+        raise HardwareTestCliError("trusted-printer record has wrong next stage")
+
+    expected_artifacts = {
+        "stageA": hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest(),
+        "protocolSanity": hashlib.sha256(protocol_sanity_artifact_path.read_bytes()).hexdigest(),
+        "tinyVisualCard": hashlib.sha256(tiny_visual_card_artifact_path.read_bytes()).hexdigest(),
+    }
+    for field, expected_sha in expected_artifacts.items():
+        evidence = _required_json_object(
+            hardware_evidence,
+            field,
+            "trusted-printer-record.hardwareEvidence",
+        )
+        if (
+            _required_json_string(
+                evidence,
+                "artifactSha256",
+                f"trusted-printer-record.hardwareEvidence.{field}",
+            )
+            != expected_sha
+        ):
+            raise HardwareTestCliError("trusted-printer record evidence chain is stale")
+
+    return {
+        "status": _required_json_string(decoded, "status", "trusted-printer-record"),
+        "device": {
+            "idRedacted": True,
+            "fingerprint": _device_fingerprint(device_id),
+        },
+        "profileId": profile_id,
+        "trustedFor": _required_json_string_list(
+            decoded,
+            "trustedFor",
+            "trusted-printer-record",
+        ),
+        "artifactSha256": artifact_sha256,
+    }
+
+
 def _validate_confirmed_tiny_visual_job(
     *,
     job_status: Mapping[str, object],
@@ -1718,6 +2169,59 @@ def _validate_confirmed_tiny_visual_job(
     ):
         if not _required_json_bool(confirmation, field, "job-status.operatorConfirmation"):
             raise HardwareTestCliError("tiny visual card operator checklist did not pass")
+
+
+def _validate_confirmed_long_print_job(
+    *,
+    job_status: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+) -> None:
+    if _required_json_string(job_status, "state", "job-status") != "confirmed_complete":
+        raise HardwareTestCliError("long-print reliability job is not confirmed complete")
+    if _required_json_string(job_status, "completionLevel", "job-status") != "verified":
+        raise HardwareTestCliError("long-print reliability job is not verified")
+    if (
+        _required_json_string(job_status, "completionConfidence", "job-status")
+        != "operator_paper_output_confirmed"
+    ):
+        raise HardwareTestCliError("long-print reliability job lacks operator confirmation")
+    if _required_json_bool(job_status, "requiresUserCheck", "job-status"):
+        raise HardwareTestCliError("long-print reliability job still requires user check")
+    if (
+        _required_json_string(job_status, "deviceId", "job-status")
+        != _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("long-print reliability job device does not match Stage A")
+
+    bands_sent = _required_json_int(job_status, "bandsSent", "job-status")
+    total_bands = _required_json_int(job_status, "totalBands", "job-status")
+    rows_sent = _required_json_int(job_status, "rowsSent", "job-status")
+    total_rows = _required_json_int(job_status, "totalRows", "job-status")
+    bytes_sent = _required_json_int(job_status, "bytesSent", "job-status")
+    total_bytes = _required_json_int(job_status, "totalBytes", "job-status")
+    tail_rows = _required_json_int(job_status, "tailBlankRowsDots", "job-status")
+    if bands_sent != total_bands or rows_sent != total_rows or bytes_sent != total_bytes:
+        raise HardwareTestCliError("long-print reliability job did not send all planned data")
+    if total_bands < LONG_PRINT_RELIABILITY_MIN_BANDS:
+        raise HardwareTestCliError("long-print reliability job is not banded enough")
+    if total_rows < LONG_PRINT_RELIABILITY_MIN_ROWS:
+        raise HardwareTestCliError("long-print reliability job is too short")
+    if tail_rows < LONG_PRINT_RELIABILITY_MIN_TAIL_ROWS:
+        raise HardwareTestCliError("long-print reliability job lacks protected tail rows")
+
+    confirmation = _required_json_object(job_status, "operatorConfirmation", "job-status")
+    if _required_json_string(confirmation, "outcome", "job-status.operatorConfirmation") != (
+        "confirmed_complete"
+    ):
+        raise HardwareTestCliError("long-print reliability operator confirmation is incomplete")
+    for field in (
+        "printedTextReadable",
+        "endMarkerVisible",
+        "noOverheat",
+        "noDisconnect",
+    ):
+        if not _required_json_bool(confirmation, field, "job-status.operatorConfirmation"):
+            raise HardwareTestCliError("long-print reliability operator checklist did not pass")
 
 
 def _device_fingerprint(device_id: str) -> str:

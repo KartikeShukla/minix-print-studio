@@ -224,6 +224,29 @@ This writes `trusted-printer-<device-fingerprint>.json`. The record enables only
 digests for the Stage A/B/C evidence chain, and keeps long-print, stable support
 claims, and agent direct printing disabled until long-print reliability passes.
 
+## Stage D Long-Print Reliability Artifact
+
+After Stage A/B/C artifacts have been reviewed, the printer has a trusted-printer
+record, and a long-print job has operator paper-output confirmation recorded on
+the daemon job, record the Stage D artifact:
+
+```bash
+scripts/hardware-test.sh record-long-print-reliability \
+  --stage-a-artifact <stage-a.zip> \
+  --protocol-sanity-artifact <hardware-test-protocol-sanity.zip> \
+  --tiny-visual-card-artifact <hardware-test-tiny-visual-card-job-id.zip> \
+  --trusted-printer-record <trusted-printer-device-fingerprint.json> \
+  --job-id <confirmed-long-print-job-id> \
+  --output-dir <local-output-dir>
+```
+
+This writes `hardware-test-long-print-reliability-<job-id>.zip`. The command
+validates the Stage A/B/C/trusted-record chain, verifies the daemon job is a
+confirmed long-print transfer with all planned bands, rows, bytes, and protected
+tail rows sent, stores only redacted device identity, and omits raster bytes and
+operator free text. The artifact records that the long-print run passed, but it
+does not by itself enable stable support claims or agent direct printing.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A

@@ -13,11 +13,13 @@ not yet a stable public installer.
   fall back from FF00-filtered scanning to name-prefix matching before read-only
   verification.
 - Stage B physical protocol sanity and Stage C tiny-card artifact evidence exists
-  locally, but long-print reliability runs are still pending.
+  locally. Long-print reliability artifact recording is implemented, but a
+  reviewed physical long-print reliability artifact is still pending.
 - User-initiated physical BLE transfer is implemented as an experimental path,
   and operator paper-output confirmation can now be recorded on the job. Stage
-  B/C artifact-recording and local trusted-printer record commands are
-  implemented, but stable support still requires long-print reliability evidence.
+  B/C artifact-recording, local trusted-printer record, and long-print
+  reliability artifact commands are implemented, but stable support still
+  requires reviewed physical long-print reliability evidence.
 - Only the Seznik MiniX profile is present.
 
 ## Packaging
@@ -35,8 +37,9 @@ not yet a stable public installer.
 ## Product Surface
 
 - The mock print flow, experimental physical BLE transport, and manual continuous
-  trusted-printer record path are implemented, but long-print and agent-direct
-  trust remain certification-gated.
+  trusted-printer record path are implemented. Long-print reliability artifact
+  recording exists, but long-print and agent-direct trust remain
+  certification-gated until reviewed physical evidence exists.
 - Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
   use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.

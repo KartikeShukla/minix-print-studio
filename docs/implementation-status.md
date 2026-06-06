@@ -203,6 +203,11 @@ Public development is on `main`; implementation slices use short-lived
 - `minix-hardware-test tiny-visual-card-preflight` validates a Stage A artifact and emits deterministic Stage C tiny-card metadata for `MINIX TEST 7K4P`, including dimensions, raster byte counts, and a digest without including printable bytes or contacting BLE.
 - `minix-hardware-test evidence-summary` emits a redacted maintainer-shareable Stage A summary with a hashed device fingerprint, redaction flags, protocol preflight counts, and tiny-card digest without artifact paths, raw logs, command payload hex, bearer tokens, raster bytes, or the raw device id.
 - Electron artifact inspection now shows the Stage B protocol sanity preflight, Stage C tiny visual card preflight, and redacted shareable evidence summary while keeping printing locked.
+- `minix-hardware-test record-long-print-reliability` records a Stage D
+  long-print reliability ZIP from a confirmed long-print daemon job, validates
+  the Stage A/B/C/trusted-record chain, redacts device identity, excludes
+  operator free text and raster bytes, and keeps stable support plus agent direct
+  printing disabled.
 
 ## Current Verification
 
@@ -292,6 +297,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for trusted-printer JSON record creation from reviewed
   Stage A/B/C artifacts while keeping long-print, stable support, and agent
   direct printing disabled.
+- TDD red/green checks for Stage D long-print reliability artifact recording
+  from a confirmed long-print job while keeping stable support and agent direct
+  printing disabled.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for required public package metadata in open-source readiness validation.
@@ -349,6 +357,9 @@ Public development is on `main`; implementation slices use short-lived
   physical evidence chain and produced a record with
   `trusted_for_manual_continuous_printing`, manual continuous printing enabled,
   and long-print, stable support, and agent direct printing still disabled.
+- Stage D long-print reliability artifact recording is implemented in the CLI,
+  but physical long-print reliability evidence for the MiniX device is still
+  pending.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -356,9 +367,9 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Add the long-print reliability hardware artifact path before stable support
-   claims.
-2. Surface the local trusted-printer record in the desktop setup flow without
+1. Surface the local trusted-printer record in the desktop setup flow without
    enabling agent direct printing or long-print trust.
-3. Implement long-print reliability execution and reviewed artifact recording
-   for stable support claims.
+2. Add a dedicated long-print reliability execution path that prints the marker
+   fixture and records a reviewed Stage D artifact from physical output.
+3. Gate stable support claims on reviewed Stage D evidence without enabling
+   agent direct printing by default.
