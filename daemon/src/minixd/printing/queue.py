@@ -33,6 +33,7 @@ class PrintJob:
     source: str
     copies: int
     device_id: str | None
+    operator_confirmation: dict[str, object] | None
     bands_sent: int
     total_bands: int
     rows_sent: int
@@ -128,6 +129,64 @@ class PrintQueue:
     def get_segments(self, job_id: str) -> list[RasterBand]:
         return self._segments.get(job_id, [])
 
+    def confirm_output(
+        self,
+        *,
+        job_id: str,
+        printed_text_readable: bool,
+        end_marker_visible: bool,
+        no_overheat: bool,
+        no_disconnect: bool,
+        operator_note: str | None,
+        confirmed_at: str,
+    ) -> PrintJob:
+        job = self.get_job(job_id)
+        if job is None:
+            raise PrintRejectedError("job not found")
+        if "confirm_complete" not in job.safe_actions:
+            raise PrintRejectedError("job is not waiting for operator confirmation")
+        if not (
+            printed_text_readable
+            and end_marker_visible
+            and no_overheat
+            and no_disconnect
+        ):
+            raise PrintRejectedError("operator confirmation requires all checklist items to pass")
+
+        confirmed = PrintJob(
+            job_id=job.job_id,
+            preview_id=job.preview_id,
+            plan_id=job.plan_id,
+            state="confirmed_complete",
+            phase="operator_confirmed",
+            completion_level="verified",
+            completion_confidence="operator_paper_output_confirmed",
+            requires_user_check=False,
+            source=job.source,
+            copies=job.copies,
+            device_id=job.device_id,
+            operator_confirmation={
+                "confirmed_at": confirmed_at,
+                "printed_text_readable": printed_text_readable,
+                "end_marker_visible": end_marker_visible,
+                "no_overheat": no_overheat,
+                "no_disconnect": no_disconnect,
+                "operator_note": operator_note,
+                "outcome": "confirmed_complete",
+            },
+            bands_sent=job.bands_sent,
+            total_bands=job.total_bands,
+            rows_sent=job.rows_sent,
+            total_rows=job.total_rows,
+            bytes_sent=job.bytes_sent,
+            total_bytes=job.total_bytes,
+            tail_blank_rows_dots=job.tail_blank_rows_dots,
+            safe_actions=["reprint_on_user_request"],
+        )
+        self._jobs[job_id] = confirmed
+        self._persist_jobs()
+        return confirmed
+
     def _find_profile(self, profile_id: str) -> dict[str, object]:
         for profile in self._profiles:
             if profile.get("id") == profile_id:
@@ -176,6 +235,7 @@ class PrintQueue:
             source=source,
             copies=copies,
             device_id=device_id,
+            operator_confirmation=None,
             bands_sent=len(plan_package.bands),
             total_bands=len(plan_package.bands),
             rows_sent=plan_package.plan.transfer_height_dots,
@@ -231,6 +291,7 @@ class PrintQueue:
             source=source,
             copies=copies,
             device_id=device_id,
+            operator_confirmation=None,
             bands_sent=result.bands_sent,
             total_bands=len(plan_package.bands),
             rows_sent=result.rows_sent,
@@ -267,6 +328,7 @@ class PrintQueue:
             source=source,
             copies=copies,
             device_id=device_id,
+            operator_confirmation=None,
             bands_sent=result.bands_sent,
             total_bands=len(plan_package.bands),
             rows_sent=result.rows_sent,
@@ -312,6 +374,7 @@ class PrintQueue:
             source=source,
             copies=copies,
             device_id=None,
+            operator_confirmation=None,
             bands_sent=len(sent_bands),
             total_bands=len(plan_package.bands),
             rows_sent=printable_rows_sent,
@@ -388,6 +451,7 @@ def _deserialize_job(payload: dict[str, Any]) -> PrintJob:
         total_bytes=_int(payload, "total_bytes"),
         tail_blank_rows_dots=_int(payload, "tail_blank_rows_dots"),
         device_id=_optional_string(payload, "device_id"),
+        operator_confirmation=_optional_dict(payload, "operator_confirmation"),
         safe_actions=_string_list(payload, "safe_actions"),
     )
 
@@ -456,6 +520,15 @@ def _optional_string(payload: dict[str, Any], key: str) -> str | None:
     if not isinstance(value, str):
         raise ValueError(f"{key} must be a string")
     return value
+
+
+def _optional_dict(payload: dict[str, Any], key: str) -> dict[str, object] | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    return dict(value)
 
 
 def _bool(payload: dict[str, Any], key: str) -> bool:

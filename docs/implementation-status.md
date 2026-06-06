@@ -126,6 +126,13 @@ Public development is on `main`; implementation slices use short-lived
   chunking, notify subscription, raster band transfer, inter-chunk delay, and
   thermal pacing metadata. Completion remains `completed_unverified` and requires
   operator inspection.
+- Print jobs can record operator paper-output confirmation through
+  `/v1/jobs/{jobId}/operator-confirmation`, persist the checklist result with the
+  job, transition the job to `confirmed_complete`, and include the confirmation in
+  diagnostics.
+- Renderer print status exposes a confirmation action for unverified jobs so the
+  operator can record readable text, visible END marker, no heat warning, and no
+  disconnect after inspecting the paper output.
 - Electron starts the real daemon by default and keeps `MINIX_DAEMON_MOCK=true`
   as the explicit development/CI mock override.
 - Versioned document model now includes typed text elements with stable thermal defaults and immutable movement updates.
@@ -275,6 +282,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for the Electron artifact-inspection bridge and renderer Stage B preflight summary from an exported Stage A artifact.
 - TDD red/green checks for Stage C tiny visual card preflight planning, unsafe artifact rejection, Electron bridge propagation, and renderer checklist display.
 - TDD red/green checks for redacted Stage A evidence summary generation, Electron bridge propagation, and renderer summary display.
+- TDD red/green checks for operator paper-output confirmation at the daemon queue,
+  daemon API, diagnostics export, renderer daemon client, and renderer print
+  status action.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for required public package metadata in open-source readiness validation.
@@ -320,8 +330,9 @@ Public development is on `main`; implementation slices use short-lived
   `/v1/jobs/print` on 2026-06-06 completed as `completed_unverified` for
   job `job_7e1aad3feba34dc48d0461f3c5ebf295`, sending 2/2 bands and 15,360
   raster bytes to the verified MiniX device with redacted fingerprint
-  `sha256:fa0f77ee9e7e43ea`; operator paper-output confirmation is still
-  required.
+  `sha256:fa0f77ee9e7e43ea`; the app can now record operator paper-output
+  confirmation, but a reviewed confirmation artifact is still required before
+  certification.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -329,10 +340,8 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Capture operator confirmation for the physical tiny-card output: text
-   readability, edge markers, orientation, smooth feed, and no stall/overheat or
-   disconnect warning.
-2. Implement durable Stage B/C hardware-test artifact recording for physical
+1. Implement durable Stage B/C hardware-test artifact recording for physical
    protocol sanity and tiny visual card runs instead of relying on an ad hoc
-   local transfer response.
+   local transfer response, reusing the operator-confirmation job record.
+2. Run a reviewed physical tiny-card confirmation through that artifact path.
 3. After Stage B and visual-card evidence exists, implement trusted-printer confirmation and keep long-print reliability as a separate certification gate.

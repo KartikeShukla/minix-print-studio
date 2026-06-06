@@ -21,8 +21,9 @@ public release has been published, and physical printer certification is not com
 The current development branch has document editing, daemon-backed preview and
 planning, MCP integration scaffolding, unsigned macOS and Windows package
 evidence, community governance docs, Stage A physical read-only verification, and
-an experimental user-initiated BLE transport path. Trusted printing remains gated
-until the staged certification flow produces reviewed evidence.
+an experimental user-initiated BLE transport path with operator confirmation
+recording. Trusted printing remains gated until the staged certification flow
+produces reviewed evidence.
 
 ## Safety Model
 

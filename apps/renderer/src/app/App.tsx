@@ -152,6 +152,7 @@ type AppDaemonClient = Pick<
       | "updateProject"
       | "deleteProject"
       | "uploadProjectAsset"
+      | "confirmJobOutput"
     >
 >;
 
@@ -189,6 +190,7 @@ type PreviewWorkflow =
 type PrintWorkflow =
   | { status: "idle" }
   | { status: "running" }
+  | { status: "confirming"; job: PrintJobResponse }
   | { status: "completed"; job: PrintJobResponse }
   | { status: "error"; message: string };
 
@@ -1147,6 +1149,48 @@ export function App({
     }
   }, [client, document, previewWorkflow, printerWorkflow]);
 
+  const confirmPrintOutput = useCallback(
+    async (job: PrintJobResponse) => {
+      if (!client.confirmJobOutput) {
+        setPrintWorkflow({
+          status: "error",
+          message: "Output confirmation unavailable"
+        });
+        return;
+      }
+      const confirmed = window.confirm(
+        "Confirm the paper output is readable, the END marker is visible, and there were no heat warnings or Bluetooth disconnects?"
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      setPrintWorkflow({ status: "confirming", job });
+      try {
+        const confirmedJob = await client.confirmJobOutput(job.jobId, {
+          printedTextReadable: true,
+          endMarkerVisible: true,
+          noOverheat: true,
+          noDisconnect: true,
+          operatorNote: "Confirmed from MiniX Print Studio."
+        });
+        setJobHistory((currentHistory) => {
+          const printedAt = currentHistory.find((item) => item.jobId === job.jobId)?.printedAt;
+          const nextHistory = prependStoredPrintJob(currentHistory, confirmedJob, printedAt);
+          saveStoredJobHistory(nextHistory);
+          return nextHistory;
+        });
+        setPrintWorkflow({ status: "completed", job: confirmedJob });
+      } catch (error: unknown) {
+        setPrintWorkflow({
+          status: "error",
+          message: error instanceof Error ? error.message : "Output confirmation failed"
+        });
+      }
+    },
+    [client]
+  );
+
   const runDiagnosticsExport = useCallback(async () => {
     if (!client.exportDiagnostics) {
       setDiagnosticsWorkflow({
@@ -1670,7 +1714,7 @@ export function App({
                       <span>{formatBandCount(previewWorkflow.plan.totalBands)}</span>
                     </div>
                   </div>
-                  <PrintStatus workflow={printWorkflow} />
+                  <PrintStatus workflow={printWorkflow} onConfirmOutput={confirmPrintOutput} />
                 </div>
               ) : previewWorkflow.status === "running" ? (
                 <p className="text-sm leading-6 text-muted-foreground">
@@ -3752,11 +3796,25 @@ function PrinterDiscoveryStatus({
   );
 }
 
-function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
+function PrintStatus({
+  workflow,
+  onConfirmOutput
+}: {
+  workflow: PrintWorkflow;
+  onConfirmOutput: (job: PrintJobResponse) => void;
+}) {
   if (workflow.status === "running") {
     return (
       <div className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
         Sending approved preview to print queue.
+      </div>
+    );
+  }
+
+  if (workflow.status === "confirming") {
+    return (
+      <div className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+        Recording output confirmation.
       </div>
     );
   }
@@ -3797,6 +3855,18 @@ function PrintStatus({ workflow }: { workflow: PrintWorkflow }) {
           </Badge>
         ))}
       </div>
+      {workflow.job.safeActions.includes("confirm_complete") ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2 w-full"
+          onClick={() => onConfirmOutput(workflow.job)}
+        >
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+          Confirm output
+        </Button>
+      ) : null}
     </div>
   );
 }

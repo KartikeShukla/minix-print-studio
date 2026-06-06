@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException
@@ -37,6 +38,14 @@ class PrintJobRequest(BaseModel):
     copies: Annotated[int, Field(gt=0, le=5)]
     source: Annotated[str, Field(min_length=1)]
     device_id: Annotated[str | None, Field(alias="deviceId", min_length=1)] = None
+
+
+class OperatorConfirmationRequest(BaseModel):
+    printed_text_readable: bool = Field(alias="printedTextReadable")
+    end_marker_visible: bool = Field(alias="endMarkerVisible")
+    no_overheat: bool = Field(alias="noOverheat")
+    no_disconnect: bool = Field(alias="noDisconnect")
+    operator_note: Annotated[str | None, Field(alias="operatorNote", min_length=1)] = None
 
 
 def create_jobs_router(
@@ -103,6 +112,28 @@ def create_jobs_router(
         job = print_queue.get_job(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="job not found")
+        return _serialize_print_job(job)
+
+    @router.post("/{job_id}/operator-confirmation")
+    def confirm_operator_output(
+        job_id: str,
+        request: OperatorConfirmationRequest,
+    ) -> dict[str, object]:
+        try:
+            job = print_queue.confirm_output(
+                job_id=job_id,
+                printed_text_readable=request.printed_text_readable,
+                end_marker_visible=request.end_marker_visible,
+                no_overheat=request.no_overheat,
+                no_disconnect=request.no_disconnect,
+                operator_note=request.operator_note,
+                confirmed_at=_utc_timestamp(),
+            )
+        except PrintRejectedError as exc:
+            detail = str(exc)
+            if detail == "job not found":
+                raise HTTPException(status_code=404, detail=detail) from exc
+            raise HTTPException(status_code=409, detail=detail) from exc
         return _serialize_print_job(job)
 
     @router.get("/{job_id}/segments")
@@ -188,6 +219,7 @@ def _serialize_print_job(job: PrintJob) -> dict[str, object]:
         "source": job.source,
         "copies": job.copies,
         "deviceId": job.device_id,
+        "operatorConfirmation": _serialize_operator_confirmation(job.operator_confirmation),
         "bandsSent": job.bands_sent,
         "totalBands": job.total_bands,
         "rowsSent": job.rows_sent,
@@ -197,3 +229,23 @@ def _serialize_print_job(job: PrintJob) -> dict[str, object]:
         "tailBlankRowsDots": job.tail_blank_rows_dots,
         "safeActions": job.safe_actions,
     }
+
+
+def _serialize_operator_confirmation(
+    confirmation: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if confirmation is None:
+        return None
+    return {
+        "confirmedAt": confirmation.get("confirmed_at"),
+        "printedTextReadable": confirmation.get("printed_text_readable"),
+        "endMarkerVisible": confirmation.get("end_marker_visible"),
+        "noOverheat": confirmation.get("no_overheat"),
+        "noDisconnect": confirmation.get("no_disconnect"),
+        "operatorNote": confirmation.get("operator_note"),
+        "outcome": confirmation.get("outcome"),
+    }
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

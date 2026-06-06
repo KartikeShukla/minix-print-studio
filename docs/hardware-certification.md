@@ -168,7 +168,9 @@ error.
 The daemon may report a physical tiny-card transfer as `completed_unverified`
 after all BLE bands are written. That is not certification. It only means the
 transport finished from the daemon's perspective; a human must inspect the paper
-output and record the confirmation before treating the stage as passed.
+output and record the confirmation before treating the stage as passed. The app
+and daemon can record this confirmation on the print job, but Stage C still needs
+a reviewed hardware-test artifact before the profile becomes trusted.
 
 ## Shareable Evidence Summary
 

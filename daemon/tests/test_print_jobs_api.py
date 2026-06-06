@@ -106,6 +106,88 @@ def test_print_endpoint_queues_mock_job_and_exposes_status_and_segments() -> Non
     assert "raster" not in segments_response.json()["segments"][0]
 
 
+def test_operator_confirmation_endpoint_records_physical_output_check() -> None:
+    client = TestClient(create_app(mock=True))
+    preview = _create_preview(client)
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+
+    response = client.post(
+        f"/v1/jobs/{printed['jobId']}/operator-confirmation",
+        json={
+            "printedTextReadable": True,
+            "endMarkerVisible": True,
+            "noOverheat": True,
+            "noDisconnect": True,
+            "operatorNote": "END marker visible and no heat warning.",
+        },
+    )
+
+    assert response.status_code == 200
+    confirmed = response.json()
+    assert confirmed["jobId"] == printed["jobId"]
+    assert confirmed["state"] == "confirmed_complete"
+    assert confirmed["completionLevel"] == "verified"
+    assert confirmed["completionConfidence"] == "operator_paper_output_confirmed"
+    assert confirmed["requiresUserCheck"] is False
+    assert confirmed["operatorConfirmation"] == {
+        "confirmedAt": confirmed["operatorConfirmation"]["confirmedAt"],
+        "printedTextReadable": True,
+        "endMarkerVisible": True,
+        "noOverheat": True,
+        "noDisconnect": True,
+        "operatorNote": "END marker visible and no heat warning.",
+        "outcome": "confirmed_complete",
+    }
+    assert client.get(f"/v1/jobs/{printed['jobId']}").json()["state"] == "confirmed_complete"
+
+
+def test_operator_confirmation_rejects_failed_checklist_without_verifying_job() -> None:
+    client = TestClient(create_app(mock=True))
+    preview = _create_preview(client)
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+
+    response = client.post(
+        f"/v1/jobs/{printed['jobId']}/operator-confirmation",
+        json={
+            "printedTextReadable": True,
+            "endMarkerVisible": True,
+            "noOverheat": True,
+            "noDisconnect": False,
+            "operatorNote": "Printer disconnected after output.",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "operator confirmation requires all checklist items to pass"
+    assert client.get(f"/v1/jobs/{printed['jobId']}").json()["state"] == "completed_unverified"
+
+
 def test_print_endpoint_rejects_bad_approval_token_without_creating_job() -> None:
     client = TestClient(create_app(mock=True))
     document = {
@@ -310,6 +392,48 @@ def test_diagnostics_export_includes_redacted_job_and_segment_metadata() -> None
         archived_bundle = json.loads(archive.read("diagnostics.json"))
         assert archived_bundle["jobs"][0]["jobId"] == printed["jobId"]
         assert "approvalToken" not in archive.read("diagnostics.json").decode("utf-8")
+
+
+def test_diagnostics_export_includes_operator_confirmation_when_available() -> None:
+    client = TestClient(create_app(mock=True))
+    preview = _create_preview(client)
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+    client.post(
+        f"/v1/jobs/{printed['jobId']}/operator-confirmation",
+        json={
+            "printedTextReadable": True,
+            "endMarkerVisible": True,
+            "noOverheat": True,
+            "noDisconnect": True,
+            "operatorNote": "END marker visible and no heat warning.",
+        },
+    )
+
+    bundle = client.post("/v1/diagnostics/export", json={"includeProjectContent": False}).json()
+
+    job = bundle["jobs"][0]
+    assert job["operatorConfirmation"]["outcome"] == "confirmed_complete"
+    assert job["operatorConfirmation"]["operatorNote"] == "END marker visible and no heat warning."
+    assert job["completionDecision"] == {
+        "level": "verified",
+        "confidence": "operator_paper_output_confirmed",
+        "phase": "operator_confirmed",
+        "requiresUserCheck": False,
+        "explanation": "Operator confirmed the paper output after BLE transfer.",
+    }
 
 
 def test_diagnostics_explains_partial_output_after_mock_segment_disconnect() -> None:

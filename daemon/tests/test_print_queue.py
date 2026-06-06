@@ -264,6 +264,65 @@ def test_physical_print_queue_uses_transport_and_reports_unverified_completion()
     assert job.safe_actions == ["confirm_complete", "feed_paper", "reprint_from_start"]
 
 
+def test_print_queue_records_operator_confirmation_for_unverified_output() -> None:
+    preview_store = PreviewStore()
+    profile = load_profile()
+    preview = preview_store.create(
+        document_hash="sha256:document",
+        render_settings_hash="sha256:settings",
+        raster=b"\x00" * 48,
+        profile_id="seznik-minix-s1-lyin48d-gy",
+        width_dots=384,
+        height_dots=1,
+        safety={"allowed": True, "warnings": [], "metrics": {}},
+    )
+    queue = PrintQueue(
+        profiles=[profile],
+        preview_store=preview_store,
+        mock=False,
+        transport=FakePrintTransport(),
+    )
+    job = queue.print_preview(
+        preview_id=preview.preview_id,
+        approval_token=preview.approval_token,
+        document_hash=preview.document_hash,
+        render_settings_hash=preview.render_settings_hash,
+        profile_id=preview.profile_id,
+        paper_mode="continuous",
+        density="medium",
+        copies=1,
+        source="ui",
+        device_id="dev_minix",
+    )
+
+    confirmed = queue.confirm_output(
+        job_id=job.job_id,
+        printed_text_readable=True,
+        end_marker_visible=True,
+        no_overheat=True,
+        no_disconnect=True,
+        operator_note="Tiny card matched the expected output.",
+        confirmed_at="2026-06-06T12:34:56Z",
+    )
+
+    assert confirmed.state == "confirmed_complete"
+    assert confirmed.phase == "operator_confirmed"
+    assert confirmed.completion_level == "verified"
+    assert confirmed.completion_confidence == "operator_paper_output_confirmed"
+    assert confirmed.requires_user_check is False
+    assert confirmed.operator_confirmation == {
+        "confirmed_at": "2026-06-06T12:34:56Z",
+        "printed_text_readable": True,
+        "end_marker_visible": True,
+        "no_overheat": True,
+        "no_disconnect": True,
+        "operator_note": "Tiny card matched the expected output.",
+        "outcome": "confirmed_complete",
+    }
+    assert confirmed.safe_actions == ["reprint_on_user_request"]
+    assert queue.get_job(job.job_id) == confirmed
+
+
 class FakePrintTransport:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []

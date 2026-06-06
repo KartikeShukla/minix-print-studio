@@ -247,6 +247,81 @@ describe("daemon API client", () => {
     );
   });
 
+  it("records operator output confirmation through the daemon with auth", async () => {
+    const confirmationResponse = {
+      jobId: "job_print",
+      previewId: "prev_print",
+      planId: "plan_job_print",
+      deviceId: "dev_minix",
+      state: "confirmed_complete",
+      phase: "operator_confirmed",
+      completionLevel: "verified",
+      completionConfidence: "operator_paper_output_confirmed",
+      requiresUserCheck: false,
+      source: "ui",
+      copies: 1,
+      operatorConfirmation: {
+        confirmedAt: "2026-06-06T12:34:56Z",
+        printedTextReadable: true,
+        endMarkerVisible: true,
+        noOverheat: true,
+        noDisconnect: true,
+        operatorNote: "END marker visible and no heat warning.",
+        outcome: "confirmed_complete"
+      },
+      bandsSent: 2,
+      totalBands: 2,
+      rowsSent: 160,
+      totalRows: 160,
+      bytesSent: 7680,
+      totalBytes: 7680,
+      tailBlankRowsDots: 160,
+      safeActions: ["reprint_on_user_request"]
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => confirmationResponse
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+
+    const client = createDaemonClient();
+
+    await expect(
+      client.confirmJobOutput("job_print", {
+        printedTextReadable: true,
+        endMarkerVisible: true,
+        noOverheat: true,
+        noDisconnect: true,
+        operatorNote: "END marker visible and no heat warning."
+      })
+    ).resolves.toEqual(confirmationResponse);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:39281/v1/jobs/job_print/operator-confirmation",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret-token",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          printedTextReadable: true,
+          endMarkerVisible: true,
+          noOverheat: true,
+          noDisconnect: true,
+          operatorNote: "END marker visible and no heat warning."
+        })
+      }
+    );
+  });
+
   it("exports redacted diagnostics through the daemon with auth", async () => {
     const diagnosticsResponse = {
       schemaVersion: 1,

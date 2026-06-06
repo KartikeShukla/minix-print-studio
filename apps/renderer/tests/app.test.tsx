@@ -678,6 +678,36 @@ describe("MiniX Print Studio shell", () => {
       tailBlankRowsDots: 160,
       safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"]
     });
+    const confirmJobOutput = vi.fn().mockResolvedValue({
+      jobId: "job_print",
+      previewId: "prev_print",
+      planId: "plan_job_print",
+      deviceId: "mock-minix-0194",
+      state: "confirmed_complete",
+      phase: "operator_confirmed",
+      completionLevel: "verified",
+      completionConfidence: "operator_paper_output_confirmed",
+      requiresUserCheck: false,
+      source: "ui",
+      copies: 1,
+      operatorConfirmation: {
+        confirmedAt: "2026-06-06T12:34:56Z",
+        printedTextReadable: true,
+        endMarkerVisible: true,
+        noOverheat: true,
+        noDisconnect: true,
+        operatorNote: "Confirmed from MiniX Print Studio.",
+        outcome: "confirmed_complete"
+      },
+      bandsSent: 5,
+      totalBands: 5,
+      rowsSent: 1060,
+      totalRows: 1060,
+      bytesSent: 50880,
+      totalBytes: 50880,
+      tailBlankRowsDots: 160,
+      safeActions: ["reprint_on_user_request"]
+    });
     const exportDiagnostics = vi.fn().mockResolvedValue({
       schemaVersion: 1,
       createdAt: "2026-06-04T00:00:00.000Z",
@@ -745,6 +775,7 @@ describe("MiniX Print Studio shell", () => {
           createDocumentPreview,
           planApprovedPreview,
           printApprovedPreview,
+          confirmJobOutput,
           exportDiagnostics,
           scanPrinters,
           readOnlyVerify
@@ -791,6 +822,34 @@ describe("MiniX Print Studio shell", () => {
         })
       ]);
     });
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm output" }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining("END marker is visible")
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText("confirmed_complete").length).toBeGreaterThanOrEqual(1);
+    });
+    expect(confirmJobOutput).toHaveBeenCalledWith("job_print", {
+      printedTextReadable: true,
+      endMarkerVisible: true,
+      noOverheat: true,
+      noDisconnect: true,
+      operatorNote: "Confirmed from MiniX Print Studio."
+    });
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("minix.printStudio.jobHistory.v1") ?? "[]");
+      expect(stored[0]).toEqual(
+        expect.objectContaining({
+          jobId: "job_print",
+          state: "confirmed_complete",
+          completionLevel: "verified"
+        })
+      );
+    });
+    confirm.mockRestore();
 
     fireEvent.click(screen.getByRole("button", { name: "Export diagnostics" }));
 
