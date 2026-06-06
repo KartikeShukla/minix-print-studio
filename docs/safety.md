@@ -12,8 +12,12 @@ explicit certification stages pass.
   offline preflight plan first.
 - Tiny visual cards and long-print reliability tests require user confirmation.
 - A trusted-printer record from reviewed Stage A/B/C artifacts enables only manual
-  continuous printing; long-print output, stable support claims, and agent direct
-  printing remain disabled until long-print reliability passes.
+  continuous printing; long-print output and stable support claims remain
+  disabled until long-print reliability passes and a stable-support gate record is
+  created from reviewed Stage D evidence.
+- A stable-support gate record may enable long-print continuous printing and
+  stable support claims, but it still keeps agent direct printing disabled by
+  default.
 - A daemon result of `completed_unverified` means the BLE transfer finished from
   the daemon's perspective; it does not certify that the paper output is correct.
 - Agent direct printing is disabled by default, and MCP print tools return

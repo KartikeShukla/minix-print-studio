@@ -278,6 +278,29 @@ tail rows sent, stores only redacted device identity, and omits raster bytes and
 operator free text. The artifact records that the long-print run passed, but it
 does not by itself enable stable support claims or agent direct printing.
 
+## Stable Support Gate Record
+
+After maintainers review the Stage D artifact, record the local stable-support
+gate:
+
+```bash
+scripts/hardware-test.sh record-stable-support-gate \
+  --stage-a-artifact <stage-a.zip> \
+  --protocol-sanity-artifact <hardware-test-protocol-sanity.zip> \
+  --tiny-visual-card-artifact <hardware-test-tiny-visual-card-job-id.zip> \
+  --trusted-printer-record <trusted-printer-device-fingerprint.json> \
+  --long-print-reliability-artifact <hardware-test-long-print-reliability-job-id.zip> \
+  --output-dir <local-output-dir>
+```
+
+This writes `stable-support-gate-<device-fingerprint>.json`. The command runs
+offline, validates the full Stage A/B/C/trusted-record/Stage D evidence chain,
+keeps stdout status-only, stores only a redacted device fingerprint and artifact
+digests, and omits raster bytes plus operator free text. The gate enables manual
+continuous printing, long-print continuous printing, and stable support claims.
+It keeps `agentDirectPrintingEnabled: false` and records the next required stage
+as `agent_direct_printing_policy_review`.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A

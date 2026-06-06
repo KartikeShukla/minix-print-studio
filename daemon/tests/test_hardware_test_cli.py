@@ -1076,6 +1076,163 @@ def test_hardware_test_cli_records_long_print_reliability_artifact_without_stabl
     assert "END LP-TEST checksum" not in encoded_artifact
 
 
+def test_hardware_test_cli_records_stable_support_gate_without_agent_direct_printing(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    stage_a_artifact_path = chain["stage_a"]
+    protocol_artifact_path = chain["protocol_sanity"]
+    tiny_artifact_path = chain["tiny_visual_card"]
+    trusted_record_path = chain["trusted_printer"]
+    device_fingerprint = chain["device_fingerprint"]
+    assert isinstance(stage_a_artifact_path, Path)
+    assert isinstance(protocol_artifact_path, Path)
+    assert isinstance(tiny_artifact_path, Path)
+    assert isinstance(trusted_record_path, Path)
+    assert isinstance(device_fingerprint, str)
+    support_gate_output_dir = tmp_path / "support-gate"
+    long_print_artifact_path = _create_long_print_reliability_artifact(tmp_path, chain)
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "record-stable-support-gate",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--long-print-reliability-artifact",
+            str(long_print_artifact_path),
+            "--output-dir",
+            str(support_gate_output_dir),
+        ],
+        stdout=stdout,
+    )
+
+    record_path = support_gate_output_dir / (
+        f"stable-support-gate-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    raw_stdout = stdout.getvalue()
+    assert exit_code == 0
+    assert raw_stdout.strip() == "stable-support-gate-recorded"
+    assert "mock-minix-0194" not in raw_stdout
+    assert device_fingerprint not in raw_stdout
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record == {
+        "schemaVersion": 1,
+        "status": "stable_support_claims_enabled",
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "trustedFor": [
+            "manual_continuous_printing",
+            "long_print_continuous_printing",
+            "stable_support_claims",
+        ],
+        "operatorNoteIncluded": False,
+        "rasterBytesIncluded": False,
+        "hardwareEvidence": {
+            "stageA": {
+                "stage": "read_only_verification",
+                "status": "valid_stage_a_artifact",
+                "artifactSha256": hashlib.sha256(stage_a_artifact_path.read_bytes()).hexdigest(),
+            },
+            "protocolSanity": {
+                "stage": "protocol_sanity_test",
+                "status": "confirmed_complete",
+                "artifactSha256": hashlib.sha256(protocol_artifact_path.read_bytes()).hexdigest(),
+            },
+            "tinyVisualCard": {
+                "stage": "tiny_visual_test_card",
+                "status": "confirmed_complete",
+                "artifactSha256": hashlib.sha256(tiny_artifact_path.read_bytes()).hexdigest(),
+            },
+            "trustedPrinter": {
+                "stage": "trusted_printer_record",
+                "status": "trusted_for_manual_continuous_printing",
+                "artifactSha256": hashlib.sha256(trusted_record_path.read_bytes()).hexdigest(),
+            },
+            "longPrintReliability": {
+                "stage": "long_print_reliability",
+                "status": "confirmed_complete",
+                "artifactSha256": hashlib.sha256(long_print_artifact_path.read_bytes()).hexdigest(),
+            },
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityPassed": True,
+            "longPrintPrintingEnabled": True,
+            "stableSupportClaimEnabled": True,
+            "agentDirectPrintingEnabled": False,
+            "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": "agent_direct_printing_policy_review",
+    }
+    encoded_record = json.dumps(record, sort_keys=True)
+    assert "mock-minix-0194" not in encoded_record
+    assert "END LP-TEST checksum" not in encoded_record
+
+
+def test_hardware_test_cli_rejects_support_gate_from_agent_direct_stage_d_unlock(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    stage_a_artifact_path = chain["stage_a"]
+    protocol_artifact_path = chain["protocol_sanity"]
+    tiny_artifact_path = chain["tiny_visual_card"]
+    trusted_record_path = chain["trusted_printer"]
+    assert isinstance(stage_a_artifact_path, Path)
+    assert isinstance(protocol_artifact_path, Path)
+    assert isinstance(tiny_artifact_path, Path)
+    assert isinstance(trusted_record_path, Path)
+    long_print_artifact_path = _create_long_print_reliability_artifact(tmp_path, chain)
+    tampered_artifact_path = tmp_path / "tampered-long-print.zip"
+    with ZipFile(long_print_artifact_path) as source, ZipFile(
+        tampered_artifact_path,
+        "w",
+        ZIP_DEFLATED,
+    ) as target:
+        for filename in source.namelist():
+            payload = source.read(filename)
+            if filename == "safety-report.json":
+                safety_report = json.loads(payload.decode("utf-8"))
+                safety_report["agentDirectPrintingEnabled"] = True
+                payload = json.dumps(safety_report).encode("utf-8")
+            target.writestr(filename, payload)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    exit_code = run(
+        [
+            "record-stable-support-gate",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--long-print-reliability-artifact",
+            str(tampered_artifact_path),
+            "--output-dir",
+            str(tmp_path / "support-gate"),
+        ],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 2
+    assert stdout.getvalue() == ""
+    assert "long-print reliability artifact unlocks support early" in stderr.getvalue()
+
+
 def test_hardware_test_cli_prints_long_print_reliability_fixture_without_unlock(
     tmp_path: Path,
 ) -> None:
@@ -1471,6 +1628,49 @@ def _create_trusted_printer_chain(tmp_path: Path) -> dict[str, object]:
         "trusted_printer": trusted_record_path,
         "device_fingerprint": device_fingerprint,
     }
+
+
+def _create_long_print_reliability_artifact(
+    tmp_path: Path,
+    chain: Mapping[str, object],
+) -> Path:
+    stage_a_artifact_path = chain["stage_a"]
+    protocol_artifact_path = chain["protocol_sanity"]
+    tiny_artifact_path = chain["tiny_visual_card"]
+    trusted_record_path = chain["trusted_printer"]
+    assert isinstance(stage_a_artifact_path, Path)
+    assert isinstance(protocol_artifact_path, Path)
+    assert isinstance(tiny_artifact_path, Path)
+    assert isinstance(trusted_record_path, Path)
+    long_print_output_dir = tmp_path / "stage-d"
+
+    long_print_exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "record-long-print-reliability",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--job-id",
+            "job_long_confirmed",
+            "--output-dir",
+            str(long_print_output_dir),
+        ],
+        stdout=io.StringIO(),
+        transport=_confirmed_long_print_transport,
+    )
+    long_print_artifact_path = (
+        long_print_output_dir
+        / "hardware-test-long-print-reliability-job_long_confirmed.zip"
+    )
+    assert long_print_exit_code == 0
+    return long_print_artifact_path
 
 
 def _write_stage_a_artifact(
