@@ -3,7 +3,8 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("minix", {
   getAppVersion: () => ipcRenderer.invoke("app:version"),
   getDaemonRuntime: () => ipcRenderer.invoke("daemon:runtime"),
-  getAgentIntegrationPreview: () => ipcRenderer.invoke("agent-integrations:preview"),
+  getAgentIntegrationPreview: () =>
+    ipcRenderer.invoke("agent-integrations:preview"),
   installAgentIntegrationConfig: (targetId: string) =>
     ipcRenderer.invoke("agent-integrations:install", targetId),
   uninstallAgentIntegrationConfig: (targetId: string) =>
@@ -16,8 +17,14 @@ contextBridge.exposeInMainWorld("minix", {
   createBetaFeedbackDraft: (request?: { supportBundlePath?: string }) =>
     ipcRenderer.invoke("support:create-feedback-draft", request),
   getUpdateChannelState: () => ipcRenderer.invoke("updates:get-state"),
-  setUpdateChannel: (channel: string) => ipcRenderer.invoke("updates:set-channel", channel),
-  checkHostBluetoothReadiness: () => ipcRenderer.invoke("hardware-readiness:check"),
-  inspectHardwareArtifact: () => ipcRenderer.invoke("hardware-artifacts:inspect"),
-  inspectTrustedPrinterRecord: () => ipcRenderer.invoke("trusted-printer-records:inspect")
+  setUpdateChannel: (channel: string) =>
+    ipcRenderer.invoke("updates:set-channel", channel),
+  checkHostBluetoothReadiness: () =>
+    ipcRenderer.invoke("hardware-readiness:check"),
+  inspectHardwareArtifact: () =>
+    ipcRenderer.invoke("hardware-artifacts:inspect"),
+  inspectTrustedPrinterRecord: () =>
+    ipcRenderer.invoke("trusted-printer-records:inspect"),
+  inspectStableSupportGate: () =>
+    ipcRenderer.invoke("stable-support-gates:inspect"),
 });

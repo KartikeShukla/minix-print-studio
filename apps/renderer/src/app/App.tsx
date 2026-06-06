@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -31,7 +38,7 @@ import {
   Wifi,
   X,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
 } from "lucide-react";
 import {
   appendElement,
@@ -53,7 +60,7 @@ import {
   type ProjectImageAssetRef,
   type QrElement,
   type RectElement,
-  type TextElement
+  type TextElement,
 } from "@minix/design-model";
 import type Konva from "konva";
 import * as QRCode from "qrcode";
@@ -64,7 +71,7 @@ import {
   Rect,
   Stage,
   Text as KonvaText,
-  Transformer
+  Transformer,
 } from "react-konva";
 import type {
   DiagnosticsExportResponse,
@@ -78,7 +85,7 @@ import type {
   PrintPlanResponse,
   PrinterCandidate,
   ReadOnlyVerification,
-  RenderSettings
+  RenderSettings,
 } from "@minix/shared-api";
 import {
   desktopAgentIntegrationInstaller,
@@ -90,7 +97,7 @@ import {
   type AgentIntegrationPreview,
   type AgentIntegrationPreviewTarget,
   type AgentIntegrationProvider,
-  type AgentIntegrationTargetId
+  type AgentIntegrationTargetId,
 } from "@/lib/agent-integrations";
 import { createDaemonClient, type DaemonClient } from "@/lib/api-client";
 import {
@@ -98,39 +105,42 @@ import {
   loadStoredDocument,
   loadStoredProjectSession,
   saveStoredDocument,
-  saveStoredProjectSession
+  saveStoredProjectSession,
 } from "@/lib/document-storage";
 import {
   loadSetupChecklistDismissed,
-  saveSetupChecklistDismissed
+  saveSetupChecklistDismissed,
 } from "@/lib/setup-checklist";
 import {
   desktopHardwareArtifactInspector,
   desktopHardwareReadinessProvider,
+  desktopStableSupportGateInspector,
   desktopTrustedPrinterRecordInspector,
   type HardwareArtifactInspectionResult,
   type HardwareArtifactInspector,
   type HardwareHostReadiness,
   type HardwareReadinessProvider,
+  type StableSupportGateInspectionResult,
+  type StableSupportGateInspector,
   type TrustedPrinterRecordInspectionResult,
-  type TrustedPrinterRecordInspector
+  type TrustedPrinterRecordInspector,
 } from "@/lib/hardware-artifacts";
 import {
   desktopSupportBundleExporter,
   type SupportBundleExporter,
-  type SupportBundleExportResult
+  type SupportBundleExportResult,
 } from "@/lib/support-bundle";
 import {
   desktopUpdateChannelProvider,
   type UpdateChannel,
   type UpdateChannelProvider,
-  type UpdateChannelState
+  type UpdateChannelState,
 } from "@/lib/update-channel";
 import {
   loadStoredJobHistory,
   prependStoredPrintJob,
   saveStoredJobHistory,
-  type StoredPrintJob
+  type StoredPrintJob,
 } from "@/lib/job-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,7 +167,7 @@ type AppDaemonClient = Pick<
       | "uploadProjectAsset"
       | "confirmJobOutput"
     >
->;
+  >;
 
 export type AppProps = {
   daemonClient?: AppDaemonClient;
@@ -165,6 +175,7 @@ export type AppProps = {
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
   trustedPrinterRecordInspector?: TrustedPrinterRecordInspector;
+  stableSupportGateInspector?: StableSupportGateInspector;
   hardwareReadinessProvider?: HardwareReadinessProvider;
   supportBundleExporter?: SupportBundleExporter;
   updateChannelProvider?: UpdateChannelProvider;
@@ -176,10 +187,13 @@ const tools = [
   { label: "Rectangle", icon: Square },
   { label: "Image", icon: ImageIcon },
   { label: "QR", icon: QrCode },
-  { label: "Insert long-print test markers", icon: Ruler }
+  { label: "Insert long-print test markers", icon: Ruler },
 ];
 
-const DEFAULT_RENDER_SETTINGS = { threshold: 128, dither: "none" } satisfies RenderSettings;
+const DEFAULT_RENDER_SETTINGS = {
+  threshold: 128,
+  dither: "none",
+} satisfies RenderSettings;
 const CANVAS_ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const DEFAULT_CANVAS_ZOOM_INDEX = 2;
 const CANVAS_PAN_STEP = 48;
@@ -187,7 +201,11 @@ const CANVAS_PAN_STEP = 48;
 type PreviewWorkflow =
   | { status: "idle" }
   | { status: "running" }
-  | { status: "ready"; preview: DocumentPreviewResponse; plan: PrintPlanResponse }
+  | {
+      status: "ready";
+      preview: DocumentPreviewResponse;
+      plan: PrintPlanResponse;
+    }
   | { status: "blocked"; preview: DocumentPreviewResponse; message: string }
   | { status: "error"; message: string };
 
@@ -241,6 +259,12 @@ type TrustedPrinterRecordWorkflow =
   | { status: "ready"; result: TrustedPrinterRecordInspectionResult }
   | { status: "error"; message: string };
 
+type StableSupportGateWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: StableSupportGateInspectionResult }
+  | { status: "error"; message: string };
+
 type HardwareReadinessWorkflow =
   | { status: "idle" }
   | { status: "running" }
@@ -290,7 +314,11 @@ type PrinterWorkflow =
   | { status: "scanning" }
   | { status: "candidates"; candidates: PrinterCandidate[] }
   | { status: "verifying"; candidates: PrinterCandidate[]; deviceId: string }
-  | { status: "verified"; candidates: PrinterCandidate[]; verification: ReadOnlyVerification }
+  | {
+      status: "verified";
+      candidates: PrinterCandidate[];
+      verification: ReadOnlyVerification;
+    }
   | { status: "error"; message: string };
 
 type ProjectWorkflow =
@@ -340,96 +368,125 @@ export function App({
   agentIntegrationInstaller,
   hardwareArtifactInspector,
   trustedPrinterRecordInspector,
+  stableSupportGateInspector,
   hardwareReadinessProvider,
   supportBundleExporter,
-  updateChannelProvider
+  updateChannelProvider,
 }: AppProps) {
-  const client = useMemo(() => daemonClient ?? createDaemonClient(), [daemonClient]);
+  const client = useMemo(
+    () => daemonClient ?? createDaemonClient(),
+    [daemonClient],
+  );
   const integrationProvider = useMemo(
     () => agentIntegrationProvider ?? loadAgentIntegrationPreview,
-    [agentIntegrationProvider]
+    [agentIntegrationProvider],
   );
   const integrationInstaller = useMemo(
     () => agentIntegrationInstaller ?? desktopAgentIntegrationInstaller,
-    [agentIntegrationInstaller]
+    [agentIntegrationInstaller],
   );
   const artifactInspector = useMemo(
     () => hardwareArtifactInspector ?? desktopHardwareArtifactInspector,
-    [hardwareArtifactInspector]
+    [hardwareArtifactInspector],
   );
   const trustedRecordInspector = useMemo(
     () => trustedPrinterRecordInspector ?? desktopTrustedPrinterRecordInspector,
-    [trustedPrinterRecordInspector]
+    [trustedPrinterRecordInspector],
+  );
+  const supportGateInspector = useMemo(
+    () => stableSupportGateInspector ?? desktopStableSupportGateInspector,
+    [stableSupportGateInspector],
   );
   const readinessProvider = useMemo(
     () => hardwareReadinessProvider ?? desktopHardwareReadinessProvider,
-    [hardwareReadinessProvider]
+    [hardwareReadinessProvider],
   );
   const supportExporter = useMemo(
     () => supportBundleExporter ?? desktopSupportBundleExporter,
-    [supportBundleExporter]
+    [supportBundleExporter],
   );
   const updateProvider = useMemo(
     () => updateChannelProvider ?? desktopUpdateChannelProvider,
-    [updateChannelProvider]
+    [updateChannelProvider],
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
-    const document = loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
+    const document =
+      loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
     return {
       document,
       past: [],
       future: [],
-      selectedElementId: null
+      selectedElementId: null,
     };
   });
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
-  const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({ status: "idle" });
-  const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({ status: "idle" });
-  const [jobHistory, setJobHistory] = useState<StoredPrintJob[]>(() => loadStoredJobHistory());
+  const [previewWorkflow, setPreviewWorkflow] = useState<PreviewWorkflow>({
+    status: "idle",
+  });
+  const [printWorkflow, setPrintWorkflow] = useState<PrintWorkflow>({
+    status: "idle",
+  });
+  const [jobHistory, setJobHistory] = useState<StoredPrintJob[]>(() =>
+    loadStoredJobHistory(),
+  );
   const [projectWorkflow, setProjectWorkflow] = useState<ProjectWorkflow>({
     status: "idle",
-    projects: []
+    projects: [],
   });
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [diagnosticsWorkflow, setDiagnosticsWorkflow] = useState<DiagnosticsWorkflow>({
-    status: "idle"
-  });
-  const [supportBundleWorkflow, setSupportBundleWorkflow] = useState<SupportBundleWorkflow>({
-    status: "idle"
-  });
-  const [betaFeedbackWorkflow, setBetaFeedbackWorkflow] = useState<BetaFeedbackWorkflow>({
-    status: "idle"
-  });
-  const [updateChannelWorkflow, setUpdateChannelWorkflow] = useState<UpdateChannelWorkflow>({
-    status: "loading"
-  });
+  const [diagnosticsWorkflow, setDiagnosticsWorkflow] =
+    useState<DiagnosticsWorkflow>({
+      status: "idle",
+    });
+  const [supportBundleWorkflow, setSupportBundleWorkflow] =
+    useState<SupportBundleWorkflow>({
+      status: "idle",
+    });
+  const [betaFeedbackWorkflow, setBetaFeedbackWorkflow] =
+    useState<BetaFeedbackWorkflow>({
+      status: "idle",
+    });
+  const [updateChannelWorkflow, setUpdateChannelWorkflow] =
+    useState<UpdateChannelWorkflow>({
+      status: "loading",
+    });
   const [hardwareArtifactWorkflow, setHardwareArtifactWorkflow] =
     useState<HardwareArtifactWorkflow>({
-      status: "idle"
+      status: "idle",
     });
   const [hardwarePreflightWorkflow, setHardwarePreflightWorkflow] =
     useState<HardwarePreflightWorkflow>({ status: "idle" });
   const [trustedPrinterRecordWorkflow, setTrustedPrinterRecordWorkflow] =
     useState<TrustedPrinterRecordWorkflow>({ status: "idle" });
+  const [stableSupportGateWorkflow, setStableSupportGateWorkflow] =
+    useState<StableSupportGateWorkflow>({ status: "idle" });
   const [hardwareReadinessWorkflow, setHardwareReadinessWorkflow] =
     useState<HardwareReadinessWorkflow>({ status: "idle" });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
     useState<AgentIntegrationWorkflow>({
-      status: "loading"
+      status: "loading",
     });
   const [copiedIntegrationId, setCopiedIntegrationId] =
     useState<AgentIntegrationTargetId | null>(null);
-  const [agentIntegrationCopyError, setAgentIntegrationCopyError] = useState<string | null>(null);
+  const [agentIntegrationCopyError, setAgentIntegrationCopyError] = useState<
+    string | null
+  >(null);
   const [agentIntegrationMutation, setAgentIntegrationMutation] =
     useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
-  const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({ status: "idle" });
+  const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({
+    status: "idle",
+  });
   const [setupChecklistDismissed, setSetupChecklistDismissed] = useState(() =>
-    loadSetupChecklistDismissed()
+    loadSetupChecklistDismissed(),
   );
-  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null);
-  const [canvasZoomIndex, setCanvasZoomIndex] = useState(DEFAULT_CANVAS_ZOOM_INDEX);
+  const [editingTextElementId, setEditingTextElementId] = useState<
+    string | null
+  >(null);
+  const [canvasZoomIndex, setCanvasZoomIndex] = useState(
+    DEFAULT_CANVAS_ZOOM_INDEX,
+  );
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const { document, past, future, selectedElementId } = editorState;
 
@@ -447,7 +504,9 @@ export function App({
       .catch((error: unknown) => {
         if (!cancelled) {
           setHealth(null);
-          setHealthError(error instanceof Error ? error.message : "Daemon unavailable");
+          setHealthError(
+            error instanceof Error ? error.message : "Daemon unavailable",
+          );
         }
       });
 
@@ -473,13 +532,18 @@ export function App({
         if (cancelled) {
           return;
         }
-        setAgentIntegrationWorkflow(preview ? { status: "ready", preview } : { status: "unavailable" });
+        setAgentIntegrationWorkflow(
+          preview ? { status: "ready", preview } : { status: "unavailable" },
+        );
       })
       .catch((error: unknown) => {
         if (!cancelled) {
           setAgentIntegrationWorkflow({
             status: "error",
-            message: error instanceof Error ? error.message : "Integration preview unavailable"
+            message:
+              error instanceof Error
+                ? error.message
+                : "Integration preview unavailable",
           });
         }
       });
@@ -499,13 +563,18 @@ export function App({
         if (cancelled) {
           return;
         }
-        setUpdateChannelWorkflow(state ? { status: "ready", state } : { status: "unavailable" });
+        setUpdateChannelWorkflow(
+          state ? { status: "ready", state } : { status: "unavailable" },
+        );
       })
       .catch((error: unknown) => {
         if (!cancelled) {
           setUpdateChannelWorkflow({
             status: "error",
-            message: error instanceof Error ? error.message : "Update channel unavailable"
+            message:
+              error instanceof Error
+                ? error.message
+                : "Update channel unavailable",
           });
         }
       });
@@ -519,7 +588,8 @@ export function App({
     if (
       editingTextElementId &&
       !document.elements.some(
-        (element) => element.id === editingTextElementId && element.type === "text"
+        (element) =>
+          element.id === editingTextElementId && element.type === "text",
       )
     ) {
       setEditingTextElementId(null);
@@ -539,18 +609,21 @@ export function App({
         document: loadedDocument,
         past: [],
         future: [],
-        selectedElementId: null
+        selectedElementId: null,
       });
       setActiveProjectId(project.projectId);
       saveStoredProjectSession(project.projectId);
       invalidatePreview();
       setProjectWorkflow((current) => ({
         status: "opened",
-        projects: upsertProjectSummary(current.projects, projectSummaryFromResponse(project)),
-        openedProjectId: project.projectId
+        projects: upsertProjectSummary(
+          current.projects,
+          projectSummaryFromResponse(project),
+        ),
+        openedProjectId: project.projectId,
       }));
     },
-    [invalidatePreview]
+    [invalidatePreview],
   );
 
   useEffect(() => {
@@ -563,7 +636,7 @@ export function App({
     setProjectWorkflow((current) => ({
       status: "opening",
       projects: current.projects,
-      projectId: session.activeProjectId
+      projectId: session.activeProjectId,
     }));
 
     client
@@ -581,7 +654,8 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: error instanceof Error ? error.message : "Project restore failed"
+          message:
+            error instanceof Error ? error.message : "Project restore failed",
         }));
       });
 
@@ -598,16 +672,20 @@ export function App({
           document: next.document,
           past: [...currentState.past, currentState.document].slice(-50),
           future: [],
-          selectedElementId: next.selectedElementId ?? currentState.selectedElementId
+          selectedElementId:
+            next.selectedElementId ?? currentState.selectedElementId,
         };
       });
       invalidatePreview();
     },
-    [invalidatePreview]
+    [invalidatePreview],
   );
 
   const selectElement = useCallback((elementId: string | null) => {
-    setEditorState((currentState) => ({ ...currentState, selectedElementId: elementId }));
+    setEditorState((currentState) => ({
+      ...currentState,
+      selectedElementId: elementId,
+    }));
   }, []);
 
   const startInlineTextEdit = useCallback(
@@ -615,13 +693,13 @@ export function App({
       selectElement(elementId);
       setEditingTextElementId(elementId);
     },
-    [selectElement]
+    [selectElement],
   );
 
   const addTextLayer = useCallback(() => {
     commitDocument((currentDocument) => {
       const textCount = currentDocument.elements.filter(
-        (element) => element.type === "text"
+        (element) => element.type === "text",
       ).length;
       const element = createTextElement({
         name: `Text ${textCount + 1}`,
@@ -629,11 +707,11 @@ export function App({
         x: 24,
         y: 56 + textCount * 24,
         width: currentDocument.target.widthDots - 48,
-        height: 80
+        height: 80,
       });
       return {
         document: appendElement(currentDocument, element),
-        selectedElementId: element.id
+        selectedElementId: element.id,
       };
     });
   }, [commitDocument]);
@@ -641,36 +719,38 @@ export function App({
   const addRectangleLayer = useCallback(() => {
     commitDocument((currentDocument) => {
       const rectCount = currentDocument.elements.filter(
-        (element) => element.type === "rect"
+        (element) => element.type === "rect",
       ).length;
       const element = createRectElement({
         name: `Rectangle ${rectCount + 1}`,
         x: 32,
         y: 144 + rectCount * 32,
         width: currentDocument.target.widthDots - 64,
-        height: 72
+        height: 72,
       });
       return {
         document: appendElement(currentDocument, element),
-        selectedElementId: element.id
+        selectedElementId: element.id,
       };
     });
   }, [commitDocument]);
 
   const addQrLayer = useCallback(() => {
     commitDocument((currentDocument) => {
-      const qrCount = currentDocument.elements.filter((element) => element.type === "qr").length;
+      const qrCount = currentDocument.elements.filter(
+        (element) => element.type === "qr",
+      ).length;
       const size = 128;
       const element = createQrElement({
         name: `QR ${qrCount + 1}`,
         payload: "https://example.com",
         x: Math.round((currentDocument.target.widthDots - size) / 2),
         y: 240 + qrCount * 32,
-        size
+        size,
       });
       return {
         document: appendElement(currentDocument, element),
-        selectedElementId: element.id
+        selectedElementId: element.id,
       };
     });
   }, [commitDocument]);
@@ -680,7 +760,7 @@ export function App({
       const documentWithMarkers = insertLongPrintTestMarkers(currentDocument);
       return {
         document: documentWithMarkers,
-        selectedElementId: "lp_test_marker_start"
+        selectedElementId: "lp_test_marker_start",
       };
     });
   }, [commitDocument]);
@@ -705,7 +785,7 @@ export function App({
           break;
       }
     },
-    [addLongPrintTestMarkers, addQrLayer, addRectangleLayer, addTextLayer]
+    [addLongPrintTestMarkers, addQrLayer, addRectangleLayer, addTextLayer],
   );
 
   const importImageFile = useCallback(
@@ -730,29 +810,38 @@ export function App({
             setProjectWorkflow((current) => ({
               status: "error",
               projects: current.projects,
-              message: "Image import failed"
+              message: "Image import failed",
             }));
             return;
           }
           try {
-            const uploadedAsset = await client.uploadProjectAsset(activeProjectId, {
-              fileName: file.name,
-              mimeType: file.type,
-              dataBase64
-            });
-            projectAsset = projectAssetRefFromResponse(activeProjectId, uploadedAsset);
+            const uploadedAsset = await client.uploadProjectAsset(
+              activeProjectId,
+              {
+                fileName: file.name,
+                mimeType: file.type,
+                dataBase64,
+              },
+            );
+            projectAsset = projectAssetRefFromResponse(
+              activeProjectId,
+              uploadedAsset,
+            );
           } catch (error: unknown) {
             setProjectWorkflow((current) => ({
               status: "error",
               projects: current.projects,
-              message: error instanceof Error ? error.message : "Project image upload failed"
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Project image upload failed",
             }));
             return;
           }
         }
         commitDocument((currentDocument) => {
           const imageCount = currentDocument.elements.filter(
-            (element) => element.type === "image"
+            (element) => element.type === "image",
           ).length;
           const imageElementOptions = {
             name: `Image ${imageCount + 1}`,
@@ -761,20 +850,26 @@ export function App({
             x: 32,
             y: 280 + imageCount * 32,
             width: Math.min(256, currentDocument.target.widthDots - 64),
-            height: 160
+            height: 160,
           };
           const element = createImageElement(
-            projectAsset ? { ...imageElementOptions, projectAsset } : imageElementOptions
+            projectAsset
+              ? { ...imageElementOptions, projectAsset }
+              : imageElementOptions,
           );
           return {
-            document: appendImageElementWithAsset(currentDocument, element, projectAsset),
-            selectedElementId: element.id
+            document: appendImageElementWithAsset(
+              currentDocument,
+              element,
+              projectAsset,
+            ),
+            selectedElementId: element.id,
           };
         });
       });
       reader.readAsDataURL(file);
     },
-    [activeProjectId, client, commitDocument]
+    [activeProjectId, client, commitDocument],
   );
 
   const handleImageFileChange = useCallback(
@@ -785,27 +880,27 @@ export function App({
       }
       event.currentTarget.value = "";
     },
-    [importImageFile]
+    [importImageFile],
   );
 
   const moveDocumentElement = useCallback(
     (elementId: string, x: number, y: number) => {
       commitDocument((currentDocument) => ({
         document: moveElement(currentDocument, elementId, { x, y }),
-        selectedElementId: elementId
+        selectedElementId: elementId,
       }));
     },
-    [commitDocument]
+    [commitDocument],
   );
 
   const updateDocumentElement = useCallback(
     (elementId: string, updater: ElementUpdater) => {
       commitDocument((currentDocument) => ({
         document: updateElement(currentDocument, elementId, updater),
-        selectedElementId: elementId
+        selectedElementId: elementId,
       }));
     },
-    [commitDocument]
+    [commitDocument],
   );
 
   const transformDocumentElement = useCallback(
@@ -816,21 +911,23 @@ export function App({
         y: normalizeDotValue(transform.y, 0),
         width: normalizeDotValue(transform.width, 1),
         height: normalizeDotValue(transform.height, 1),
-        rotation: Math.round(transform.rotation)
+        rotation: Math.round(transform.rotation),
       }));
     },
-    [updateDocumentElement]
+    [updateDocumentElement],
   );
 
   const commitInlineTextEdit = useCallback(
     (elementId: string, text: string) => {
       updateDocumentElement(elementId, (currentElement) => {
         const currentText = textElementSchema.safeParse(currentElement);
-        return currentText.success ? { ...currentText.data, text } : currentElement;
+        return currentText.success
+          ? { ...currentText.data, text }
+          : currentElement;
       });
       setEditingTextElementId(null);
     },
-    [updateDocumentElement]
+    [updateDocumentElement],
   );
 
   const cancelInlineTextEdit = useCallback(() => {
@@ -843,7 +940,7 @@ export function App({
 
   const zoomCanvasIn = useCallback(() => {
     setCanvasZoomIndex((currentIndex) =>
-      Math.min(CANVAS_ZOOM_STEPS.length - 1, currentIndex + 1)
+      Math.min(CANVAS_ZOOM_STEPS.length - 1, currentIndex + 1),
     );
   }, []);
 
@@ -854,7 +951,7 @@ export function App({
   const panCanvas = useCallback((x: number, y: number) => {
     setCanvasPan((currentPan) => ({
       x: currentPan.x + x,
-      y: currentPan.y + y
+      y: currentPan.y + y,
     }));
   }, []);
 
@@ -873,7 +970,7 @@ export function App({
         document: previousDocument,
         past: currentState.past.slice(0, -1),
         future: [currentState.document, ...currentState.future],
-        selectedElementId: null
+        selectedElementId: null,
       };
     });
     invalidatePreview();
@@ -890,7 +987,7 @@ export function App({
         document: nextDocument,
         past: [...currentState.past, currentState.document].slice(-50),
         future: currentState.future.slice(1),
-        selectedElementId: null
+        selectedElementId: null,
       };
     });
     invalidatePreview();
@@ -900,7 +997,10 @@ export function App({
     setPreviewWorkflow({ status: "running" });
     setPrintWorkflow({ status: "idle" });
     try {
-      const preview = await client.createDocumentPreview(document, DEFAULT_RENDER_SETTINGS);
+      const preview = await client.createDocumentPreview(
+        document,
+        DEFAULT_RENDER_SETTINGS,
+      );
       try {
         const plan = await client.planApprovedPreview({
           jobId: "job_preview",
@@ -910,7 +1010,7 @@ export function App({
           renderSettingsHash: preview.renderSettingsHash,
           profileId: document.target.profileId,
           paperMode: document.target.paperMode,
-          density: document.target.density
+          density: document.target.density,
         });
         setPreviewWorkflow({ status: "ready", preview, plan });
       } catch (error: unknown) {
@@ -918,7 +1018,10 @@ export function App({
           setPreviewWorkflow({
             status: "blocked",
             preview,
-            message: error instanceof Error ? error.message : "Preview blocked by safety"
+            message:
+              error instanceof Error
+                ? error.message
+                : "Preview blocked by safety",
           });
           return;
         }
@@ -927,7 +1030,7 @@ export function App({
     } catch (error: unknown) {
       setPreviewWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Preview failed"
+        message: error instanceof Error ? error.message : "Preview failed",
       });
     }
   }, [client, document]);
@@ -936,11 +1039,14 @@ export function App({
     setPrinterWorkflow({ status: "scanning" });
     try {
       const response = await client.scanPrinters();
-      setPrinterWorkflow({ status: "candidates", candidates: response.printers });
+      setPrinterWorkflow({
+        status: "candidates",
+        candidates: response.printers,
+      });
     } catch (error: unknown) {
       setPrinterWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Printer scan failed"
+        message: error instanceof Error ? error.message : "Printer scan failed",
       });
     }
   }, [client]);
@@ -954,11 +1060,14 @@ export function App({
       } catch (error: unknown) {
         setPrinterWorkflow({
           status: "error",
-          message: error instanceof Error ? error.message : "Read-only verification failed"
+          message:
+            error instanceof Error
+              ? error.message
+              : "Read-only verification failed",
         });
       }
     },
-    [client]
+    [client],
   );
 
   const checkHostBluetoothReadiness = useCallback(async () => {
@@ -969,7 +1078,10 @@ export function App({
     } catch (error: unknown) {
       setHardwareReadinessWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Host Bluetooth check failed"
+        message:
+          error instanceof Error
+            ? error.message
+            : "Host Bluetooth check failed",
       });
     }
   }, [readinessProvider]);
@@ -979,11 +1091,14 @@ export function App({
       setProjectWorkflow((current) => ({
         status: "error",
         projects: current.projects,
-        message: "Project API unavailable"
+        message: "Project API unavailable",
       }));
       return;
     }
-    setProjectWorkflow((current) => ({ status: "loading", projects: current.projects }));
+    setProjectWorkflow((current) => ({
+      status: "loading",
+      projects: current.projects,
+    }));
     try {
       const response = await client.listProjects();
       setProjectWorkflow({ status: "ready", projects: response.projects });
@@ -991,7 +1106,7 @@ export function App({
       setProjectWorkflow((current) => ({
         status: "error",
         projects: current.projects,
-        message: error instanceof Error ? error.message : "Project list failed"
+        message: error instanceof Error ? error.message : "Project list failed",
       }));
     }
   }, [client]);
@@ -999,7 +1114,7 @@ export function App({
   const saveProject = useCallback(async () => {
     const request = {
       name: document.title,
-      document
+      document,
     };
 
     if (activeProjectId) {
@@ -1007,26 +1122,33 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: "Project API unavailable"
+          message: "Project API unavailable",
         }));
         return;
       }
-      setProjectWorkflow((current) => ({ status: "saving", projects: current.projects }));
+      setProjectWorkflow((current) => ({
+        status: "saving",
+        projects: current.projects,
+      }));
       try {
-        const savedProject = await client.updateProject(activeProjectId, request);
+        const savedProject = await client.updateProject(
+          activeProjectId,
+          request,
+        );
         const summary = projectSummaryFromResponse(savedProject);
         setActiveProjectId(savedProject.projectId);
         saveStoredProjectSession(savedProject.projectId);
         setProjectWorkflow((current) => ({
           status: "saved",
           projects: upsertProjectSummary(current.projects, summary),
-          savedProjectId: savedProject.projectId
+          savedProjectId: savedProject.projectId,
         }));
       } catch (error: unknown) {
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: error instanceof Error ? error.message : "Project save failed"
+          message:
+            error instanceof Error ? error.message : "Project save failed",
         }));
       }
       return;
@@ -1036,11 +1158,14 @@ export function App({
       setProjectWorkflow((current) => ({
         status: "error",
         projects: current.projects,
-        message: "Project API unavailable"
+        message: "Project API unavailable",
       }));
       return;
     }
-    setProjectWorkflow((current) => ({ status: "saving", projects: current.projects }));
+    setProjectWorkflow((current) => ({
+      status: "saving",
+      projects: current.projects,
+    }));
     try {
       const savedProject = await client.createProject(request);
       const summary = projectSummaryFromResponse(savedProject);
@@ -1049,13 +1174,13 @@ export function App({
       setProjectWorkflow((current) => ({
         status: "saved",
         projects: upsertProjectSummary(current.projects, summary),
-        savedProjectId: savedProject.projectId
+        savedProjectId: savedProject.projectId,
       }));
     } catch (error: unknown) {
       setProjectWorkflow((current) => ({
         status: "error",
         projects: current.projects,
-        message: error instanceof Error ? error.message : "Project save failed"
+        message: error instanceof Error ? error.message : "Project save failed",
       }));
     }
   }, [activeProjectId, client, document]);
@@ -1066,14 +1191,14 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: "Project API unavailable"
+          message: "Project API unavailable",
         }));
         return;
       }
       setProjectWorkflow((current) => ({
         status: "opening",
         projects: current.projects,
-        projectId
+        projectId,
       }));
       try {
         const project = await client.getProject(projectId);
@@ -1082,11 +1207,12 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: error instanceof Error ? error.message : "Project open failed"
+          message:
+            error instanceof Error ? error.message : "Project open failed",
         }));
       }
     },
-    [applyOpenedProject, client]
+    [applyOpenedProject, client],
   );
 
   const deleteProject = useCallback(
@@ -1095,18 +1221,20 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: "Project API unavailable"
+          message: "Project API unavailable",
         }));
         return;
       }
-      const confirmed = window.confirm(`Delete project "${project.name}"? This cannot be undone.`);
+      const confirmed = window.confirm(
+        `Delete project "${project.name}"? This cannot be undone.`,
+      );
       if (!confirmed) {
         return;
       }
       setProjectWorkflow((current) => ({
         status: "deleting",
         projects: current.projects,
-        projectId: project.projectId
+        projectId: project.projectId,
       }));
       try {
         await client.deleteProject(project.projectId);
@@ -1117,19 +1245,20 @@ export function App({
         setProjectWorkflow((current) => ({
           status: "deleted",
           projects: current.projects.filter(
-            (currentProject) => currentProject.projectId !== project.projectId
+            (currentProject) => currentProject.projectId !== project.projectId,
           ),
-          deletedProjectId: project.projectId
+          deletedProjectId: project.projectId,
         }));
       } catch (error: unknown) {
         setProjectWorkflow((current) => ({
           status: "error",
           projects: current.projects,
-          message: error instanceof Error ? error.message : "Project delete failed"
+          message:
+            error instanceof Error ? error.message : "Project delete failed",
         }));
       }
     },
-    [activeProjectId, client]
+    [activeProjectId, client],
   );
 
   const runPrint = useCallback(async () => {
@@ -1137,7 +1266,9 @@ export function App({
       return;
     }
     const verifiedDeviceId =
-      printerWorkflow.status === "verified" ? printerWorkflow.verification.deviceId : undefined;
+      printerWorkflow.status === "verified"
+        ? printerWorkflow.verification.deviceId
+        : undefined;
     setPrintWorkflow({ status: "running" });
     try {
       const job = await client.printApprovedPreview({
@@ -1150,7 +1281,7 @@ export function App({
         density: document.target.density,
         copies: 1,
         source: "ui",
-        ...(verifiedDeviceId ? { deviceId: verifiedDeviceId } : {})
+        ...(verifiedDeviceId ? { deviceId: verifiedDeviceId } : {}),
       });
       setJobHistory((currentHistory) => {
         const nextHistory = prependStoredPrintJob(currentHistory, job);
@@ -1161,7 +1292,7 @@ export function App({
     } catch (error: unknown) {
       setPrintWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Print failed"
+        message: error instanceof Error ? error.message : "Print failed",
       });
     }
   }, [client, document, previewWorkflow, printerWorkflow]);
@@ -1171,12 +1302,12 @@ export function App({
       if (!client.confirmJobOutput) {
         setPrintWorkflow({
           status: "error",
-          message: "Output confirmation unavailable"
+          message: "Output confirmation unavailable",
         });
         return;
       }
       const confirmed = window.confirm(
-        "Confirm the paper output is readable, the END marker is visible, and there were no heat warnings or Bluetooth disconnects?"
+        "Confirm the paper output is readable, the END marker is visible, and there were no heat warnings or Bluetooth disconnects?",
       );
       if (!confirmed) {
         return;
@@ -1189,11 +1320,17 @@ export function App({
           endMarkerVisible: true,
           noOverheat: true,
           noDisconnect: true,
-          operatorNote: "Confirmed from MiniX Print Studio."
+          operatorNote: "Confirmed from MiniX Print Studio.",
         });
         setJobHistory((currentHistory) => {
-          const printedAt = currentHistory.find((item) => item.jobId === job.jobId)?.printedAt;
-          const nextHistory = prependStoredPrintJob(currentHistory, confirmedJob, printedAt);
+          const printedAt = currentHistory.find(
+            (item) => item.jobId === job.jobId,
+          )?.printedAt;
+          const nextHistory = prependStoredPrintJob(
+            currentHistory,
+            confirmedJob,
+            printedAt,
+          );
           saveStoredJobHistory(nextHistory);
           return nextHistory;
         });
@@ -1201,18 +1338,21 @@ export function App({
       } catch (error: unknown) {
         setPrintWorkflow({
           status: "error",
-          message: error instanceof Error ? error.message : "Output confirmation failed"
+          message:
+            error instanceof Error
+              ? error.message
+              : "Output confirmation failed",
         });
       }
     },
-    [client]
+    [client],
   );
 
   const runDiagnosticsExport = useCallback(async () => {
     if (!client.exportDiagnostics) {
       setDiagnosticsWorkflow({
         status: "error",
-        message: "Diagnostics export unavailable"
+        message: "Diagnostics export unavailable",
       });
       return;
     }
@@ -1220,13 +1360,14 @@ export function App({
     try {
       const bundle = await client.exportDiagnostics({
         includeProjectContent: false,
-        includeRawImages: false
+        includeRawImages: false,
       });
       setDiagnosticsWorkflow({ status: "exported", bundle });
     } catch (error: unknown) {
       setDiagnosticsWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Diagnostics export failed"
+        message:
+          error instanceof Error ? error.message : "Diagnostics export failed",
       });
     }
   }, [client]);
@@ -1239,7 +1380,10 @@ export function App({
     } catch (error: unknown) {
       setSupportBundleWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Support bundle export failed"
+        message:
+          error instanceof Error
+            ? error.message
+            : "Support bundle export failed",
       });
     }
   }, [supportExporter]);
@@ -1257,14 +1401,17 @@ export function App({
       const draft = await createFeedbackDraft(
         supportBundleWorkflow.status === "exported"
           ? { supportBundlePath: supportBundleWorkflow.bundle.targetPath }
-          : undefined
+          : undefined,
       );
       await navigator.clipboard.writeText(draft.targetUrl);
       setBetaFeedbackWorkflow({ status: "copied" });
     } catch (error: unknown) {
       setBetaFeedbackWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Beta feedback link unavailable"
+        message:
+          error instanceof Error
+            ? error.message
+            : "Beta feedback link unavailable",
       });
     }
   }, [supportBundleWorkflow, supportExporter]);
@@ -1277,7 +1424,8 @@ export function App({
   const selectUpdateChannel = useCallback(
     async (channel: UpdateChannel) => {
       const currentState =
-        updateChannelWorkflow.status === "ready" || updateChannelWorkflow.status === "running"
+        updateChannelWorkflow.status === "ready" ||
+        updateChannelWorkflow.status === "running"
           ? updateChannelWorkflow.state
           : null;
       if (!currentState) {
@@ -1287,7 +1435,7 @@ export function App({
       setUpdateChannelWorkflow({
         status: "running",
         state: currentState,
-        nextChannel: channel
+        nextChannel: channel,
       });
       try {
         const state = await updateProvider.setChannel(channel);
@@ -1295,11 +1443,14 @@ export function App({
       } catch (error: unknown) {
         setUpdateChannelWorkflow({
           status: "error",
-          message: error instanceof Error ? error.message : "Update channel selection failed"
+          message:
+            error instanceof Error
+              ? error.message
+              : "Update channel selection failed",
         });
       }
     },
-    [updateChannelWorkflow, updateProvider]
+    [updateChannelWorkflow, updateProvider],
   );
 
   const runHardwareArtifactExport = useCallback(
@@ -1308,7 +1459,7 @@ export function App({
         setHardwareArtifactWorkflow({
           status: "error",
           deviceId,
-          message: "Hardware artifact export unavailable"
+          message: "Hardware artifact export unavailable",
         });
         return;
       }
@@ -1319,28 +1470,36 @@ export function App({
         setHardwareArtifactWorkflow({
           status: "exported",
           deviceId,
-          sizeBytes: artifact.size
+          sizeBytes: artifact.size,
         });
       } catch (error: unknown) {
         setHardwareArtifactWorkflow({
           status: "error",
           deviceId,
-          message: error instanceof Error ? error.message : "Hardware artifact export failed"
+          message:
+            error instanceof Error
+              ? error.message
+              : "Hardware artifact export failed",
         });
       }
     },
-    [client]
+    [client],
   );
 
   const inspectHardwareArtifact = useCallback(async () => {
     setHardwarePreflightWorkflow({ status: "running" });
     try {
       const result = await artifactInspector.inspect();
-      setHardwarePreflightWorkflow(result ? { status: "ready", result } : { status: "idle" });
+      setHardwarePreflightWorkflow(
+        result ? { status: "ready", result } : { status: "idle" },
+      );
     } catch (error: unknown) {
       setHardwarePreflightWorkflow({
         status: "error",
-        message: error instanceof Error ? error.message : "Hardware artifact inspection failed"
+        message:
+          error instanceof Error
+            ? error.message
+            : "Hardware artifact inspection failed",
       });
     }
   }, [artifactInspector]);
@@ -1349,29 +1508,56 @@ export function App({
     setTrustedPrinterRecordWorkflow({ status: "running" });
     try {
       const result = await trustedRecordInspector.inspect();
-      setTrustedPrinterRecordWorkflow(result ? { status: "ready", result } : { status: "idle" });
+      setTrustedPrinterRecordWorkflow(
+        result ? { status: "ready", result } : { status: "idle" },
+      );
     } catch (error: unknown) {
       setTrustedPrinterRecordWorkflow({
         status: "error",
         message:
-          error instanceof Error ? error.message : "Trusted-printer record inspection failed"
+          error instanceof Error
+            ? error.message
+            : "Trusted-printer record inspection failed",
       });
     }
   }, [trustedRecordInspector]);
 
-  const copyAgentIntegrationConfig = useCallback(async (target: AgentIntegrationPreviewTarget) => {
+  const inspectStableSupportGate = useCallback(async () => {
+    setStableSupportGateWorkflow({ status: "running" });
     try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error("Clipboard unavailable");
-      }
-      await navigator.clipboard.writeText(target.content);
-      setCopiedIntegrationId(target.id);
-      setAgentIntegrationCopyError(null);
+      const result = await supportGateInspector.inspect();
+      setStableSupportGateWorkflow(
+        result ? { status: "ready", result } : { status: "idle" },
+      );
     } catch (error: unknown) {
-      setCopiedIntegrationId(null);
-      setAgentIntegrationCopyError(error instanceof Error ? error.message : "Copy failed");
+      setStableSupportGateWorkflow({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Stable-support gate inspection failed",
+      });
     }
-  }, []);
+  }, [supportGateInspector]);
+
+  const copyAgentIntegrationConfig = useCallback(
+    async (target: AgentIntegrationPreviewTarget) => {
+      try {
+        if (!navigator.clipboard?.writeText) {
+          throw new Error("Clipboard unavailable");
+        }
+        await navigator.clipboard.writeText(target.content);
+        setCopiedIntegrationId(target.id);
+        setAgentIntegrationCopyError(null);
+      } catch (error: unknown) {
+        setCopiedIntegrationId(null);
+        setAgentIntegrationCopyError(
+          error instanceof Error ? error.message : "Copy failed",
+        );
+      }
+    },
+    [],
+  );
 
   const installAgentIntegrationTarget = useCallback(
     async (target: AgentIntegrationPreviewTarget) => {
@@ -1379,7 +1565,7 @@ export function App({
         return;
       }
       const confirmed = window.confirm(
-        `Install ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`
+        `Install ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`,
       );
       if (!confirmed) {
         return;
@@ -1387,7 +1573,7 @@ export function App({
       setAgentIntegrationMutation({
         status: "running",
         action: "install",
-        targetId: target.id
+        targetId: target.id,
       });
       try {
         const result = await integrationInstaller.install(target.id);
@@ -1395,18 +1581,18 @@ export function App({
           status: "success",
           action: "install",
           targetId: target.id,
-          result
+          result,
         });
       } catch (error: unknown) {
         setAgentIntegrationMutation({
           status: "error",
           action: "install",
           targetId: target.id,
-          message: error instanceof Error ? error.message : "Install failed"
+          message: error instanceof Error ? error.message : "Install failed",
         });
       }
     },
-    [integrationInstaller]
+    [integrationInstaller],
   );
 
   const uninstallAgentIntegrationTarget = useCallback(
@@ -1415,7 +1601,7 @@ export function App({
         return;
       }
       const confirmed = window.confirm(
-        `Uninstall ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`
+        `Uninstall ${target.name} MCP config?\n\nTarget file:\n${target.configPath}\n\nA backup will be created before modifying the file.`,
       );
       if (!confirmed) {
         return;
@@ -1423,7 +1609,7 @@ export function App({
       setAgentIntegrationMutation({
         status: "running",
         action: "uninstall",
-        targetId: target.id
+        targetId: target.id,
       });
       try {
         const result = await integrationInstaller.uninstall(target.id);
@@ -1431,18 +1617,18 @@ export function App({
           status: "success",
           action: "uninstall",
           targetId: target.id,
-          result
+          result,
         });
       } catch (error: unknown) {
         setAgentIntegrationMutation({
           status: "error",
           action: "uninstall",
           targetId: target.id,
-          message: error instanceof Error ? error.message : "Uninstall failed"
+          message: error instanceof Error ? error.message : "Uninstall failed",
         });
       }
     },
-    [integrationInstaller]
+    [integrationInstaller],
   );
 
   const testAgentIntegrationTarget = useCallback(
@@ -1450,7 +1636,7 @@ export function App({
       setAgentIntegrationMutation({
         status: "running",
         action: "test",
-        targetId: target.id
+        targetId: target.id,
       });
       try {
         const result = await integrationInstaller.testConnection(target.id);
@@ -1458,18 +1644,19 @@ export function App({
           status: "success",
           action: "test",
           targetId: target.id,
-          result
+          result,
         });
       } catch (error: unknown) {
         setAgentIntegrationMutation({
           status: "error",
           action: "test",
           targetId: target.id,
-          message: error instanceof Error ? error.message : "Connection test failed"
+          message:
+            error instanceof Error ? error.message : "Connection test failed",
         });
       }
     },
-    [integrationInstaller]
+    [integrationInstaller],
   );
 
   const exportAgentIntegrationTarget = useCallback(
@@ -1480,7 +1667,7 @@ export function App({
       setAgentIntegrationMutation({
         status: "running",
         action: "export",
-        targetId: target.id
+        targetId: target.id,
       });
       try {
         const exportBundle = integrationInstaller.exportBundle;
@@ -1492,18 +1679,18 @@ export function App({
           status: "success",
           action: "export",
           targetId: target.id,
-          result
+          result,
         });
       } catch (error: unknown) {
         setAgentIntegrationMutation({
           status: "error",
           action: "export",
           targetId: target.id,
-          message: error instanceof Error ? error.message : "Export failed"
+          message: error instanceof Error ? error.message : "Export failed",
         });
       }
     },
-    [integrationInstaller]
+    [integrationInstaller],
   );
 
   const statusLabel = health
@@ -1521,13 +1708,16 @@ export function App({
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
   const canvasZoom =
-    CANVAS_ZOOM_STEPS[canvasZoomIndex] ?? CANVAS_ZOOM_STEPS[DEFAULT_CANVAS_ZOOM_INDEX];
+    CANVAS_ZOOM_STEPS[canvasZoomIndex] ??
+    CANVAS_ZOOM_STEPS[DEFAULT_CANVAS_ZOOM_INDEX];
   const canZoomOut = canvasZoomIndex > 0;
   const canZoomIn = canvasZoomIndex < CANVAS_ZOOM_STEPS.length - 1;
   const canResetPan = canvasPan.x !== 0 || canvasPan.y !== 0;
   const selectedElement = useMemo(
-    () => document.elements.find((element) => element.id === selectedElementId) ?? null,
-    [document.elements, selectedElementId]
+    () =>
+      document.elements.find((element) => element.id === selectedElementId) ??
+      null,
+    [document.elements, selectedElementId],
   );
 
   return (
@@ -1539,7 +1729,9 @@ export function App({
               <Printer className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-base font-semibold">MiniX Print Studio</h1>
+              <h1 className="truncate text-base font-semibold">
+                MiniX Print Studio
+              </h1>
               <p className="truncate text-xs text-muted-foreground">
                 {document.title} - {formatPaperMode(document.target.paperMode)}
               </p>
@@ -1547,7 +1739,11 @@ export function App({
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant={health ? "success" : healthError ? "destructive" : "muted"}>
+            <Badge
+              variant={
+                health ? "success" : healthError ? "destructive" : "muted"
+              }
+            >
               <Wifi className="size-3.5" aria-hidden="true" />
               {statusLabel}
             </Badge>
@@ -1578,7 +1774,9 @@ export function App({
               disabled={printerWorkflow.status === "scanning"}
             >
               <ScanSearch className="size-4" aria-hidden="true" />
-              {printerWorkflow.status === "scanning" ? "Scanning" : "Scan printers"}
+              {printerWorkflow.status === "scanning"
+                ? "Scanning"
+                : "Scan printers"}
             </Button>
             <Button
               variant="outline"
@@ -1603,7 +1801,9 @@ export function App({
         <main className="grid min-h-0 grid-cols-[248px_minmax(420px,1fr)_320px]">
           <aside className="min-h-0 border-r border-border bg-muted/30">
             <section className="border-b border-border p-3">
-              <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Tools</div>
+              <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                Tools
+              </div>
               <div className="grid grid-cols-6 gap-1">
                 {tools.map((tool) => {
                   const Icon = tool.icon;
@@ -1633,8 +1833,13 @@ export function App({
 
             <section className="p-3">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-xs font-medium uppercase text-muted-foreground">Layers</div>
-                <Layers3 className="size-4 text-muted-foreground" aria-hidden="true" />
+                <div className="text-xs font-medium uppercase text-muted-foreground">
+                  Layers
+                </div>
+                <Layers3
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
               </div>
               <div className="space-y-2">
                 <LayerList
@@ -1652,7 +1857,9 @@ export function App({
                 document={document}
                 selectedElementId={selectedElementId}
                 previewReady={previewReady}
-                totalBands={previewReady ? previewWorkflow.plan.totalBands : null}
+                totalBands={
+                  previewReady ? previewWorkflow.plan.totalBands : null
+                }
                 editingTextElementId={editingTextElementId}
                 zoom={canvasZoom}
                 pan={canvasPan}
@@ -1674,6 +1881,7 @@ export function App({
                 hardwareArtifactWorkflow={hardwareArtifactWorkflow}
                 hardwarePreflightWorkflow={hardwarePreflightWorkflow}
                 trustedPrinterRecordWorkflow={trustedPrinterRecordWorkflow}
+                stableSupportGateWorkflow={stableSupportGateWorkflow}
                 agentIntegrationWorkflow={agentIntegrationWorkflow}
                 onDismiss={dismissSetupChecklist}
               />
@@ -1683,7 +1891,9 @@ export function App({
               workflow={projectWorkflow}
               canLoad={Boolean(client.listProjects)}
               canSave={
-                activeProjectId ? Boolean(client.updateProject) : Boolean(client.createProject)
+                activeProjectId
+                  ? Boolean(client.updateProject)
+                  : Boolean(client.createProject)
               }
               canOpen={Boolean(client.getProject)}
               canDelete={Boolean(client.deleteProject)}
@@ -1698,29 +1908,43 @@ export function App({
               hardwareArtifactWorkflow={hardwareArtifactWorkflow}
               hardwarePreflightWorkflow={hardwarePreflightWorkflow}
               trustedPrinterRecordWorkflow={trustedPrinterRecordWorkflow}
+              stableSupportGateWorkflow={stableSupportGateWorkflow}
               onCheckHostBluetooth={checkHostBluetoothReadiness}
               onVerify={runReadOnlyVerify}
               onExportHardwareArtifact={runHardwareArtifactExport}
               onInspectHardwareArtifact={inspectHardwareArtifact}
               onInspectTrustedPrinterRecord={inspectTrustedPrinterRecord}
+              onInspectStableSupportGate={inspectStableSupportGate}
             />
-            <ElementInspector element={selectedElement} onUpdate={updateDocumentElement} />
+            <ElementInspector
+              element={selectedElement}
+              onUpdate={updateDocumentElement}
+            />
 
             <section className="border-b border-border p-4">
               <div className="mb-3 flex items-center gap-2">
-                <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+                <ShieldCheck
+                  className="size-4 text-primary"
+                  aria-hidden="true"
+                />
                 <h2 className="text-sm font-semibold">Safety</h2>
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Coverage</span>
-                  <span>{safetyPreview ? formatCoverage(safetyPreview) : "0%"}</span>
+                  <span>
+                    {safetyPreview ? formatCoverage(safetyPreview) : "0%"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Agent direct print</span>
+                  <span className="text-muted-foreground">
+                    Agent direct print
+                  </span>
                   <span>Off</span>
                 </div>
-                {safetyPreview ? <SafetyMessages preview={safetyPreview} /> : null}
+                {safetyPreview ? (
+                  <SafetyMessages preview={safetyPreview} />
+                ) : null}
               </div>
             </section>
 
@@ -1745,10 +1969,15 @@ export function App({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Plan</span>
-                      <span>{formatBandCount(previewWorkflow.plan.totalBands)}</span>
+                      <span>
+                        {formatBandCount(previewWorkflow.plan.totalBands)}
+                      </span>
                     </div>
                   </div>
-                  <PrintStatus workflow={printWorkflow} onConfirmOutput={confirmPrintOutput} />
+                  <PrintStatus
+                    workflow={printWorkflow}
+                    onConfirmOutput={confirmPrintOutput}
+                  />
                 </div>
               ) : previewWorkflow.status === "running" ? (
                 <p className="text-sm leading-6 text-muted-foreground">
@@ -1764,13 +1993,18 @@ export function App({
                     <span className="text-muted-foreground">Preview</span>
                     <span>{previewWorkflow.preview.previewId}</span>
                   </div>
-                  <p className="leading-6 text-destructive">{previewWorkflow.message}</p>
+                  <p className="leading-6 text-destructive">
+                    {previewWorkflow.message}
+                  </p>
                 </div>
               ) : previewWorkflow.status === "error" ? (
-                <p className="text-sm leading-6 text-destructive">{previewWorkflow.message}</p>
+                <p className="text-sm leading-6 text-destructive">
+                  {previewWorkflow.message}
+                </p>
               ) : (
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Printing will require a daemon-generated preview hash before physical output.
+                  Printing will require a daemon-generated preview hash before
+                  physical output.
                 </p>
               )}
             </section>
@@ -1820,7 +2054,9 @@ export function App({
             >
               <ZoomOut className="size-3.5" aria-hidden="true" />
             </Button>
-            <span className="w-20 text-center tabular-nums">{formatZoom(canvasZoom)}</span>
+            <span className="w-20 text-center tabular-nums">
+              {formatZoom(canvasZoom)}
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -1897,7 +2133,9 @@ export function App({
               <RotateCcw className="size-3.5" aria-hidden="true" />
             </Button>
           </div>
-          <span>{health ? `Daemon ${health.version}` : "No daemon health yet"}</span>
+          <span>
+            {health ? `Daemon ${health.version}` : "No daemon health yet"}
+          </span>
           <span>{formatQueueStatus(previewReady, printWorkflow)}</span>
         </footer>
       </div>
@@ -1914,7 +2152,7 @@ function ProjectsPanel({
   onLoad,
   onSave,
   onOpen,
-  onDelete
+  onDelete,
 }: {
   workflow: ProjectWorkflow;
   canLoad: boolean;
@@ -1996,11 +2234,13 @@ function ProjectsPanel({
                   onClick={() => onOpen(project.projectId)}
                   disabled={
                     !canOpen ||
-                    (workflow.status === "opening" && workflow.projectId === project.projectId)
+                    (workflow.status === "opening" &&
+                      workflow.projectId === project.projectId)
                   }
                 >
                   <FolderOpen className="size-4" aria-hidden="true" />
-                  {workflow.status === "opening" && workflow.projectId === project.projectId
+                  {workflow.status === "opening" &&
+                  workflow.projectId === project.projectId
                     ? "Opening"
                     : "Open"}
                 </Button>
@@ -2012,11 +2252,13 @@ function ProjectsPanel({
                   onClick={() => onDelete(project)}
                   disabled={
                     !canDelete ||
-                    (workflow.status === "deleting" && workflow.projectId === project.projectId)
+                    (workflow.status === "deleting" &&
+                      workflow.projectId === project.projectId)
                   }
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
-                  {workflow.status === "deleting" && workflow.projectId === project.projectId
+                  {workflow.status === "deleting" &&
+                  workflow.projectId === project.projectId
                     ? "Deleting"
                     : "Delete"}
                 </Button>
@@ -2032,7 +2274,7 @@ function ProjectsPanel({
 function RecentJobsPanel({
   jobs,
   workflow,
-  onExport
+  onExport,
 }: {
   jobs: StoredPrintJob[];
   workflow: DiagnosticsWorkflow;
@@ -2057,12 +2299,16 @@ function RecentJobsPanel({
         disabled={workflow.status === "running"}
       >
         <FileText className="size-4" aria-hidden="true" />
-        {workflow.status === "running" ? "Exporting diagnostics" : "Export diagnostics"}
+        {workflow.status === "running"
+          ? "Exporting diagnostics"
+          : "Export diagnostics"}
       </Button>
       {workflow.status === "exported" ? (
         <div className="mb-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
           <div className="font-medium">Diagnostics exported</div>
-          <div className="text-xs">{formatDiagnosticsJobCount(workflow.bundle.jobs.length)}</div>
+          <div className="text-xs">
+            {formatDiagnosticsJobCount(workflow.bundle.jobs.length)}
+          </div>
         </div>
       ) : workflow.status === "error" ? (
         <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
@@ -2071,10 +2317,15 @@ function RecentJobsPanel({
       ) : null}
       <div className="space-y-2">
         {jobs.slice(0, 5).map((job) => (
-          <div key={job.jobId} className="rounded-md border border-border bg-background p-2 text-sm">
+          <div
+            key={job.jobId}
+            className="rounded-md border border-border bg-background p-2 text-sm"
+          >
             <div className="flex items-center justify-between gap-2">
               <span className="truncate font-medium">{job.jobId}</span>
-              <Badge variant={job.requiresUserCheck ? "warning" : "success"}>{job.state}</Badge>
+              <Badge variant={job.requiresUserCheck ? "warning" : "success"}>
+                {job.state}
+              </Badge>
             </div>
             <div className="mt-1 flex justify-between text-xs text-muted-foreground">
               <span>{job.completionLevel}</span>
@@ -2095,40 +2346,46 @@ function SetupChecklistPanel({
   hardwareArtifactWorkflow,
   hardwarePreflightWorkflow,
   trustedPrinterRecordWorkflow,
+  stableSupportGateWorkflow,
   agentIntegrationWorkflow,
-  onDismiss
+  onDismiss,
 }: {
   health: HealthResponse | null;
   printerWorkflow: PrinterWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   hardwarePreflightWorkflow: HardwarePreflightWorkflow;
   trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
+  stableSupportGateWorkflow: StableSupportGateWorkflow;
   agentIntegrationWorkflow: AgentIntegrationWorkflow;
   onDismiss: () => void;
 }) {
   const items = [
     {
       label: "Daemon",
-      ready: health?.ok === true
+      ready: health?.ok === true,
     },
     {
       label: "Printer verification",
-      ready: printerWorkflow.status === "verified"
+      ready: printerWorkflow.status === "verified",
     },
     {
       label: "Stage A artifact",
       ready:
         hardwareArtifactWorkflow.status === "exported" ||
-        hardwarePreflightWorkflow.status === "ready"
+        hardwarePreflightWorkflow.status === "ready",
     },
     {
       label: "Trusted printer record",
-      ready: trustedPrinterRecordWorkflow.status === "ready"
+      ready: trustedPrinterRecordWorkflow.status === "ready",
+    },
+    {
+      label: "Stable support gate",
+      ready: stableSupportGateWorkflow.status === "ready",
     },
     {
       label: "Agent integrations",
-      ready: agentIntegrationWorkflow.status === "ready"
-    }
+      ready: agentIntegrationWorkflow.status === "ready",
+    },
   ];
 
   return (
@@ -2151,7 +2408,10 @@ function SetupChecklistPanel({
       </div>
       <div className="space-y-2 text-sm">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center justify-between gap-3">
+          <div
+            key={item.label}
+            className="flex items-center justify-between gap-3"
+          >
             <span className="text-muted-foreground">{item.label}</span>
             <Badge variant={item.ready ? "success" : "muted"}>
               {item.ready ? "Ready" : "Pending"}
@@ -2167,7 +2427,7 @@ function SupportBundlePanel({
   workflow,
   feedbackWorkflow,
   onExport,
-  onCopyFeedback
+  onCopyFeedback,
 }: {
   workflow: SupportBundleWorkflow;
   feedbackWorkflow: BetaFeedbackWorkflow;
@@ -2189,7 +2449,9 @@ function SupportBundlePanel({
         disabled={workflow.status === "running"}
       >
         <FileText className="size-4" aria-hidden="true" />
-        {workflow.status === "running" ? "Exporting support bundle" : "Export support bundle"}
+        {workflow.status === "running"
+          ? "Exporting support bundle"
+          : "Export support bundle"}
       </Button>
       <Button
         type="button"
@@ -2200,7 +2462,9 @@ function SupportBundlePanel({
         disabled={feedbackWorkflow.status === "running"}
       >
         <Copy className="size-4" aria-hidden="true" />
-        {feedbackWorkflow.status === "running" ? "Copying feedback link" : "Copy beta feedback link"}
+        {feedbackWorkflow.status === "running"
+          ? "Copying feedback link"
+          : "Copy beta feedback link"}
       </Button>
       {workflow.status === "exported" ? (
         <div className="mt-3 rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
@@ -2232,7 +2496,7 @@ function SupportBundlePanel({
 
 function UpdateChannelPanel({
   workflow,
-  onSelectChannel
+  onSelectChannel,
 }: {
   workflow: UpdateChannelWorkflow;
   onSelectChannel: (channel: UpdateChannel) => void;
@@ -2245,7 +2509,9 @@ function UpdateChannelPanel({
       </div>
 
       {workflow.status === "loading" ? (
-        <p className="text-sm leading-6 text-muted-foreground">Loading update channel.</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Loading update channel.
+        </p>
       ) : workflow.status === "unavailable" ? (
         <p className="text-sm leading-6 text-muted-foreground">
           Open the desktop app to manage update channels.
@@ -2253,7 +2519,10 @@ function UpdateChannelPanel({
       ) : workflow.status === "error" ? (
         <p className="text-sm leading-6 text-destructive">{workflow.message}</p>
       ) : (
-        <UpdateChannelControls workflow={workflow} onSelectChannel={onSelectChannel} />
+        <UpdateChannelControls
+          workflow={workflow}
+          onSelectChannel={onSelectChannel}
+        />
       )}
     </section>
   );
@@ -2261,7 +2530,7 @@ function UpdateChannelPanel({
 
 function UpdateChannelControls({
   workflow,
-  onSelectChannel
+  onSelectChannel,
 }: {
   workflow: Extract<UpdateChannelWorkflow, { status: "ready" | "running" }>;
   onSelectChannel: (channel: UpdateChannel) => void;
@@ -2285,7 +2554,9 @@ function UpdateChannelControls({
           {state.autoUpdate.enabled ? "Enabled" : "Disabled"}
         </Badge>
       </div>
-      <p className="leading-6 text-muted-foreground">{state.autoUpdate.reason}</p>
+      <p className="leading-6 text-muted-foreground">
+        {state.autoUpdate.reason}
+      </p>
       <div className="grid grid-cols-2 gap-2">
         {state.availableChannels.map((channel) => (
           <Button
@@ -2303,7 +2574,8 @@ function UpdateChannelControls({
       </div>
       {isRunning ? (
         <p className="text-sm leading-6 text-muted-foreground">
-          Selecting {formatUpdateChannel(workflow.nextChannel).toLowerCase()} channel.
+          Selecting {formatUpdateChannel(workflow.nextChannel).toLowerCase()}{" "}
+          channel.
         </p>
       ) : (
         <div className="rounded-md border border-success/30 bg-success/10 p-2 text-sm text-success">
@@ -2323,7 +2595,7 @@ function AgentIntegrationsPanel({
   onInstall,
   onUninstall,
   onTest,
-  onExport
+  onExport,
 }: {
   workflow: AgentIntegrationWorkflow;
   copiedTargetId: AgentIntegrationTargetId | null;
@@ -2343,7 +2615,9 @@ function AgentIntegrationsPanel({
       </div>
 
       {workflow.status === "loading" ? (
-        <p className="text-sm leading-6 text-muted-foreground">Loading local MCP config previews.</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Loading local MCP config previews.
+        </p>
       ) : workflow.status === "unavailable" ? (
         <p className="text-sm leading-6 text-muted-foreground">
           Open the desktop app to generate local MCP config previews.
@@ -2354,7 +2628,9 @@ function AgentIntegrationsPanel({
         <div className="space-y-3">
           <div className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
             <div className="font-medium text-foreground">Runtime handoff</div>
-            <div className="mt-1 break-all">{workflow.preview.runtimeFilePath}</div>
+            <div className="mt-1 break-all">
+              {workflow.preview.runtimeFilePath}
+            </div>
           </div>
           {copyError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">
@@ -2375,7 +2651,9 @@ function AgentIntegrationsPanel({
                 </div>
                 <Badge variant="muted">{target.format}</Badge>
               </div>
-              <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-4 text-muted-foreground">{target.content}</pre>
+              <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-2 text-[11px] leading-4 text-muted-foreground">
+                {target.content}
+              </pre>
               <div className="mt-2 grid grid-cols-1 gap-2">
                 <Button
                   type="button"
@@ -2395,7 +2673,10 @@ function AgentIntegrationsPanel({
                   className="w-full"
                   aria-label={`Test ${target.name} connection`}
                   onClick={() => onTest(target)}
-                  disabled={mutation.status === "running" && mutation.targetId === target.id}
+                  disabled={
+                    mutation.status === "running" &&
+                    mutation.targetId === target.id
+                  }
                 >
                   <Wifi className="size-4" aria-hidden="true" />
                   Test
@@ -2408,7 +2689,10 @@ function AgentIntegrationsPanel({
                     className="w-full"
                     aria-label={`Export ${target.name} .mcpb`}
                     onClick={() => onExport(target)}
-                    disabled={mutation.status === "running" && mutation.targetId === target.id}
+                    disabled={
+                      mutation.status === "running" &&
+                      mutation.targetId === target.id
+                    }
                   >
                     <Download className="size-4" aria-hidden="true" />
                     Export .mcpb
@@ -2423,7 +2707,8 @@ function AgentIntegrationsPanel({
                       aria-label={`Install ${target.name} config`}
                       onClick={() => onInstall(target)}
                       disabled={
-                        mutation.status === "running" && mutation.targetId === target.id
+                        mutation.status === "running" &&
+                        mutation.targetId === target.id
                       }
                     >
                       <Download className="size-4" aria-hidden="true" />
@@ -2436,7 +2721,8 @@ function AgentIntegrationsPanel({
                       aria-label={`Uninstall ${target.name} config`}
                       onClick={() => onUninstall(target)}
                       disabled={
-                        mutation.status === "running" && mutation.targetId === target.id
+                        mutation.status === "running" &&
+                        mutation.targetId === target.id
                       }
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -2450,7 +2736,8 @@ function AgentIntegrationsPanel({
                   Copied {target.name} config
                 </div>
               ) : null}
-              {mutation.status === "success" && mutation.targetId === target.id ? (
+              {mutation.status === "success" &&
+              mutation.targetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-success">
                   {mutation.action === "test"
                     ? mutation.result.message
@@ -2463,7 +2750,8 @@ function AgentIntegrationsPanel({
                     </div>
                   ) : null}
                 </div>
-              ) : mutation.status === "error" && mutation.targetId === target.id ? (
+              ) : mutation.status === "error" &&
+                mutation.targetId === target.id ? (
                 <div className="mt-2 text-xs font-medium text-destructive">
                   {mutation.message}
                 </div>
@@ -2478,7 +2766,7 @@ function AgentIntegrationsPanel({
 
 function ElementInspector({
   element,
-  onUpdate
+  onUpdate,
 }: {
   element: DocumentElement | null;
   onUpdate: (elementId: string, updater: ElementUpdater) => void;
@@ -2492,14 +2780,20 @@ function ElementInspector({
     if (!element) {
       return;
     }
-    onUpdate(element.id, (currentElement) => ({ ...currentElement, name: value }));
+    onUpdate(element.id, (currentElement) => ({
+      ...currentElement,
+      name: value,
+    }));
   };
 
   const updateBooleanField = (field: "locked" | "visible", value: boolean) => {
     if (!element) {
       return;
     }
-    onUpdate(element.id, (currentElement) => ({ ...currentElement, [field]: value }));
+    onUpdate(element.id, (currentElement) => ({
+      ...currentElement,
+      [field]: value,
+    }));
   };
 
   const updateNumberField = (field: NumericElementField, value: number) => {
@@ -2509,7 +2803,7 @@ function ElementInspector({
     const minimum = field === "width" || field === "height" ? 1 : 0;
     onUpdate(element.id, (currentElement) => ({
       ...currentElement,
-      [field]: normalizeDotValue(value, minimum)
+      [field]: normalizeDotValue(value, minimum),
     }));
   };
 
@@ -2517,12 +2811,17 @@ function ElementInspector({
     <section className="border-b border-border p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold">Inspector</h2>
-        {element ? <Badge variant="muted">{formatElementType(element.type)}</Badge> : null}
+        {element ? (
+          <Badge variant="muted">{formatElementType(element.type)}</Badge>
+        ) : null}
       </div>
 
       {element ? (
         <div className="space-y-4">
-          <label className="block text-xs font-medium text-muted-foreground" htmlFor="inspector-name">
+          <label
+            className="block text-xs font-medium text-muted-foreground"
+            htmlFor="inspector-name"
+          >
             Name
             <input
               id="inspector-name"
@@ -2533,7 +2832,9 @@ function ElementInspector({
           </label>
 
           <div>
-            <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Geometry</div>
+            <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+              Geometry
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <InspectorNumberField
                 id="inspector-x"
@@ -2572,7 +2873,9 @@ function ElementInspector({
                 type="checkbox"
                 className="size-4 accent-primary"
                 checked={element.visible}
-                onChange={(event) => updateBooleanField("visible", event.currentTarget.checked)}
+                onChange={(event) =>
+                  updateBooleanField("visible", event.currentTarget.checked)
+                }
               />
               Visible
             </label>
@@ -2581,7 +2884,9 @@ function ElementInspector({
                 type="checkbox"
                 className="size-4 accent-primary"
                 checked={element.locked}
-                onChange={(event) => updateBooleanField("locked", event.currentTarget.checked)}
+                onChange={(event) =>
+                  updateBooleanField("locked", event.currentTarget.checked)
+                }
               />
               Locked
             </label>
@@ -2589,13 +2894,18 @@ function ElementInspector({
 
           {rectElement?.success ? (
             <div>
-              <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Fill</div>
+              <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                Fill
+              </div>
               <FillSwatches
                 value={rectElement.data.fill}
                 onChange={(fill) => {
                   onUpdate(element.id, (currentElement) => {
-                    const currentRect = rectElementSchema.safeParse(currentElement);
-                    return currentRect.success ? { ...currentRect.data, fill } : currentElement;
+                    const currentRect =
+                      rectElementSchema.safeParse(currentElement);
+                    return currentRect.success
+                      ? { ...currentRect.data, fill }
+                      : currentElement;
                   });
                 }}
               />
@@ -2616,7 +2926,8 @@ function ElementInspector({
                   onChange={(event) => {
                     const text = event.currentTarget.value;
                     onUpdate(element.id, (currentElement) => {
-                      const currentText = textElementSchema.safeParse(currentElement);
+                      const currentText =
+                        textElementSchema.safeParse(currentElement);
                       return currentText.success
                         ? { ...currentText.data, text }
                         : currentElement;
@@ -2632,11 +2943,12 @@ function ElementInspector({
                   value={textElement.data.style.fill}
                   onChange={(fill) => {
                     onUpdate(element.id, (currentElement) => {
-                      const currentText = textElementSchema.safeParse(currentElement);
+                      const currentText =
+                        textElementSchema.safeParse(currentElement);
                       return currentText.success
                         ? {
                             ...currentText.data,
-                            style: { ...currentText.data.style, fill }
+                            style: { ...currentText.data.style, fill },
                           }
                         : currentElement;
                     });
@@ -2652,7 +2964,9 @@ function ElementInspector({
                 <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">
                   Source
                 </div>
-                <div className="truncate text-sm">{imageElement.data.source.mimeType}</div>
+                <div className="truncate text-sm">
+                  {imageElement.data.source.mimeType}
+                </div>
               </div>
               <label
                 className="block text-xs font-medium text-muted-foreground"
@@ -2664,10 +2978,14 @@ function ElementInspector({
                   className="mt-1 h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
                   value={imageElement.data.fit}
                   onChange={(event) => {
-                    const fit = event.currentTarget.value as ImageElement["fit"];
+                    const fit = event.currentTarget
+                      .value as ImageElement["fit"];
                     onUpdate(element.id, (currentElement) => {
-                      const currentImage = imageElementSchema.safeParse(currentElement);
-                      return currentImage.success ? { ...currentImage.data, fit } : currentElement;
+                      const currentImage =
+                        imageElementSchema.safeParse(currentElement);
+                      return currentImage.success
+                        ? { ...currentImage.data, fit }
+                        : currentElement;
                     });
                   }}
                 >
@@ -2684,14 +3002,18 @@ function ElementInspector({
                 max={255}
                 onChange={(value) => {
                   onUpdate(element.id, (currentElement) => {
-                    const currentImage = imageElementSchema.safeParse(currentElement);
+                    const currentImage =
+                      imageElementSchema.safeParse(currentElement);
                     return currentImage.success
                       ? {
                           ...currentImage.data,
                           processing: {
                             ...currentImage.data.processing,
-                            threshold: Math.min(255, normalizeDotValue(value, 0))
-                          }
+                            threshold: Math.min(
+                              255,
+                              normalizeDotValue(value, 0),
+                            ),
+                          },
                         }
                       : currentElement;
                   });
@@ -2705,14 +3027,15 @@ function ElementInspector({
                   onChange={(event) => {
                     const invert = event.currentTarget.checked;
                     onUpdate(element.id, (currentElement) => {
-                      const currentImage = imageElementSchema.safeParse(currentElement);
+                      const currentImage =
+                        imageElementSchema.safeParse(currentElement);
                       return currentImage.success
                         ? {
                             ...currentImage.data,
                             processing: {
                               ...currentImage.data.processing,
-                              invert
-                            }
+                              invert,
+                            },
                           }
                         : currentElement;
                     });
@@ -2737,7 +3060,8 @@ function ElementInspector({
                   onChange={(event) => {
                     const payload = event.currentTarget.value;
                     onUpdate(element.id, (currentElement) => {
-                      const currentQr = qrElementSchema.safeParse(currentElement);
+                      const currentQr =
+                        qrElementSchema.safeParse(currentElement);
                       return currentQr.success
                         ? { ...currentQr.data, payload }
                         : currentElement;
@@ -2758,7 +3082,8 @@ function ElementInspector({
                     const errorCorrectionLevel = event.currentTarget
                       .value as QrElement["errorCorrectionLevel"];
                     onUpdate(element.id, (currentElement) => {
-                      const currentQr = qrElementSchema.safeParse(currentElement);
+                      const currentQr =
+                        qrElementSchema.safeParse(currentElement);
                       return currentQr.success
                         ? { ...currentQr.data, errorCorrectionLevel }
                         : currentElement;
@@ -2787,7 +3112,7 @@ function InspectorNumberField({
   value,
   min,
   max,
-  onChange
+  onChange,
 }: {
   id: string;
   label: string;
@@ -2797,7 +3122,10 @@ function InspectorNumberField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="block text-xs font-medium text-muted-foreground" htmlFor={id}>
+    <label
+      className="block text-xs font-medium text-muted-foreground"
+      htmlFor={id}
+    >
       {label}
       <input
         id={id}
@@ -2824,14 +3152,14 @@ function InspectorNumberField({
 
 function FillSwatches({
   value,
-  onChange
+  onChange,
 }: {
   value: string;
   onChange: (value: string) => void;
 }) {
   const fills = [
     { label: "Black fill", value: "#000000" },
-    { label: "White fill", value: "#ffffff" }
+    { label: "White fill", value: "#ffffff" },
   ];
 
   return (
@@ -2861,7 +3189,7 @@ function FillSwatches({
 function LayerList({
   document,
   selectedElementId,
-  onSelect
+  onSelect,
 }: {
   document: PrintDocument;
   selectedElementId: string | null;
@@ -2871,9 +3199,13 @@ function LayerList({
     {
       name: "Receipt artboard",
       detail: `${document.target.widthDots} x ${document.target.heightDots} dots`,
-      icon: FileText
+      icon: FileText,
     },
-    { name: "Protected tail margin", detail: "160 blank rows", icon: ShieldCheck }
+    {
+      name: "Protected tail margin",
+      detail: "160 blank rows",
+      icon: ShieldCheck,
+    },
   ];
 
   return (
@@ -2881,12 +3213,17 @@ function LayerList({
       {baseLayers.map((layer) => {
         const Icon = layer.icon;
         return (
-          <div key={layer.name} className="rounded-md border border-border bg-card p-2 text-sm">
+          <div
+            key={layer.name}
+            className="rounded-md border border-border bg-card p-2 text-sm"
+          >
             <div className="flex items-center gap-2 font-medium">
               <Icon className="size-4 text-primary" aria-hidden="true" />
               {layer.name}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">{layer.detail}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {layer.detail}
+            </div>
           </div>
         );
       })}
@@ -2937,7 +3274,7 @@ function DocumentCanvas({
   onTransform,
   onStartTextEdit,
   onCommitTextEdit,
-  onCancelTextEdit
+  onCancelTextEdit,
 }: {
   document: PrintDocument;
   selectedElementId: string | null;
@@ -2955,39 +3292,43 @@ function DocumentCanvas({
 }) {
   const selectedNodeRef = useRef<Konva.Node | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
-  const canvasElements = document.elements.reduce<CanvasElement[]>((items, element) => {
-    const textElement = textElementSchema.safeParse(element);
-    if (textElement.success) {
-      items.push({ kind: "text", element: textElement.data });
-      return items;
-    }
+  const canvasElements = document.elements.reduce<CanvasElement[]>(
+    (items, element) => {
+      const textElement = textElementSchema.safeParse(element);
+      if (textElement.success) {
+        items.push({ kind: "text", element: textElement.data });
+        return items;
+      }
 
-    const rectElement = rectElementSchema.safeParse(element);
-    if (rectElement.success) {
-      items.push({ kind: "rect", element: rectElement.data });
-      return items;
-    }
+      const rectElement = rectElementSchema.safeParse(element);
+      if (rectElement.success) {
+        items.push({ kind: "rect", element: rectElement.data });
+        return items;
+      }
 
-    const imageElement = imageElementSchema.safeParse(element);
-    if (imageElement.success) {
-      items.push({ kind: "image", element: imageElement.data });
-      return items;
-    }
+      const imageElement = imageElementSchema.safeParse(element);
+      if (imageElement.success) {
+        items.push({ kind: "image", element: imageElement.data });
+        return items;
+      }
 
-    const qrElement = qrElementSchema.safeParse(element);
-    if (qrElement.success) {
-      items.push({ kind: "qr", element: qrElement.data });
-      return items;
-    }
+      const qrElement = qrElementSchema.safeParse(element);
+      if (qrElement.success) {
+        items.push({ kind: "qr", element: qrElement.data });
+        return items;
+      }
 
-    return items;
-  }, []);
-  const editingTextItem = canvasElements.find(
-    (item) => item.kind === "text" && item.element.id === editingTextElementId
+      return items;
+    },
+    [],
   );
-  const editingTextElement = editingTextItem?.kind === "text" ? editingTextItem.element : null;
+  const editingTextItem = canvasElements.find(
+    (item) => item.kind === "text" && item.element.id === editingTextElementId,
+  );
+  const editingTextElement =
+    editingTextItem?.kind === "text" ? editingTextItem.element : null;
   const selectedCanvasElement = canvasElements.find(
-    (item) => item.element.id === selectedElementId
+    (item) => item.element.id === selectedElementId,
   );
   const canTransformSelectedElement =
     Boolean(selectedCanvasElement) &&
@@ -3001,7 +3342,9 @@ function DocumentCanvas({
       return;
     }
     transformerRef.current.nodes(
-      canTransformSelectedElement && selectedNodeRef.current ? [selectedNodeRef.current] : []
+      canTransformSelectedElement && selectedNodeRef.current
+        ? [selectedNodeRef.current]
+        : [],
     );
     transformerRef.current.getLayer()?.batchDraw();
   }, [canTransformSelectedElement, document.elements, selectedElementId]);
@@ -3023,13 +3366,13 @@ function DocumentCanvas({
         y: node.y(),
         width: node.width() * scaleX,
         height: node.height() * scaleY,
-        rotation: node.rotation()
+        rotation: node.rotation(),
       };
       node.scaleX(1);
       node.scaleY(1);
       onTransform(elementId, nextTransform);
     },
-    [onTransform]
+    [onTransform],
   );
 
   return (
@@ -3047,10 +3390,15 @@ function DocumentCanvas({
           data-testid="canvas-pan-viewport"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transformOrigin: "top left"
+            transformOrigin: "top left",
           }}
         >
-          <Stage width={stageWidth} height={stageHeight} scaleX={zoom} scaleY={zoom}>
+          <Stage
+            width={stageWidth}
+            height={stageHeight}
+            scaleX={zoom}
+            scaleY={zoom}
+          >
             <Layer>
               <Rect
                 x={0}
@@ -3070,7 +3418,8 @@ function DocumentCanvas({
                     onEdit={onStartTextEdit}
                     onTransformEnd={transformSelectedElement}
                     nodeRef={
-                      canTransformSelectedElement && selectedElementId === item.element.id
+                      canTransformSelectedElement &&
+                      selectedElementId === item.element.id
                         ? attachSelectedNode
                         : undefined
                     }
@@ -3084,7 +3433,8 @@ function DocumentCanvas({
                     onMove={onMove}
                     onTransformEnd={transformSelectedElement}
                     nodeRef={
-                      canTransformSelectedElement && selectedElementId === item.element.id
+                      canTransformSelectedElement &&
+                      selectedElementId === item.element.id
                         ? attachSelectedNode
                         : undefined
                     }
@@ -3098,7 +3448,8 @@ function DocumentCanvas({
                     onMove={onMove}
                     onTransformEnd={transformSelectedElement}
                     nodeRef={
-                      canTransformSelectedElement && selectedElementId === item.element.id
+                      canTransformSelectedElement &&
+                      selectedElementId === item.element.id
                         ? attachSelectedNode
                         : undefined
                     }
@@ -3112,12 +3463,13 @@ function DocumentCanvas({
                     onMove={onMove}
                     onTransformEnd={transformSelectedElement}
                     nodeRef={
-                      canTransformSelectedElement && selectedElementId === item.element.id
+                      canTransformSelectedElement &&
+                      selectedElementId === item.element.id
                         ? attachSelectedNode
                         : undefined
                     }
                   />
-                )
+                ),
               )}
               {canTransformSelectedElement ? (
                 <Transformer
@@ -3131,7 +3483,7 @@ function DocumentCanvas({
                     "bottom-right",
                     "bottom-center",
                     "bottom-left",
-                    "middle-left"
+                    "middle-left",
                   ]}
                   boundBoxFunc={(oldBox, newBox) =>
                     newBox.width < 8 || newBox.height < 8 ? oldBox : newBox
@@ -3151,7 +3503,10 @@ function DocumentCanvas({
         </div>
         {document.elements.length === 0 ? (
           <div className="thermal-stage-empty">
-            <Boxes className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden="true" />
+            <Boxes
+              className="mx-auto mb-3 size-9 text-muted-foreground"
+              aria-hidden="true"
+            />
             <div className="text-sm font-medium">Canvas editor bootstrap</div>
             <div className="mt-1 max-w-56 text-xs text-muted-foreground">
               {previewReady
@@ -3172,7 +3527,7 @@ function InlineTextEditor({
   element,
   zoom,
   onCommit,
-  onCancel
+  onCancel,
 }: {
   element: TextElement;
   zoom: number;
@@ -3217,7 +3572,7 @@ function InlineTextEditor({
         fontWeight: element.style.fontWeight,
         lineHeight: element.style.lineHeight,
         color: element.style.fill,
-        textAlign: element.style.align
+        textAlign: element.style.align,
       }}
       onChange={(event) => setDraft(event.currentTarget.value)}
       onBlur={finishEditing}
@@ -3244,7 +3599,7 @@ function CanvasTextElement({
   onMove,
   onEdit,
   onTransformEnd,
-  nodeRef
+  nodeRef,
 }: {
   element: TextElement;
   selected: boolean;
@@ -3293,7 +3648,7 @@ function CanvasRectElement({
   onSelect,
   onMove,
   onTransformEnd,
-  nodeRef
+  nodeRef,
 }: {
   element: RectElement;
   selected: boolean;
@@ -3333,7 +3688,7 @@ function CanvasImageElement({
   onSelect,
   onMove,
   onTransformEnd,
-  nodeRef
+  nodeRef,
 }: {
   element: ImageElement;
   selected: boolean;
@@ -3349,7 +3704,7 @@ function CanvasImageElement({
         imageHeight: image.naturalHeight || image.height,
         boxWidth: element.width,
         boxHeight: element.height,
-        fit: element.fit
+        fit: element.fit,
       })
     : null;
 
@@ -3417,7 +3772,7 @@ function CanvasQrElement({
   onSelect,
   onMove,
   onTransformEnd,
-  nodeRef
+  nodeRef,
 }: {
   element: QrElement;
   selected: boolean;
@@ -3428,7 +3783,7 @@ function CanvasQrElement({
 }) {
   const matrix = useMemo(
     () => createQrMatrix(element.payload, element.errorCorrectionLevel),
-    [element.errorCorrectionLevel, element.payload]
+    [element.errorCorrectionLevel, element.payload],
   );
   const availableSize = Math.max(1, Math.min(element.width, element.height));
   const moduleSize = Math.max(1, Math.floor(availableSize / matrix.size));
@@ -3493,26 +3848,31 @@ function PrinterPanel({
   hardwareArtifactWorkflow,
   hardwarePreflightWorkflow,
   trustedPrinterRecordWorkflow,
+  stableSupportGateWorkflow,
   onCheckHostBluetooth,
   onVerify,
   onExportHardwareArtifact,
   onInspectHardwareArtifact,
-  onInspectTrustedPrinterRecord
+  onInspectTrustedPrinterRecord,
+  onInspectStableSupportGate,
 }: {
   workflow: PrinterWorkflow;
   hardwareReadinessWorkflow: HardwareReadinessWorkflow;
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   hardwarePreflightWorkflow: HardwarePreflightWorkflow;
   trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
+  stableSupportGateWorkflow: StableSupportGateWorkflow;
   onCheckHostBluetooth: () => void;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
   onExportHardwareArtifact: (deviceId: string) => void;
   onInspectHardwareArtifact: () => void;
   onInspectTrustedPrinterRecord: () => void;
+  onInspectStableSupportGate: () => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
-  const verification = workflow.status === "verified" ? workflow.verification : null;
+  const verification =
+    workflow.status === "verified" ? workflow.verification : null;
 
   return (
     <section className="border-b border-border p-4">
@@ -3566,13 +3926,17 @@ function PrinterPanel({
         workflow={trustedPrinterRecordWorkflow}
         onInspect={onInspectTrustedPrinterRecord}
       />
+      <StableSupportGateStatus
+        workflow={stableSupportGateWorkflow}
+        onInspect={onInspectStableSupportGate}
+      />
     </section>
   );
 }
 
 function TrustedPrinterRecordStatus({
   workflow,
-  onInspect
+  onInspect,
 }: {
   workflow: TrustedPrinterRecordWorkflow;
   onInspect: () => void;
@@ -3617,19 +3981,27 @@ function TrustedPrinterRecordStatus({
             />
             <TrustedEvidenceRow
               label="Stage B protocol sanity recorded"
-              ready={summary.hardwareEvidence.protocolSanity.artifactSha256Included}
+              ready={
+                summary.hardwareEvidence.protocolSanity.artifactSha256Included
+              }
             />
             <TrustedEvidenceRow
               label="Stage C visual card recorded"
-              ready={summary.hardwareEvidence.tinyVisualCard.artifactSha256Included}
+              ready={
+                summary.hardwareEvidence.tinyVisualCard.artifactSha256Included
+              }
             />
           </div>
           <div className="flex flex-wrap gap-2">
             {summary.safety.manualContinuousPrintingEnabled ? (
-              <Badge variant="success">Manual continuous printing enabled</Badge>
+              <Badge variant="success">
+                Manual continuous printing enabled
+              </Badge>
             ) : null}
             {summary.safety.longPrintReliabilityRequired ? (
-              <Badge variant="warning">Long-print reliability still required</Badge>
+              <Badge variant="warning">
+                Long-print reliability still required
+              </Badge>
             ) : null}
             {!summary.safety.longPrintPrintingEnabled ? (
               <Badge variant="warning">Long-print trust disabled</Badge>
@@ -3651,11 +4023,117 @@ function TrustedPrinterRecordStatus({
   );
 }
 
-function TrustedEvidenceRow({ label, ready }: { label: string; ready: boolean }) {
+function StableSupportGateStatus({
+  workflow,
+  onInspect,
+}: {
+  workflow: StableSupportGateWorkflow;
+  onInspect: () => void;
+}) {
+  const summary = workflow.status === "ready" ? workflow.result.summary : null;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onInspect}
+        disabled={workflow.status === "running"}
+      >
+        <ShieldCheck className="size-4" aria-hidden="true" />
+        {workflow.status === "running"
+          ? "Inspecting stable-support gate"
+          : "Inspect stable-support gate"}
+      </Button>
+      {summary ? (
+        <div className="space-y-3 rounded-md border border-success/30 bg-success/10 p-3">
+          <div>
+            <div className="font-medium text-success">
+              Stable support claims enabled
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Profile</span>
+              <span className="text-right">{summary.profileId}</span>
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Fingerprint</span>
+              <span className="break-words text-right font-mono text-xs">
+                {summary.device.fingerprint}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <TrustedEvidenceRow
+              label="Stage A evidence recorded"
+              ready={summary.hardwareEvidence.stageA.artifactSha256Included}
+            />
+            <TrustedEvidenceRow
+              label="Stage B protocol sanity recorded"
+              ready={
+                summary.hardwareEvidence.protocolSanity.artifactSha256Included
+              }
+            />
+            <TrustedEvidenceRow
+              label="Stage C visual card recorded"
+              ready={
+                summary.hardwareEvidence.tinyVisualCard.artifactSha256Included
+              }
+            />
+            <TrustedEvidenceRow
+              label="Trusted printer record recorded"
+              ready={
+                summary.hardwareEvidence.trustedPrinter.artifactSha256Included
+              }
+            />
+            <TrustedEvidenceRow
+              label="Stage D long-print reliability recorded"
+              ready={
+                summary.hardwareEvidence.longPrintReliability
+                  .artifactSha256Included
+              }
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {summary.safety.longPrintPrintingEnabled ? (
+              <Badge variant="success">Long-print trust enabled</Badge>
+            ) : null}
+            {summary.safety.stableSupportClaimEnabled ? (
+              <Badge variant="success">Stable support claim enabled</Badge>
+            ) : null}
+            {!summary.safety.agentDirectPrintingEnabled ? (
+              <Badge variant="warning">Agent direct printing disabled</Badge>
+            ) : null}
+            {summary.safety.agentDirectPrintingDefault ===
+            "approval_required" ? (
+              <Badge variant="warning">
+                Agent direct default: approval required
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TrustedEvidenceRow({
+  label,
+  ready,
+}: {
+  label: string;
+  ready: boolean;
+}) {
   return (
     <div className="flex items-center gap-2 rounded-sm bg-background/70 px-2 py-1">
       <CheckCircle2
-        className={ready ? "size-4 text-success" : "size-4 text-muted-foreground"}
+        className={
+          ready ? "size-4 text-success" : "size-4 text-muted-foreground"
+        }
         aria-hidden="true"
       />
       <span>{label}</span>
@@ -3665,7 +4143,7 @@ function TrustedEvidenceRow({ label, ready }: { label: string; ready: boolean })
 
 function HostBluetoothReadinessStatus({
   workflow,
-  onCheck
+  onCheck,
 }: {
   workflow: HardwareReadinessWorkflow;
   onCheck: () => void;
@@ -3685,14 +4163,18 @@ function HostBluetoothReadinessStatus({
         disabled={workflow.status === "running"}
       >
         <Bluetooth className="size-4" aria-hidden="true" />
-        {workflow.status === "running" ? "Checking host Bluetooth" : "Check host Bluetooth"}
+        {workflow.status === "running"
+          ? "Checking host Bluetooth"
+          : "Check host Bluetooth"}
       </Button>
       {result ? (
         <div className="space-y-2 rounded-md border border-warning/30 bg-warning/10 p-3">
           <div className="font-medium text-warning">{title}</div>
           <div className="text-muted-foreground">{result.detail}</div>
           {primaryEvidence ? (
-            <div className="break-words font-mono text-xs">{primaryEvidence}</div>
+            <div className="break-words font-mono text-xs">
+              {primaryEvidence}
+            </div>
           ) : null}
           {recommendedActions.length > 0 ? (
             <div className="space-y-1">
@@ -3723,15 +4205,17 @@ function HostBluetoothReadinessStatus({
 
 function HardwarePreflightStatus({
   workflow,
-  onInspect
+  onInspect,
 }: {
   workflow: HardwarePreflightWorkflow;
   onInspect: () => void;
 }) {
-  const preflight = workflow.status === "ready" ? workflow.result.preflight : null;
+  const preflight =
+    workflow.status === "ready" ? workflow.result.preflight : null;
   const visualCardPreflight =
     workflow.status === "ready" ? workflow.result.visualCardPreflight : null;
-  const evidenceSummary = workflow.status === "ready" ? workflow.result.evidenceSummary : null;
+  const evidenceSummary =
+    workflow.status === "ready" ? workflow.result.evidenceSummary : null;
 
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
@@ -3743,12 +4227,16 @@ function HardwarePreflightStatus({
         disabled={workflow.status === "running"}
       >
         <FileSearch className="size-4" aria-hidden="true" />
-        {workflow.status === "running" ? "Inspecting artifact" : "Inspect Stage A artifact"}
+        {workflow.status === "running"
+          ? "Inspecting artifact"
+          : "Inspect Stage A artifact"}
       </Button>
       {workflow.status === "ready" && preflight ? (
         <div className="space-y-3 rounded-md border border-warning/30 bg-warning/10 p-3">
           <div>
-            <div className="font-medium text-warning">Protocol sanity preflight ready</div>
+            <div className="font-medium text-warning">
+              Protocol sanity preflight ready
+            </div>
             <div className="mt-1 flex justify-between gap-3">
               <span className="text-muted-foreground">Device</span>
               <span className="text-right">{preflight.deviceId}</span>
@@ -3765,16 +4253,22 @@ function HardwarePreflightStatus({
                 className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 rounded-sm bg-background/70 px-2 py-1"
               >
                 <span>{command.name}</span>
-                <span className="min-w-0 break-words font-mono text-xs">{command.hex}</span>
+                <span className="min-w-0 break-words font-mono text-xs">
+                  {command.hex}
+                </span>
               </div>
             ))}
           </div>
           {visualCardPreflight ? (
             <div className="border-t border-warning/20 pt-3">
-              <div className="font-medium text-warning">Tiny visual card preflight ready</div>
+              <div className="font-medium text-warning">
+                Tiny visual card preflight ready
+              </div>
               <div className="mt-2 grid grid-cols-[112px_minmax(0,1fr)] gap-x-2 gap-y-1">
                 <span className="text-muted-foreground">Text</span>
-                <span className="font-mono text-xs">{visualCardPreflight.displayText}</span>
+                <span className="font-mono text-xs">
+                  {visualCardPreflight.displayText}
+                </span>
                 <span className="text-muted-foreground">Height</span>
                 <span>{visualCardPreflight.heightDots} dots</span>
                 <span className="text-muted-foreground">Prerequisite</span>
@@ -3789,16 +4283,24 @@ function HardwarePreflightStatus({
           ) : null}
           {evidenceSummary ? (
             <div className="border-t border-warning/20 pt-3">
-              <div className="font-medium text-warning">Shareable evidence summary ready</div>
+              <div className="font-medium text-warning">
+                Shareable evidence summary ready
+              </div>
               <div className="mt-2 grid grid-cols-[112px_minmax(0,1fr)] gap-x-2 gap-y-1">
                 <span className="text-muted-foreground">Fingerprint</span>
                 <span className="break-words font-mono text-xs">
                   {evidenceSummary.device.fingerprint}
                 </span>
                 <span className="text-muted-foreground">Protocol</span>
-                <span>{evidenceSummary.preflights.protocolSanity.commandCount} commands planned</span>
+                <span>
+                  {evidenceSummary.preflights.protocolSanity.commandCount}{" "}
+                  commands planned
+                </span>
                 <span className="text-muted-foreground">Tiny card</span>
-                <span>{evidenceSummary.preflights.tinyVisualCard.heightDots} dots summarized</span>
+                <span>
+                  {evidenceSummary.preflights.tinyVisualCard.heightDots} dots
+                  summarized
+                </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {!evidenceSummary.redaction.commandPayloadHexIncluded &&
@@ -3836,7 +4338,7 @@ function PrinterDiscoveryStatus({
   verification,
   hardwareArtifactWorkflow,
   onVerify,
-  onExportHardwareArtifact
+  onExportHardwareArtifact,
 }: {
   workflow: PrinterWorkflow;
   candidate: PrinterCandidate | undefined;
@@ -3850,7 +4352,9 @@ function PrinterDiscoveryStatus({
   }
 
   if (workflow.status === "error") {
-    return <div className="mt-4 text-sm text-destructive">{workflow.message}</div>;
+    return (
+      <div className="mt-4 text-sm text-destructive">{workflow.message}</div>
+    );
   }
 
   if (!candidate) {
@@ -3860,13 +4364,19 @@ function PrinterDiscoveryStatus({
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
       <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate font-medium">{candidate.name ?? candidate.deviceId}</span>
-        <Badge variant="warning">{formatSupportLevel(candidate.supportLevel)}</Badge>
+        <span className="min-w-0 truncate font-medium">
+          {candidate.name ?? candidate.deviceId}
+        </span>
+        <Badge variant="warning">
+          {formatSupportLevel(candidate.supportLevel)}
+        </Badge>
       </div>
       <div className="space-y-2">
         <div className="flex justify-between gap-3">
           <span className="text-muted-foreground">Stage</span>
-          <span className="text-right">{formatDiscoveryStage(candidate.nextRequiredStage)}</span>
+          <span className="text-right">
+            {formatDiscoveryStage(candidate.nextRequiredStage)}
+          </span>
         </div>
         <div className="flex justify-between gap-3">
           <span className="text-muted-foreground">RSSI</span>
@@ -3912,7 +4422,9 @@ function PrinterDiscoveryStatus({
           hardwareArtifactWorkflow.deviceId === verification.deviceId ? (
             <div className="rounded-md border border-success/30 bg-success/10 p-2 text-success">
               <div className="font-medium">Hardware artifact exported</div>
-              <div className="text-xs">Ready for physical validation record</div>
+              <div className="text-xs">
+                Ready for physical validation record
+              </div>
             </div>
           ) : hardwareArtifactWorkflow.status === "error" &&
             hardwareArtifactWorkflow.deviceId === verification.deviceId ? (
@@ -3939,7 +4451,7 @@ function PrinterDiscoveryStatus({
 
 function PrintStatus({
   workflow,
-  onConfirmOutput
+  onConfirmOutput,
 }: {
   workflow: PrintWorkflow;
   onConfirmOutput: (job: PrintJobResponse) => void;
@@ -4022,7 +4534,10 @@ function SafetyMessages({ preview }: { preview: DocumentPreviewResponse }) {
   return (
     <div className="space-y-1 pt-2">
       {warnings.map((message) => (
-        <div key={`warning-${message}`} className="rounded-md bg-warning/10 px-2 py-1 text-xs text-warning">
+        <div
+          key={`warning-${message}`}
+          className="rounded-md bg-warning/10 px-2 py-1 text-xs text-warning"
+        >
           {message}
         </div>
       ))}
@@ -4072,7 +4587,7 @@ function calculateImagePlacement({
   imageHeight,
   boxWidth,
   boxHeight,
-  fit
+  fit,
 }: {
   imageWidth: number;
   imageHeight: number;
@@ -4094,7 +4609,7 @@ function calculateImagePlacement({
     x: Math.round((boxWidth - width) / 2),
     y: Math.round((boxHeight - height) / 2),
     width,
-    height
+    height,
   };
 }
 
@@ -4155,40 +4670,41 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 function createQrMatrix(
   payload: string,
-  errorCorrectionLevel: QrElement["errorCorrectionLevel"]
+  errorCorrectionLevel: QrElement["errorCorrectionLevel"],
 ): { size: number; data: Uint8Array } {
   const safePayload = payload.trim().length > 0 ? payload : " ";
   try {
     const qr = QRCode.create(safePayload, { errorCorrectionLevel });
     return {
       size: qr.modules.size,
-      data: qr.modules.data
+      data: qr.modules.data,
     };
   } catch {
     const fallbackQr = QRCode.create(" ", { errorCorrectionLevel: "M" });
     return {
       size: fallbackQr.modules.size,
-      data: fallbackQr.modules.data
+      data: fallbackQr.modules.data,
     };
   }
 }
 
 function projectSummaryFromResponse(project: ProjectResponse): ProjectSummary {
-  const documentId = typeof project.document.id === "string" ? project.document.id : "";
+  const documentId =
+    typeof project.document.id === "string" ? project.document.id : "";
   return {
     projectId: project.projectId,
     name: project.name,
     documentId,
-    updatedAt: project.updatedAt
+    updatedAt: project.updatedAt,
   };
 }
 
 function upsertProjectSummary(
   projects: ProjectSummary[],
-  nextProject: ProjectSummary
+  nextProject: ProjectSummary,
 ): ProjectSummary[] {
   const remainingProjects = projects.filter(
-    (project) => project.projectId !== nextProject.projectId
+    (project) => project.projectId !== nextProject.projectId,
   );
   return [nextProject, ...remainingProjects];
 }
@@ -4196,13 +4712,15 @@ function upsertProjectSummary(
 const PROJECT_ASSET_MIME_TYPES: ProjectAssetUploadRequest["mimeType"][] = [
   "image/png",
   "image/jpeg",
-  "image/webp"
+  "image/webp",
 ];
 
 function isProjectAssetMimeType(
-  mimeType: string
+  mimeType: string,
 ): mimeType is ProjectAssetUploadRequest["mimeType"] {
-  return PROJECT_ASSET_MIME_TYPES.includes(mimeType as ProjectAssetUploadRequest["mimeType"]);
+  return PROJECT_ASSET_MIME_TYPES.includes(
+    mimeType as ProjectAssetUploadRequest["mimeType"],
+  );
 }
 
 function dataBase64FromImageDataUrl(dataUrl: string): string | null {
@@ -4213,7 +4731,7 @@ function dataBase64FromImageDataUrl(dataUrl: string): string | null {
 
 function projectAssetRefFromResponse(
   projectId: string,
-  asset: ProjectAssetResponse
+  asset: ProjectAssetResponse,
 ): ProjectImageAssetRef {
   return {
     kind: "daemon_project_asset",
@@ -4222,14 +4740,14 @@ function projectAssetRefFromResponse(
     sha256: asset.sha256,
     fileName: asset.fileName,
     mimeType: asset.mimeType,
-    byteLength: asset.byteLength
+    byteLength: asset.byteLength,
   };
 }
 
 function appendImageElementWithAsset(
   document: PrintDocument,
   element: ImageElement,
-  projectAsset: ProjectImageAssetRef | undefined
+  projectAsset: ProjectImageAssetRef | undefined,
 ): PrintDocument {
   const nextDocument = appendElement(document, element);
   if (!projectAsset) {
@@ -4242,11 +4760,11 @@ function appendImageElementWithAsset(
         asset !== null &&
         "assetId" in asset &&
         asset.assetId === projectAsset.assetId
-      )
+      ),
   );
   return {
     ...nextDocument,
-    assets: [...remainingAssets, projectAsset]
+    assets: [...remainingAssets, projectAsset],
   };
 }
 
@@ -4263,7 +4781,7 @@ function formatElementType(type: string): string {
     path: "Path",
     qr: "QR",
     barcode: "Barcode",
-    group: "Group"
+    group: "Group",
   };
   return labels[type] ?? type;
 }
@@ -4276,7 +4794,7 @@ function formatPaperMode(mode: string): string {
   const labels: Record<string, string> = {
     continuous: "continuous paper",
     gap_label: "gap label",
-    black_mark: "black mark"
+    black_mark: "black mark",
   };
   return labels[mode] ?? mode;
 }
@@ -4287,7 +4805,7 @@ function formatSupportLevel(level: string): string {
     official: "Official",
     community_verified: "Community verified",
     experimental: "Experimental",
-    unsupported: "Unsupported"
+    unsupported: "Unsupported",
   };
   return labels[level] ?? level;
 }
@@ -4297,7 +4815,7 @@ function formatDiscoveryStage(stage: string): string {
     read_only_verification: "Read-only verification required",
     protocol_sanity_test: "Protocol sanity test required",
     supported_printer_test: "Supported-printer test required",
-    unsupported: "Unsupported"
+    unsupported: "Unsupported",
   };
   return labels[stage] ?? stage;
 }
@@ -4307,7 +4825,7 @@ function formatHostReadinessStatus(status: string): string {
     ready_to_scan: "Host Bluetooth ready",
     not_visible: "Host Bluetooth not visible",
     unsupported_platform: "Host Bluetooth check unsupported",
-    unknown: "Host Bluetooth readiness unknown"
+    unknown: "Host Bluetooth readiness unknown",
   };
   return labels[status] ?? "Host Bluetooth readiness unknown";
 }
@@ -4336,9 +4854,14 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function formatQueueStatus(previewReady: boolean, workflow: PrintWorkflow): string {
+function formatQueueStatus(
+  previewReady: boolean,
+  workflow: PrintWorkflow,
+): string {
   if (workflow.status === "completed") {
-    return workflow.job.requiresUserCheck ? "Job completed, check paper" : "Job complete";
+    return workflow.job.requiresUserCheck
+      ? "Job completed, check paper"
+      : "Job complete";
   }
   if (workflow.status === "running") {
     return "Print in progress";
@@ -4350,7 +4873,7 @@ function formatSafeAction(action: string): string {
   const labels: Record<string, string> = {
     confirm_complete: "Confirm complete",
     feed_paper: "Feed paper",
-    reprint_from_start: "Reprint from start"
+    reprint_from_start: "Reprint from start",
   };
   return labels[action] ?? action;
 }

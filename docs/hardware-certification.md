@@ -301,6 +301,19 @@ continuous printing, long-print continuous printing, and stable support claims.
 It keeps `agentDirectPrintingEnabled: false` and records the next required stage
 as `agent_direct_printing_policy_review`.
 
+Inspect the gate before relying on it:
+
+```bash
+scripts/hardware-test.sh inspect-stable-support-gate <stable-support-gate-device-fingerprint.json>
+```
+
+The CLI inspection runs offline and prints only a status line to stdout. It
+rejects records that expose a raw device id, include operator free text or raster
+bytes, omit the Stage A/B/C/trusted-record/Stage D evidence digests, or enable
+agent direct printing. In the desktop app, use `Inspect stable-support gate` in
+the Printer panel to validate the selected JSON through the same CLI path and
+show the reviewed Stage D state in the setup flow.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A

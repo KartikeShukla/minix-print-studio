@@ -359,6 +359,10 @@ def run(
             inspect_trusted_printer_record(Path(args.record_path))
             stdout.write("trusted-printer-record-inspected\n")
             return 0
+        if args.command == "inspect-stable-support-gate":
+            inspect_stable_support_gate(Path(args.record_path))
+            stdout.write("stable-support-gate-inspected\n")
+            return 0
         if args.command == "record-protocol-sanity":
             record_protocol_sanity_artifact(
                 stage_a_artifact_path=Path(args.stage_a_artifact),
@@ -508,6 +512,14 @@ def _build_parser() -> argparse.ArgumentParser:
     trusted_inspect_parser.add_argument(
         "record_path",
         help="Path to a trusted-printer JSON record.",
+    )
+    stable_support_inspect_parser = subparsers.add_parser(
+        "inspect-stable-support-gate",
+        help="Inspect a stable-support gate JSON record without contacting the daemon.",
+    )
+    stable_support_inspect_parser.add_argument(
+        "record_path",
+        help="Path to a stable-support gate JSON record.",
     )
     record_tiny_parser = subparsers.add_parser(
         "record-tiny-visual-card",
@@ -1584,6 +1596,170 @@ def inspect_trusted_printer_record(record_path: Path) -> dict[str, object]:
             "stableSupportClaimEnabled": False,
         },
         "nextRequiredStage": next_required_stage,
+    }
+
+
+def inspect_stable_support_gate(record_path: Path) -> dict[str, object]:
+    try:
+        decoded = json.loads(record_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("stable-support gate not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HardwareTestCliError("stable-support gate is invalid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError("stable-support gate is not a JSON object")
+    if "deviceId" in decoded or "rawDeviceId" in decoded:
+        raise HardwareTestCliError("stable-support gate exposes raw device id")
+
+    device = _required_json_object(decoded, "device", "stable-support-gate")
+    safety = _required_json_object(decoded, "safety", "stable-support-gate")
+    hardware_evidence = _required_json_object(
+        decoded,
+        "hardwareEvidence",
+        "stable-support-gate",
+    )
+    if "deviceId" in device or "rawDeviceId" in device:
+        raise HardwareTestCliError("stable-support gate exposes raw device id")
+    if (
+        _required_json_string(decoded, "status", "stable-support-gate")
+        != "stable_support_claims_enabled"
+    ):
+        raise HardwareTestCliError("stable-support gate has wrong status")
+    if not _required_json_bool(device, "idRedacted", "stable-support-gate.device"):
+        raise HardwareTestCliError("stable-support gate exposes raw device id")
+    device_fingerprint = _required_json_string(
+        device,
+        "fingerprint",
+        "stable-support-gate.device",
+    )
+    if not device_fingerprint.startswith("sha256:"):
+        raise HardwareTestCliError("stable-support gate has invalid device fingerprint")
+    trusted_for = _required_json_string_list(decoded, "trustedFor", "stable-support-gate")
+    for trust in (
+        "manual_continuous_printing",
+        "long_print_continuous_printing",
+        "stable_support_claims",
+    ):
+        if trust not in trusted_for:
+            raise HardwareTestCliError("stable-support gate does not include required trust")
+    if _required_json_bool(decoded, "operatorNoteIncluded", "stable-support-gate"):
+        raise HardwareTestCliError("stable-support gate includes operator free text")
+    if _required_json_bool(decoded, "rasterBytesIncluded", "stable-support-gate"):
+        raise HardwareTestCliError("stable-support gate includes raster bytes")
+
+    for field in (
+        "manualContinuousPrintingEnabled",
+        "longPrintReliabilityPassed",
+        "longPrintPrintingEnabled",
+        "stableSupportClaimEnabled",
+    ):
+        if not _required_json_bool(safety, field, "stable-support-gate.safety"):
+            raise HardwareTestCliError("stable-support gate is missing enabled support")
+    if _required_json_bool(
+        safety,
+        "agentDirectPrintingEnabled",
+        "stable-support-gate.safety",
+    ):
+        raise HardwareTestCliError("stable-support gate enables agent direct printing")
+    if (
+        _required_json_string(
+            safety,
+            "agentDirectPrintingDefault",
+            "stable-support-gate.safety",
+        )
+        != "approval_required"
+    ):
+        raise HardwareTestCliError("stable-support gate has wrong agent direct default")
+    next_required_stage = _required_json_string(
+        decoded,
+        "nextRequiredStage",
+        "stable-support-gate",
+    )
+    if next_required_stage != "agent_direct_printing_policy_review":
+        raise HardwareTestCliError("stable-support gate has wrong next stage")
+
+    return {
+        "status": "stable_support_claims_enabled",
+        "profileId": _required_json_string(decoded, "profileId", "stable-support-gate"),
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "trustedFor": trusted_for,
+        "operatorNoteIncluded": False,
+        "rasterBytesIncluded": False,
+        "hardwareEvidence": {
+            "stageA": _summarize_support_gate_evidence_stage(
+                hardware_evidence,
+                "stageA",
+                expected_stage="read_only_verification",
+            ),
+            "protocolSanity": _summarize_support_gate_evidence_stage(
+                hardware_evidence,
+                "protocolSanity",
+                expected_stage="protocol_sanity_test",
+            ),
+            "tinyVisualCard": _summarize_support_gate_evidence_stage(
+                hardware_evidence,
+                "tinyVisualCard",
+                expected_stage="tiny_visual_test_card",
+            ),
+            "trustedPrinter": _summarize_support_gate_evidence_stage(
+                hardware_evidence,
+                "trustedPrinter",
+                expected_stage="trusted_printer_record",
+            ),
+            "longPrintReliability": _summarize_support_gate_evidence_stage(
+                hardware_evidence,
+                "longPrintReliability",
+                expected_stage="long_print_reliability",
+            ),
+        },
+        "safety": {
+            "manualContinuousPrintingEnabled": True,
+            "longPrintReliabilityPassed": True,
+            "longPrintPrintingEnabled": True,
+            "stableSupportClaimEnabled": True,
+            "agentDirectPrintingEnabled": False,
+            "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": next_required_stage,
+    }
+
+
+def _summarize_support_gate_evidence_stage(
+    hardware_evidence: Mapping[str, object],
+    field: str,
+    *,
+    expected_stage: str,
+) -> dict[str, object]:
+    evidence = _required_json_object(
+        hardware_evidence,
+        field,
+        "stable-support-gate.hardwareEvidence",
+    )
+    stage = _required_json_string(
+        evidence,
+        "stage",
+        f"stable-support-gate.hardwareEvidence.{field}",
+    )
+    if stage != expected_stage:
+        raise HardwareTestCliError("stable-support gate evidence stage mismatch")
+    artifact_sha256 = _required_json_string(
+        evidence,
+        "artifactSha256",
+        f"stable-support-gate.hardwareEvidence.{field}",
+    )
+    if len(artifact_sha256) != 64:
+        raise HardwareTestCliError("stable-support gate evidence digest is invalid")
+    return {
+        "stage": stage,
+        "status": _required_json_string(
+            evidence,
+            "status",
+            f"stable-support-gate.hardwareEvidence.{field}",
+        ),
+        "artifactSha256Included": True,
     }
 
 

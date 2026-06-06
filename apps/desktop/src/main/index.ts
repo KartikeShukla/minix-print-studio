@@ -1,28 +1,35 @@
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type OpenDialogOptions,
+} from "electron";
 import log from "electron-log";
 import {
   buildAgentIntegrationPreview,
   testAgentIntegrationConnection,
-  type AgentIntegrationTargetId
+  type AgentIntegrationTargetId,
 } from "./agentIntegrations";
 import { buildBetaFeedbackDraft } from "./betaFeedback";
 import {
   createDaemonLaunchConfig,
   createDaemonRuntime,
   resolveDaemonMockMode,
-  startDaemon
+  startDaemon,
 } from "./daemonSupervisor";
 import {
   installAgentIntegrationConfig,
-  uninstallAgentIntegrationConfig
+  uninstallAgentIntegrationConfig,
 } from "./integrationInstaller";
 import { ensureMcpShim } from "./mcpShim";
 import { exportClaudeDesktopMcpb } from "./mcpbExport";
 import {
   checkHostBluetoothReadiness,
   inspectHardwareArtifact,
-  inspectTrustedPrinterRecord
+  inspectStableSupportGate,
+  inspectTrustedPrinterRecord,
 } from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
 import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
@@ -41,7 +48,9 @@ function createWindow(): void {
     minHeight: 680,
     title: "MiniX Print Studio",
     backgroundColor: "#f8f6f0",
-    webPreferences: buildSecureWebPreferences(path.join(__dirname, "../preload/index.js"))
+    webPreferences: buildSecureWebPreferences(
+      path.join(__dirname, "../preload/index.js"),
+    ),
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -60,7 +69,7 @@ function startSidecar(): void {
     token: runtime.token,
     mock: runtime.mock,
     dataDir: path.join(app.getPath("userData"), "daemon"),
-    sidecarMode
+    sidecarMode,
   });
 
   const child = startDaemon(config);
@@ -68,12 +77,12 @@ function startSidecar(): void {
     writeDaemonRuntimeHandoff({
       runtime,
       userDataPath: app.getPath("userData"),
-      pid: child.pid ?? process.pid
+      pid: child.pid ?? process.pid,
     });
     ensureMcpShim({
       userDataPath: app.getPath("userData"),
       repoRoot,
-      sidecarMode
+      sidecarMode,
     });
   } catch (error) {
     log.warn("Unable to write daemon runtime handoff or MCP shim", error);
@@ -86,85 +95,98 @@ function startSidecar(): void {
 ipcMain.handle("app:version", () => app.getVersion());
 ipcMain.handle("daemon:runtime", () => ({
   baseUrl: runtime.baseUrl,
-  token: runtime.token
+  token: runtime.token,
 }));
 ipcMain.handle("agent-integrations:preview", () =>
-  buildAgentIntegrationPreview({ userDataPath: app.getPath("userData") })
+  buildAgentIntegrationPreview({ userDataPath: app.getPath("userData") }),
 );
-ipcMain.handle("agent-integrations:install", (_event, targetId: AgentIntegrationTargetId) => {
-  const userDataPath = app.getPath("userData");
-  const target = getAgentIntegrationTarget(targetId, userDataPath);
-  return installAgentIntegrationConfig({
-    targetId,
-    configPath: target.configPath,
-    content: target.content,
-    userDataPath
-  });
-});
-ipcMain.handle("agent-integrations:uninstall", (_event, targetId: AgentIntegrationTargetId) => {
-  const userDataPath = app.getPath("userData");
-  const target = getAgentIntegrationTarget(targetId, userDataPath);
-  return uninstallAgentIntegrationConfig({
-    targetId,
-    configPath: target.configPath,
-    userDataPath
-  });
-});
-ipcMain.handle("agent-integrations:test", (_event, targetId: AgentIntegrationTargetId) =>
-  testAgentIntegrationConnection({
-    targetId,
-    userDataPath: app.getPath("userData"),
-    repoRoot: getRepoRoot(),
-    sidecarMode: app.isPackaged ? "bundled" : "source"
-  })
+ipcMain.handle(
+  "agent-integrations:install",
+  (_event, targetId: AgentIntegrationTargetId) => {
+    const userDataPath = app.getPath("userData");
+    const target = getAgentIntegrationTarget(targetId, userDataPath);
+    return installAgentIntegrationConfig({
+      targetId,
+      configPath: target.configPath,
+      content: target.content,
+      userDataPath,
+    });
+  },
 );
-ipcMain.handle("agent-integrations:export-bundle", (_event, targetId: AgentIntegrationTargetId) => {
-  if (targetId !== "claude-desktop") {
-    throw new Error(`${targetId} does not support MCPB export`);
-  }
-  return exportClaudeDesktopMcpb({
-    userDataPath: app.getPath("userData"),
-    repoRoot: getRepoRoot(),
-    sidecarMode: app.isPackaged ? "bundled" : "source"
-  });
-});
+ipcMain.handle(
+  "agent-integrations:uninstall",
+  (_event, targetId: AgentIntegrationTargetId) => {
+    const userDataPath = app.getPath("userData");
+    const target = getAgentIntegrationTarget(targetId, userDataPath);
+    return uninstallAgentIntegrationConfig({
+      targetId,
+      configPath: target.configPath,
+      userDataPath,
+    });
+  },
+);
+ipcMain.handle(
+  "agent-integrations:test",
+  (_event, targetId: AgentIntegrationTargetId) =>
+    testAgentIntegrationConnection({
+      targetId,
+      userDataPath: app.getPath("userData"),
+      repoRoot: getRepoRoot(),
+      sidecarMode: app.isPackaged ? "bundled" : "source",
+    }),
+);
+ipcMain.handle(
+  "agent-integrations:export-bundle",
+  (_event, targetId: AgentIntegrationTargetId) => {
+    if (targetId !== "claude-desktop") {
+      throw new Error(`${targetId} does not support MCPB export`);
+    }
+    return exportClaudeDesktopMcpb({
+      userDataPath: app.getPath("userData"),
+      repoRoot: getRepoRoot(),
+      sidecarMode: app.isPackaged ? "bundled" : "source",
+    });
+  },
+);
 ipcMain.handle("support:export-bundle", () =>
   exportSupportBundle({
     userDataPath: app.getPath("userData"),
     appVersion: app.getVersion(),
-    platform: process.platform
-  })
-);
-ipcMain.handle("support:create-feedback-draft", (_event, request?: { supportBundlePath?: string }) =>
-  buildBetaFeedbackDraft({
-    appVersion: app.getVersion(),
     platform: process.platform,
-    supportBundlePath: request?.supportBundlePath ?? null
-  })
+  }),
+);
+ipcMain.handle(
+  "support:create-feedback-draft",
+  (_event, request?: { supportBundlePath?: string }) =>
+    buildBetaFeedbackDraft({
+      appVersion: app.getVersion(),
+      platform: process.platform,
+      supportBundlePath: request?.supportBundlePath ?? null,
+    }),
 );
 ipcMain.handle("updates:get-state", () =>
   getUpdateChannelState({
     userDataPath: app.getPath("userData"),
-    appVersion: app.getVersion()
-  })
+    appVersion: app.getVersion(),
+  }),
 );
 ipcMain.handle("updates:set-channel", (_event, channel: string) =>
   setUpdateChannel({
     userDataPath: app.getPath("userData"),
     appVersion: app.getVersion(),
-    channel
-  })
+    channel,
+  }),
 );
 ipcMain.handle("hardware-readiness:check", () =>
   checkHostBluetoothReadiness({
-    repoRoot: getRepoRoot()
-  })
+    repoRoot: getRepoRoot(),
+  }),
 );
 ipcMain.handle("hardware-artifacts:inspect", async () => {
   const options: OpenDialogOptions = {
     title: "Inspect Stage A artifact",
     properties: ["openFile"],
-    filters: [{ name: "Hardware-test ZIP", extensions: ["zip"] }]
+    filters: [{ name: "Hardware-test ZIP", extensions: ["zip"] }],
   };
   const selection = mainWindow
     ? await dialog.showOpenDialog(mainWindow, options)
@@ -175,14 +197,14 @@ ipcMain.handle("hardware-artifacts:inspect", async () => {
   }
   return inspectHardwareArtifact({
     artifactPath,
-    repoRoot: getRepoRoot()
+    repoRoot: getRepoRoot(),
   });
 });
 ipcMain.handle("trusted-printer-records:inspect", async () => {
   const options: OpenDialogOptions = {
     title: "Inspect trusted-printer record",
     properties: ["openFile"],
-    filters: [{ name: "Trusted-printer JSON", extensions: ["json"] }]
+    filters: [{ name: "Trusted-printer JSON", extensions: ["json"] }],
   };
   const selection = mainWindow
     ? await dialog.showOpenDialog(mainWindow, options)
@@ -193,11 +215,32 @@ ipcMain.handle("trusted-printer-records:inspect", async () => {
   }
   return inspectTrustedPrinterRecord({
     recordPath,
-    repoRoot: getRepoRoot()
+    repoRoot: getRepoRoot(),
+  });
+});
+ipcMain.handle("stable-support-gates:inspect", async () => {
+  const options: OpenDialogOptions = {
+    title: "Inspect stable-support gate",
+    properties: ["openFile"],
+    filters: [{ name: "Stable-support gate JSON", extensions: ["json"] }],
+  };
+  const selection = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  const recordPath = selection.filePaths[0];
+  if (selection.canceled || !recordPath) {
+    return null;
+  }
+  return inspectStableSupportGate({
+    recordPath,
+    repoRoot: getRepoRoot(),
   });
 });
 
-function getAgentIntegrationTarget(targetId: AgentIntegrationTargetId, userDataPath: string) {
+function getAgentIntegrationTarget(
+  targetId: AgentIntegrationTargetId,
+  userDataPath: string,
+) {
   const preview = buildAgentIntegrationPreview({ userDataPath });
   const target = preview.targets.find((candidate) => candidate.id === targetId);
   if (!target) {

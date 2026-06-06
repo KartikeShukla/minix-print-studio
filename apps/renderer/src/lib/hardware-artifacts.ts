@@ -159,6 +159,44 @@ export type TrustedPrinterRecordInspectionResult = {
   summary: TrustedPrinterRecordSummary;
 };
 
+export type StableSupportGateSummary = {
+  status: string;
+  profileId: string;
+  device: {
+    idRedacted: boolean;
+    fingerprint: string;
+  };
+  trustedFor: string[];
+  operatorNoteIncluded: boolean;
+  rasterBytesIncluded: boolean;
+  hardwareEvidence: TrustedPrinterRecordSummary["hardwareEvidence"] & {
+    trustedPrinter: {
+      stage: string;
+      status: string;
+      artifactSha256Included: boolean;
+    };
+    longPrintReliability: {
+      stage: string;
+      status: string;
+      artifactSha256Included: boolean;
+    };
+  };
+  safety: {
+    manualContinuousPrintingEnabled: boolean;
+    longPrintReliabilityPassed: boolean;
+    longPrintPrintingEnabled: boolean;
+    stableSupportClaimEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    agentDirectPrintingDefault: string;
+  };
+  nextRequiredStage: string;
+};
+
+export type StableSupportGateInspectionResult = {
+  recordPath: string;
+  summary: StableSupportGateSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -181,6 +219,10 @@ export type TrustedPrinterRecordInspector = {
   inspect: () => Promise<TrustedPrinterRecordInspectionResult | null>;
 };
 
+export type StableSupportGateInspector = {
+  inspect: () => Promise<StableSupportGateInspectionResult | null>;
+};
+
 export type HardwareReadinessProvider = {
   check: () => Promise<HardwareHostReadiness>;
 };
@@ -192,25 +234,38 @@ export const desktopHardwareArtifactInspector: HardwareArtifactInspector = {
       throw new Error("Hardware artifact inspection is unavailable");
     }
     return inspectHardwareArtifact();
-  }
+  },
 };
 
-export const desktopTrustedPrinterRecordInspector: TrustedPrinterRecordInspector = {
+export const desktopTrustedPrinterRecordInspector: TrustedPrinterRecordInspector =
+  {
+    async inspect() {
+      const inspectTrustedPrinterRecord =
+        window.minix?.inspectTrustedPrinterRecord;
+      if (!inspectTrustedPrinterRecord) {
+        throw new Error("Trusted-printer record inspection is unavailable");
+      }
+      return inspectTrustedPrinterRecord();
+    },
+  };
+
+export const desktopStableSupportGateInspector: StableSupportGateInspector = {
   async inspect() {
-    const inspectTrustedPrinterRecord = window.minix?.inspectTrustedPrinterRecord;
-    if (!inspectTrustedPrinterRecord) {
-      throw new Error("Trusted-printer record inspection is unavailable");
+    const inspectStableSupportGate = window.minix?.inspectStableSupportGate;
+    if (!inspectStableSupportGate) {
+      throw new Error("Stable-support gate inspection is unavailable");
     }
-    return inspectTrustedPrinterRecord();
-  }
+    return inspectStableSupportGate();
+  },
 };
 
 export const desktopHardwareReadinessProvider: HardwareReadinessProvider = {
   async check() {
-    const checkHostBluetoothReadiness = window.minix?.checkHostBluetoothReadiness;
+    const checkHostBluetoothReadiness =
+      window.minix?.checkHostBluetoothReadiness;
     if (!checkHostBluetoothReadiness) {
       throw new Error("Host Bluetooth readiness check is unavailable");
     }
     return checkHostBluetoothReadiness();
-  }
+  },
 };

@@ -5,7 +5,8 @@ import path from "node:path";
 import {
   checkHostBluetoothReadiness,
   inspectHardwareArtifact,
-  inspectTrustedPrinterRecord
+  inspectStableSupportGate,
+  inspectTrustedPrinterRecord,
 } from "../src/main/hardwareArtifacts";
 
 describe("hardware artifact inspection bridge", () => {
@@ -22,23 +23,24 @@ describe("hardware artifact inspection bridge", () => {
             platform: "Darwin",
             controllerVisible: false,
             canAttemptStageA: false,
-            detail: "macOS did not report a Bluetooth controller to this process.",
+            detail:
+              "macOS did not report a Bluetooth controller to this process.",
             recommendedActions: [
               "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
-              "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+              "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access.",
             ],
             checks: [
               {
                 name: "system_profiler SPBluetoothDataType",
                 status: "not_visible",
-                evidence: "controllerInfo == nil"
-              }
-            ]
+                evidence: "controllerInfo == nil",
+              },
+            ],
           }),
           stderr: "",
-          exitCode: 0
+          exitCode: 0,
         };
-      }
+      },
     });
 
     expect(result).toEqual({
@@ -49,22 +51,22 @@ describe("hardware artifact inspection bridge", () => {
       detail: "macOS did not report a Bluetooth controller to this process.",
       recommendedActions: [
         "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
-        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access."
+        "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed local session with Bluetooth access.",
       ],
       checks: [
         {
           name: "system_profiler SPBluetoothDataType",
           status: "not_visible",
-          evidence: "controllerInfo == nil"
-        }
-      ]
+          evidence: "controllerInfo == nil",
+        },
+      ],
     });
     expect(calls).toEqual([
       {
         command: "/repo/minix/.venv/bin/python",
         args: ["-m", "minixd.hardware_test_cli", "host-readiness"],
-        cwd: "/repo/minix"
-      }
+        cwd: "/repo/minix",
+      },
     ]);
   });
 
@@ -82,10 +84,10 @@ describe("hardware artifact inspection bridge", () => {
               status: "valid_stage_a_artifact",
               deviceId: "mock-minix-0194",
               profileId: "seznik-minix-s1-lyin48d-gy",
-              nextRequiredStage: "protocol_sanity_test"
+              nextRequiredStage: "protocol_sanity_test",
             }),
             stderr: "",
-            exitCode: 0
+            exitCode: 0,
           };
         }
         if (args.includes("protocol-sanity-preflight")) {
@@ -106,18 +108,18 @@ describe("hardware artifact inspection bridge", () => {
                   index: 0,
                   name: "wake",
                   payloadBytes: 12,
-                  hex: "00 00 00 00 00 00 00 00 00 00 00 00"
-                }
+                  hex: "00 00 00 00 00 00 00 00 00 00 00 00",
+                },
               ],
               safety: {
                 requiresPhysicalPrinter: true,
                 requiresUserConfirmation: true,
                 sendsRaster: false,
-                unlocksPrinting: false
-              }
+                unlocksPrinting: false,
+              },
             }),
             stderr: "",
-            exitCode: 0
+            exitCode: 0,
           };
         }
         if (args.includes("evidence-summary")) {
@@ -130,7 +132,7 @@ describe("hardware artifact inspection bridge", () => {
               nextRequiredStage: "protocol_sanity_test",
               device: {
                 idRedacted: true,
-                fingerprint: "sha256:3d90f3ac7a07147e"
+                fingerprint: "sha256:3d90f3ac7a07147e",
               },
               redaction: {
                 artifactPathIncluded: false,
@@ -139,7 +141,7 @@ describe("hardware artifact inspection bridge", () => {
                 rawNotificationLogIncluded: false,
                 commandPayloadHexIncluded: false,
                 rasterBytesIncluded: false,
-                bearerTokensIncluded: false
+                bearerTokensIncluded: false,
               },
               certification: {
                 stageAReadOnlyVerified: true,
@@ -147,7 +149,7 @@ describe("hardware artifact inspection bridge", () => {
                 certificationComplete: false,
                 requiresStageBProtocolSanity: true,
                 requiresTinyVisualCard: true,
-                requiresLongPrintReliability: true
+                requiresLongPrintReliability: true,
               },
               preflights: {
                 protocolSanity: {
@@ -155,7 +157,7 @@ describe("hardware artifact inspection bridge", () => {
                   stage: "protocol_sanity_test",
                   commandCount: 3,
                   sendsRaster: false,
-                  unlocksPrinting: false
+                  unlocksPrinting: false,
                 },
                 tinyVisualCard: {
                   status: "tiny_visual_card_preflight_ready",
@@ -164,12 +166,12 @@ describe("hardware artifact inspection bridge", () => {
                   heightDots: 160,
                   rawBytesIncluded: false,
                   contentSha256:
-                    "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
-                }
-              }
+                    "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31",
+                },
+              },
             }),
             stderr: "",
-            exitCode: 0
+            exitCode: 0,
           };
         }
         return {
@@ -193,13 +195,13 @@ describe("hardware artifact inspection bridge", () => {
               rasterBytes: 7680,
               rawBytesIncluded: false,
               contentSha256:
-                "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31"
+                "d1f0cdbf2eb7b70262fbe7825ac39e47847d3eaccc8737f4ff61a1970a9beb31",
             },
             confirmationChecklist: [
               "Text MINIX TEST 7K4P is readable.",
               "Left and right edge markers are visible.",
               "Output is not mirrored or upside down.",
-              "Feed is smooth with no stall, overheat warning, disconnect, or fatal error."
+              "Feed is smooth with no stall, overheat warning, disconnect, or fatal error.",
             ],
             safety: {
               requiresPhysicalPrinter: true,
@@ -207,13 +209,13 @@ describe("hardware artifact inspection bridge", () => {
               requiresPriorProtocolSanity: true,
               sendsRasterIfExecuted: true,
               unlocksPrinting: false,
-              preflightOnly: true
-            }
+              preflightOnly: true,
+            },
           }),
           stderr: "",
-          exitCode: 0
+          exitCode: 0,
         };
-      }
+      },
     });
 
     expect(result).toEqual(
@@ -221,32 +223,32 @@ describe("hardware artifact inspection bridge", () => {
         artifactPath: "/tmp/hardware-test-stage-a.zip",
         inspection: expect.objectContaining({
           status: "valid_stage_a_artifact",
-          nextRequiredStage: "protocol_sanity_test"
+          nextRequiredStage: "protocol_sanity_test",
         }),
         preflight: expect.objectContaining({
           status: "protocol_sanity_preflight_ready",
           printCommandsSent: false,
-          rasterBytesIncluded: false
+          rasterBytesIncluded: false,
         }),
         evidenceSummary: expect.objectContaining({
           status: "shareable_stage_a_evidence_ready",
           shareable: true,
           device: {
             idRedacted: true,
-            fingerprint: "sha256:3d90f3ac7a07147e"
+            fingerprint: "sha256:3d90f3ac7a07147e",
           },
           redaction: expect.objectContaining({
             artifactPathIncluded: false,
             commandPayloadHexIncluded: false,
-            rasterBytesIncluded: false
-          })
+            rasterBytesIncluded: false,
+          }),
         }),
         visualCardPreflight: expect.objectContaining({
           status: "tiny_visual_card_preflight_ready",
           displayText: "MINIX TEST 7K4P",
-          rasterBytesIncluded: false
-        })
-      })
+          rasterBytesIncluded: false,
+        }),
+      }),
     );
     expect(calls).toEqual([
       {
@@ -255,9 +257,9 @@ describe("hardware artifact inspection bridge", () => {
           "-m",
           "minixd.hardware_test_cli",
           "inspect-artifact",
-          "/tmp/hardware-test-stage-a.zip"
+          "/tmp/hardware-test-stage-a.zip",
         ],
-        cwd: "/repo/minix"
+        cwd: "/repo/minix",
       },
       {
         command: "/repo/minix/.venv/bin/python",
@@ -265,9 +267,9 @@ describe("hardware artifact inspection bridge", () => {
           "-m",
           "minixd.hardware_test_cli",
           "protocol-sanity-preflight",
-          "/tmp/hardware-test-stage-a.zip"
+          "/tmp/hardware-test-stage-a.zip",
         ],
-        cwd: "/repo/minix"
+        cwd: "/repo/minix",
       },
       {
         command: "/repo/minix/.venv/bin/python",
@@ -275,9 +277,9 @@ describe("hardware artifact inspection bridge", () => {
           "-m",
           "minixd.hardware_test_cli",
           "tiny-visual-card-preflight",
-          "/tmp/hardware-test-stage-a.zip"
+          "/tmp/hardware-test-stage-a.zip",
         ],
-        cwd: "/repo/minix"
+        cwd: "/repo/minix",
       },
       {
         command: "/repo/minix/.venv/bin/python",
@@ -285,10 +287,10 @@ describe("hardware artifact inspection bridge", () => {
           "-m",
           "minixd.hardware_test_cli",
           "evidence-summary",
-          "/tmp/hardware-test-stage-a.zip"
+          "/tmp/hardware-test-stage-a.zip",
         ],
-        cwd: "/repo/minix"
-      }
+        cwd: "/repo/minix",
+      },
     ]);
   });
 
@@ -300,16 +302,21 @@ describe("hardware artifact inspection bridge", () => {
         runner: async () => ({
           stdout: "",
           stderr: "artifact is not read-only safe\n",
-          exitCode: 2
-        })
-      })
+          exitCode: 2,
+        }),
+      }),
     ).rejects.toThrow("artifact is not read-only safe");
   });
 
   it("runs the shared hardware-test CLI trusted-printer record inspection", async () => {
     const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "minix-trusted-record-test-"));
-    const recordPath = path.join(tempDir, "trusted-printer-fa0f77ee9e7e43ea.json");
+    const tempDir = await mkdtemp(
+      path.join(os.tmpdir(), "minix-trusted-record-test-"),
+    );
+    const recordPath = path.join(
+      tempDir,
+      "trusted-printer-fa0f77ee9e7e43ea.json",
+    );
 
     try {
       await writeFile(
@@ -319,7 +326,7 @@ describe("hardware artifact inspection bridge", () => {
           profileId: "seznik-minix-s1-lyin48d-gy",
           device: {
             idRedacted: true,
-            fingerprint: "sha256:fa0f77ee9e7e43ea"
+            fingerprint: "sha256:fa0f77ee9e7e43ea",
           },
           trustedFor: ["manual_continuous_printing"],
           operatorNoteIncluded: false,
@@ -327,28 +334,28 @@ describe("hardware artifact inspection bridge", () => {
             stageA: {
               stage: "read_only_verification",
               status: "valid_stage_a_artifact",
-              artifactSha256: "a".repeat(64)
+              artifactSha256: "a".repeat(64),
             },
             protocolSanity: {
               stage: "protocol_sanity_test",
               status: "confirmed_complete",
-              artifactSha256: "b".repeat(64)
+              artifactSha256: "b".repeat(64),
             },
             tinyVisualCard: {
               stage: "tiny_visual_test_card",
               status: "confirmed_complete",
-              artifactSha256: "c".repeat(64)
-            }
+              artifactSha256: "c".repeat(64),
+            },
           },
           safety: {
             manualContinuousPrintingEnabled: true,
             longPrintReliabilityRequired: true,
             longPrintPrintingEnabled: false,
             agentDirectPrintingEnabled: false,
-            stableSupportClaimEnabled: false
+            stableSupportClaimEnabled: false,
           },
-          nextRequiredStage: "long_print_reliability"
-        })
+          nextRequiredStage: "long_print_reliability",
+        }),
       );
       const result = await inspectTrustedPrinterRecord({
         recordPath,
@@ -358,9 +365,9 @@ describe("hardware artifact inspection bridge", () => {
           return {
             stdout: "trusted-printer-record-inspected\n",
             stderr: "",
-            exitCode: 0
+            exitCode: 0,
           };
-        }
+        },
       });
 
       expect(result).toEqual(
@@ -371,17 +378,17 @@ describe("hardware artifact inspection bridge", () => {
             profileId: "seznik-minix-s1-lyin48d-gy",
             device: {
               idRedacted: true,
-              fingerprint: "sha256:fa0f77ee9e7e43ea"
+              fingerprint: "sha256:fa0f77ee9e7e43ea",
             },
             safety: expect.objectContaining({
               manualContinuousPrintingEnabled: true,
               longPrintReliabilityRequired: true,
               longPrintPrintingEnabled: false,
               agentDirectPrintingEnabled: false,
-              stableSupportClaimEnabled: false
-            })
-          })
-        })
+              stableSupportClaimEnabled: false,
+            }),
+          }),
+        }),
       );
       expect(JSON.stringify(result)).not.toContain("mock-minix-0194");
       expect(JSON.stringify(result)).not.toContain("aaaaaaaa");
@@ -393,11 +400,135 @@ describe("hardware artifact inspection bridge", () => {
             "-m",
             "minixd.hardware_test_cli",
             "inspect-trusted-printer-record",
-            recordPath
+            recordPath,
           ],
-          cwd: "/repo/minix"
-        })
+          cwd: "/repo/minix",
+        }),
       );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs the shared hardware-test CLI stable-support gate inspection", async () => {
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+    const tempDir = await mkdtemp(
+      path.join(os.tmpdir(), "minix-support-gate-test-"),
+    );
+    const recordPath = path.join(
+      tempDir,
+      "stable-support-gate-fa0f77ee9e7e43ea.json",
+    );
+
+    try {
+      await writeFile(
+        recordPath,
+        JSON.stringify({
+          status: "stable_support_claims_enabled",
+          profileId: "seznik-minix-s1-lyin48d-gy",
+          device: {
+            idRedacted: true,
+            fingerprint: "sha256:fa0f77ee9e7e43ea",
+          },
+          trustedFor: [
+            "manual_continuous_printing",
+            "long_print_continuous_printing",
+            "stable_support_claims",
+          ],
+          operatorNoteIncluded: false,
+          rasterBytesIncluded: false,
+          hardwareEvidence: {
+            stageA: {
+              stage: "read_only_verification",
+              status: "valid_stage_a_artifact",
+              artifactSha256: "a".repeat(64),
+            },
+            protocolSanity: {
+              stage: "protocol_sanity_test",
+              status: "confirmed_complete",
+              artifactSha256: "b".repeat(64),
+            },
+            tinyVisualCard: {
+              stage: "tiny_visual_test_card",
+              status: "confirmed_complete",
+              artifactSha256: "c".repeat(64),
+            },
+            trustedPrinter: {
+              stage: "trusted_printer_record",
+              status: "trusted_for_manual_continuous_printing",
+              artifactSha256: "d".repeat(64),
+            },
+            longPrintReliability: {
+              stage: "long_print_reliability",
+              status: "confirmed_complete",
+              artifactSha256: "e".repeat(64),
+            },
+          },
+          safety: {
+            manualContinuousPrintingEnabled: true,
+            longPrintReliabilityPassed: true,
+            longPrintPrintingEnabled: true,
+            stableSupportClaimEnabled: true,
+            agentDirectPrintingEnabled: false,
+            agentDirectPrintingDefault: "approval_required",
+          },
+          nextRequiredStage: "agent_direct_printing_policy_review",
+        }),
+      );
+
+      const result = await inspectStableSupportGate({
+        recordPath,
+        repoRoot: "/repo/minix",
+        runner: async (command, args, options) => {
+          calls.push({ command, args, cwd: options.cwd });
+          return {
+            stdout: "stable-support-gate-inspected\n",
+            stderr: "",
+            exitCode: 0,
+          };
+        },
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          recordPath,
+          summary: expect.objectContaining({
+            status: "stable_support_claims_enabled",
+            profileId: "seznik-minix-s1-lyin48d-gy",
+            device: {
+              idRedacted: true,
+              fingerprint: "sha256:fa0f77ee9e7e43ea",
+            },
+            safety: expect.objectContaining({
+              longPrintReliabilityPassed: true,
+              longPrintPrintingEnabled: true,
+              stableSupportClaimEnabled: true,
+              agentDirectPrintingEnabled: false,
+              agentDirectPrintingDefault: "approval_required",
+            }),
+            hardwareEvidence: expect.objectContaining({
+              longPrintReliability: expect.objectContaining({
+                stage: "long_print_reliability",
+                artifactSha256Included: true,
+              }),
+            }),
+          }),
+        }),
+      );
+      expect(JSON.stringify(result)).not.toContain("mock-minix-0194");
+      expect(JSON.stringify(result)).not.toContain("aaaaaaaa");
+      expect(calls).toEqual([
+        {
+          command: "/repo/minix/.venv/bin/python",
+          args: [
+            "-m",
+            "minixd.hardware_test_cli",
+            "inspect-stable-support-gate",
+            recordPath,
+          ],
+          cwd: "/repo/minix",
+        },
+      ]);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

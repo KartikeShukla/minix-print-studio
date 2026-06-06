@@ -1179,6 +1179,58 @@ def test_hardware_test_cli_records_stable_support_gate_without_agent_direct_prin
     assert "END LP-TEST checksum" not in encoded_record
 
 
+def test_hardware_test_cli_inspects_stable_support_gate_without_agent_direct_printing(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    device_fingerprint = chain["device_fingerprint"]
+    assert isinstance(device_fingerprint, str)
+    support_gate_output_dir = tmp_path / "support-gate"
+    long_print_artifact_path = _create_long_print_reliability_artifact(tmp_path, chain)
+    stage_a_artifact_path = chain["stage_a"]
+    protocol_artifact_path = chain["protocol_sanity"]
+    tiny_artifact_path = chain["tiny_visual_card"]
+    trusted_record_path = chain["trusted_printer"]
+    assert isinstance(stage_a_artifact_path, Path)
+    assert isinstance(protocol_artifact_path, Path)
+    assert isinstance(tiny_artifact_path, Path)
+    assert isinstance(trusted_record_path, Path)
+    record_exit_code = run(
+        [
+            "record-stable-support-gate",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--long-print-reliability-artifact",
+            str(long_print_artifact_path),
+            "--output-dir",
+            str(support_gate_output_dir),
+        ],
+        stdout=io.StringIO(),
+    )
+    record_path = support_gate_output_dir / (
+        f"stable-support-gate-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    stdout = io.StringIO()
+
+    exit_code = run(
+        ["inspect-stable-support-gate", str(record_path)],
+        stdout=stdout,
+    )
+
+    raw_stdout = stdout.getvalue()
+    assert record_exit_code == 0
+    assert exit_code == 0
+    assert raw_stdout.strip() == "stable-support-gate-inspected"
+    assert "mock-minix-0194" not in raw_stdout
+    assert device_fingerprint not in raw_stdout
+
+
 def test_hardware_test_cli_rejects_support_gate_from_agent_direct_stage_d_unlock(
     tmp_path: Path,
 ) -> None:
