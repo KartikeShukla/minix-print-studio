@@ -58,7 +58,13 @@ Public development is on `main`; implementation slices use short-lived
 - Preview store that binds document hash, render settings hash, raster hash, and approval token.
 - `/v1/render/preview` endpoint that creates preview-bound approval artifacts.
 - `/v1/render/document-preview` endpoint that renders document JSON through the daemon before creating a preview-bound approval artifact.
+- Profile-backed canonical safety reports apply thermal coverage thresholds from
+  the selected printer profile, including daemon recomputation for raw raster
+  preview submissions, and can block dense 64-dot bands before print planning.
 - `/v1/jobs/plan` endpoint that verifies the preview approval token before returning print plan and band metadata without exposing raw raster bytes.
+- `/v1/jobs/plan` and `/v1/jobs/print` reject preview-bound requests whose
+  safety report is blocked, so unsafe dense output cannot bypass the preview
+  gate.
 - In-memory mock print queue that consumes preview-bound jobs and reports `completed_unverified` with user-check actions.
 - `/v1/jobs/print`, `/v1/jobs`, `/v1/jobs/{jobId}`, and `/v1/jobs/{jobId}/segments` endpoints for mock print flow and job inspection.
 - Disk-backed daemon project store with `/v1/projects` create/list/get/update/delete endpoints and hash-addressed project asset upload that persist under `data_dir` when configured.
@@ -69,6 +75,8 @@ Public development is on `main`; implementation slices use short-lived
 - Renderer shows a dismissible first-run Setup checklist that summarizes daemon, printer verification, Stage A artifact, and Agent Integration readiness without unlocking printing, and persists dismissal in localStorage.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
+- Renderer safety panel keeps blocked preview coverage, warning, and error
+  details visible when print planning is refused by the daemon.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
 - MCP daemon HTTP client for bearer-authenticated daemon health and document-preview requests.
@@ -201,6 +209,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for virtual segment-boundary transport disconnects reporting
   `failed_partial_output` and diagnostics that explain why auto-retry is unsafe
   after printable bytes may have left the printer.
+- TDD red/green checks for profile-backed thermal coverage safety reports,
+  blocked-preview rejection at print plan/print boundaries, and renderer display
+  of blocked preview safety details without enabling Print.
 - TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
 - TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.

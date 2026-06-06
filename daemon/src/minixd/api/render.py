@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import base64
 import binascii
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from minixd.render.canonical import document_hash, render_document, render_settings_hash
+from minixd.render.canonical import (
+    build_raster_safety_report,
+    document_hash,
+    render_document,
+    render_settings_hash,
+)
 from minixd.render.preview_store import PreviewRecord, PreviewStore
 
 
@@ -29,12 +34,23 @@ class RenderDocumentPreviewRequest(BaseModel):
     ]
 
 
-def create_render_router(*, preview_store: PreviewStore) -> APIRouter:
+def create_render_router(
+    *,
+    preview_store: PreviewStore,
+    profiles: list[dict[str, Any]],
+) -> APIRouter:
     router = APIRouter(prefix="/v1/render", tags=["render"])
 
     @router.post("/preview")
     def render_preview(request: RenderPreviewRequest) -> dict[str, object]:
         raster = _decode_base64(request.raster_base64)
+        profile = _find_profile(profiles, request.profile_id)
+        safety = build_raster_safety_report(
+            raster,
+            width_dots=request.width_dots,
+            height_dots=request.height_dots,
+            profile=profile,
+        )
         record = preview_store.create(
             document_hash=request.document_hash,
             render_settings_hash=request.render_settings_hash,
@@ -42,19 +58,20 @@ def create_render_router(*, preview_store: PreviewStore) -> APIRouter:
             profile_id=request.profile_id,
             width_dots=request.width_dots,
             height_dots=request.height_dots,
-            safety=request.safety,
+            safety=safety,
         )
         return _serialize_preview_record(record, include_approval_token=True)
 
     @router.post("/document-preview")
     def render_document_preview(request: RenderDocumentPreviewRequest) -> dict[str, object]:
-        rendered = render_document(request.document)
         target = request.document.get("target")
         if not isinstance(target, dict):
             raise HTTPException(status_code=422, detail="document.target is required")
         profile_id = target.get("profileId")
         if not isinstance(profile_id, str):
             raise HTTPException(status_code=422, detail="document.target.profileId is required")
+        profile = _find_profile(profiles, profile_id)
+        rendered = render_document(request.document, profile=profile)
         record = preview_store.create(
             document_hash=document_hash(request.document),
             render_settings_hash=render_settings_hash(request.render_settings),
@@ -74,6 +91,13 @@ def create_render_router(*, preview_store: PreviewStore) -> APIRouter:
         return _serialize_preview_record(record, include_approval_token=False)
 
     return router
+
+
+def _find_profile(profiles: list[dict[str, Any]], profile_id: str) -> dict[str, Any]:
+    for profile in profiles:
+        if profile.get("id") == profile_id:
+            return profile
+    raise HTTPException(status_code=404, detail=f"unknown profile: {profile_id}")
 
 
 def _decode_base64(value: str) -> bytes:

@@ -48,3 +48,45 @@ def test_plan_job_endpoint_returns_segment_metadata_without_raw_raster() -> None
     assert body["bands"][0]["rasterByteLength"] == 12288
     assert body["bands"][0]["payloadBytes"] == 12296
     assert "raster" not in body["bands"][0]
+
+
+def test_plan_job_endpoint_rejects_preview_blocked_by_safety() -> None:
+    client = TestClient(create_app(mock=True))
+    row_bytes = 48
+    content_height = 64
+    content_raster = bytes([0xFF]) * row_bytes * content_height
+    preview_response = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": content_height,
+            "rasterBase64": base64.b64encode(content_raster).decode("ascii"),
+            "safety": {
+                "allowed": False,
+                "warnings": [],
+                "errors": [{"code": "band_coverage_blocked"}],
+                "metrics": {"maxBandCoverage64": 1.0},
+            },
+        },
+    )
+    preview = preview_response.json()
+
+    response = client.post(
+        "/v1/jobs/plan",
+        json={
+            "jobId": "job_dense",
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "preview safety blocked printing: band_coverage_blocked"

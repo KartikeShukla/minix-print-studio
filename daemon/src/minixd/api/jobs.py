@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from minixd.printing.planner import PrintPlanPackage, create_print_plan
 from minixd.printing.queue import PrintJob, PrintQueue, PrintRejectedError
+from minixd.printing.safety import preview_safety_block_reason
 from minixd.render.preview_store import PreviewBindingError, PreviewStore
 
 
@@ -57,6 +58,9 @@ def create_jobs_router(
             )
         except PreviewBindingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        if block_reason := preview_safety_block_reason(preview.safety):
+            raise HTTPException(status_code=409, detail=block_reason)
 
         package = create_print_plan(
             job_id=request.job_id,

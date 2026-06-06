@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from minixd.printing.planner import PrintPlanPackage, RasterBand, create_print_plan
+from minixd.printing.safety import preview_safety_block_reason
 from minixd.render.preview_store import PreviewBindingError, PreviewStore
 
 
@@ -80,6 +81,9 @@ class PrintQueue:
             )
         except PreviewBindingError as exc:
             raise PrintRejectedError(str(exc)) from exc
+
+        if block_reason := preview_safety_block_reason(preview.safety):
+            raise PrintRejectedError(block_reason)
 
         job_id = f"job_{uuid4().hex}"
         plan_package = create_print_plan(
