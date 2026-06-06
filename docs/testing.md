@@ -44,6 +44,8 @@ pnpm release-package-check
 - Offline evidence-summary tests cover maintainer-shareable Stage A summaries
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
+- MCP tool tests cover approval-required print-note policy decisions, safety
+  metric propagation, and approval-token redaction.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.

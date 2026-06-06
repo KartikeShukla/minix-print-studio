@@ -10,6 +10,11 @@ from minix_mcp.daemon_client import (
 )
 
 DEFAULT_RENDER_SETTINGS: JsonObject = {"threshold": 128, "dither": "none"}
+DEFAULT_AGENT_POLICY: JsonObject = {
+    "directPrint": False,
+    "requireTrustedPrinter": True,
+    "rateLimitJobsPerMinute": 3,
+}
 
 
 class DaemonClient(Protocol):
@@ -53,16 +58,27 @@ def print_note_tool(
     text: str,
     title: str = "Agent note",
 ) -> JsonObject:
-    return preview_document_tool(
-        client,
-        document=_build_note_document(text=text, title=title),
-        render_settings=DEFAULT_RENDER_SETTINGS,
+    try:
+        preview = client.create_document_preview(
+            document=_build_note_document(text=text, title=title),
+            render_settings=DEFAULT_RENDER_SETTINGS,
+        )
+    except DaemonUnavailable:
+        return build_app_not_running_response()
+
+    return _approval_required_response(
+        preview,
+        policy_decision=_agent_policy_decision(tool_name="print_note"),
     )
 
 
-def _approval_required_response(preview: JsonObject) -> JsonObject:
+def _approval_required_response(
+    preview: JsonObject,
+    *,
+    policy_decision: JsonObject | None = None,
+) -> JsonObject:
     preview_id = _string_value(preview, "previewId")
-    return {
+    response: JsonObject = {
         "status": "approval_required",
         "previewId": preview_id,
         "approvalUrl": f"minixprint://approval/{preview_id}",
@@ -73,6 +89,23 @@ def _approval_required_response(preview: JsonObject) -> JsonObject:
         "heightDots": _int_value(preview, "heightDots"),
         "expiresAt": _string_value(preview, "expiresAt"),
         "message": "Preview created. User approval is required before printing.",
+    }
+    safety = _optional_object_value(preview, "safety")
+    if safety is not None:
+        response["safety"] = safety
+    if policy_decision is not None:
+        response["policyDecision"] = policy_decision
+    return response
+
+
+def _agent_policy_decision(*, tool_name: str) -> JsonObject:
+    return {
+        "tool": tool_name,
+        "directPrintAllowed": False,
+        "reasons": ["agent_direct_print_disabled", "printer_not_trusted"],
+        "rateLimit": {
+            "jobsPerMinute": _int_value(DEFAULT_AGENT_POLICY, "rateLimitJobsPerMinute")
+        },
     }
 
 
@@ -128,4 +161,13 @@ def _int_value(source: JsonObject, key: str) -> int:
     value: JsonValue = source.get(key)
     if not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
+    return value
+
+
+def _optional_object_value(source: JsonObject, key: str) -> JsonObject | None:
+    value = source.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
     return value
