@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -90,16 +91,38 @@ TINY_VISUAL_CARD_CONFIRMATION_CHECKLIST = (
 LONG_PRINT_RELIABILITY_MIN_ROWS = 2000
 LONG_PRINT_RELIABILITY_MIN_BANDS = 4
 LONG_PRINT_RELIABILITY_MIN_TAIL_ROWS = 160
+LONG_PRINT_RELIABILITY_HEIGHT_DOTS = 8000
+LONG_PRINT_RELIABILITY_PRINT_TIMEOUT_SECONDS = 600.0
+LONG_PRINT_RELIABILITY_SOURCE = "hardware-test-long-print-reliability"
+LONG_PRINT_RELIABILITY_CHECKSUM = "7F3A"
+LONG_PRINT_RELIABILITY_MARKERS = (
+    ("START LP-TEST", 24),
+    ("25% MARKER", 2000),
+    ("50% MARKER", 4000),
+    ("75% MARKER", 6000),
+    (f"END LP-TEST {LONG_PRINT_RELIABILITY_CHECKSUM}", 7904),
+)
 _TINY_CARD_FONT: dict[str, tuple[str, ...]] = {
+    "%": ("11001", "11010", "00100", "01000", "01011", "10011", "00000"),
+    "-": ("00000", "00000", "00000", "11111", "00000", "00000", "00000"),
     " ": ("00000", "00000", "00000", "00000", "00000", "00000", "00000"),
+    "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
+    "2": ("01110", "10001", "00001", "00010", "00100", "01000", "11111"),
+    "3": ("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
     "4": ("10010", "10010", "10010", "11111", "00010", "00010", "00010"),
+    "5": ("11111", "10000", "10000", "11110", "00001", "00001", "11110"),
     "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
+    "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
+    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
     "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+    "F": ("11111", "10000", "10000", "11110", "10000", "10000", "10000"),
     "I": ("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
     "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
+    "L": ("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
     "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
     "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
     "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
     "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
     "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
     "X": ("10001", "01010", "00100", "00100", "00100", "01010", "10001"),
@@ -138,14 +161,83 @@ class HardwareTestClient:
     def get_job_status(self, *, job_id: str) -> dict[str, object]:
         return self._request_json("GET", f"/v1/jobs/{urllib.parse.quote(job_id, safe='')}")
 
+    def create_raster_preview(
+        self,
+        *,
+        document_hash: str,
+        render_settings_hash: str,
+        profile_id: str,
+        width_dots: int,
+        height_dots: int,
+        packed_raster: bytes,
+    ) -> dict[str, object]:
+        return self._request_json(
+            "POST",
+            "/v1/render/preview",
+            body={
+                "documentHash": document_hash,
+                "renderSettingsHash": render_settings_hash,
+                "profileId": profile_id,
+                "widthDots": width_dots,
+                "heightDots": height_dots,
+                "rasterBase64": base64.b64encode(packed_raster).decode("ascii"),
+                "safety": {
+                    "allowed": True,
+                    "errors": [],
+                    "warnings": ["operator confirmation required"],
+                },
+            },
+        )
+
+    def print_preview(
+        self,
+        *,
+        preview: Mapping[str, object],
+        device_id: str,
+        profile_id: str,
+        paper_mode: str,
+        density: str,
+        timeout: float | None = None,
+    ) -> dict[str, object]:
+        return self._request_json(
+            "POST",
+            "/v1/jobs/print",
+            body={
+                "previewId": _required_json_string(preview, "previewId", "render-preview"),
+                "approvalToken": _required_json_string(
+                    preview,
+                    "approvalToken",
+                    "render-preview",
+                ),
+                "documentHash": _required_json_string(
+                    preview,
+                    "documentHash",
+                    "render-preview",
+                ),
+                "renderSettingsHash": _required_json_string(
+                    preview,
+                    "renderSettingsHash",
+                    "render-preview",
+                ),
+                "profileId": profile_id,
+                "paperMode": paper_mode,
+                "density": density,
+                "copies": 1,
+                "source": LONG_PRINT_RELIABILITY_SOURCE,
+                "deviceId": device_id,
+            },
+            timeout=timeout,
+        )
+
     def _request_json(
         self,
         method: str,
         path: str,
         *,
         body: dict[str, object] | None = None,
+        timeout: float | None = None,
     ) -> dict[str, object]:
-        response = self._request(method, path, body=body)
+        response = self._request(method, path, body=body, timeout=timeout)
         try:
             decoded = json.loads(response.body.decode("utf-8"))
         except json.JSONDecodeError as exc:
@@ -160,6 +252,7 @@ class HardwareTestClient:
         path: str,
         *,
         body: dict[str, object] | None = None,
+        timeout: float | None = None,
     ) -> HttpResponse:
         headers: dict[str, str] = {}
         if self._token:
@@ -175,7 +268,7 @@ class HardwareTestClient:
             f"{self._base_url}{path}",
             encoded_body,
             headers,
-            self._timeout,
+            timeout if timeout is not None else self._timeout,
         )
         if response.status >= 400:
             raise HardwareTestCliError(_error_detail(response))
@@ -303,6 +396,16 @@ def run(
                 output_dir=Path(args.output_dir),
             )
             stdout.write("long-print-reliability-recorded\n")
+            return 0
+        if args.command == "print-long-print-reliability":
+            print_long_print_reliability_fixture(
+                client=client,
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
+                tiny_visual_card_artifact_path=Path(args.tiny_visual_card_artifact),
+                trusted_printer_record_path=Path(args.trusted_printer_record),
+            )
+            stdout.write("long-print-reliability-print-started\n")
             return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
@@ -499,6 +602,31 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=".",
         help="Directory for the Stage D hardware-test ZIP artifact.",
+    )
+
+    print_long_print_parser = subparsers.add_parser(
+        "print-long-print-reliability",
+        help="Print the Stage D long-print reliability marker fixture through the daemon.",
+    )
+    print_long_print_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP for the printer.",
+    )
+    print_long_print_parser.add_argument(
+        "--protocol-sanity-artifact",
+        required=True,
+        help="Path to the confirmed Stage B protocol-sanity hardware-test ZIP.",
+    )
+    print_long_print_parser.add_argument(
+        "--tiny-visual-card-artifact",
+        required=True,
+        help="Path to the confirmed Stage C tiny visual-card hardware-test ZIP.",
+    )
+    print_long_print_parser.add_argument(
+        "--trusted-printer-record",
+        required=True,
+        help="Path to the local trusted-printer JSON record.",
     )
     return parser
 
@@ -1288,6 +1416,109 @@ def record_trusted_printer(
     return record_path
 
 
+def print_long_print_reliability_fixture(
+    *,
+    client: HardwareTestClient,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    tiny_visual_card_artifact_path: Path,
+    trusted_printer_record_path: Path,
+) -> dict[str, object]:
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    trusted_printer_summary = _inspect_trusted_printer_record(
+        record_path=trusted_printer_record_path,
+        stage_a_artifact_path=stage_a_artifact_path,
+        protocol_sanity_artifact_path=protocol_sanity_artifact_path,
+        tiny_visual_card_artifact_path=tiny_visual_card_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    profile = _read_stage_a_profile(stage_a_artifact_path)
+    profile_id = _required_json_string(profile, "id", "profile.json")
+    stage_profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    if profile_id != stage_profile_id:
+        raise HardwareTestCliError("artifact profile does not match transfer manifest")
+
+    print_config = _required_json_object(profile, "print", "profile.json")
+    width_dots = _required_json_int(print_config, "widthDots", "profile.json.print")
+    row_bytes = _required_json_int(print_config, "rowBytes", "profile.json.print")
+    if width_dots <= 0 or width_dots % 8 != 0:
+        raise HardwareTestCliError("artifact profile has invalid print width")
+    if row_bytes != width_dots // 8:
+        raise HardwareTestCliError("artifact profile row bytes do not match print width")
+    paper_mode = _required_json_string(print_config, "defaultPaperMode", "profile.json.print")
+    density = _required_json_string(print_config, "defaultDensity", "profile.json.print")
+    if paper_mode != "continuous":
+        raise HardwareTestCliError("long-print reliability requires continuous paper mode")
+
+    device_id = _required_json_string(
+        stage_a_summary,
+        "deviceId",
+        "print-transfer-manifest.json",
+    )
+    packed_raster = _build_long_print_reliability_raster(
+        width_dots=width_dots,
+        height_dots=LONG_PRINT_RELIABILITY_HEIGHT_DOTS,
+    )
+    raster_sha = _sha256_hex(packed_raster)
+    document_hash = _stable_json_sha256(
+        {
+            "source": LONG_PRINT_RELIABILITY_SOURCE,
+            "profileId": profile_id,
+            "widthDots": width_dots,
+            "heightDots": LONG_PRINT_RELIABILITY_HEIGHT_DOTS,
+            "rasterSha256": raster_sha,
+            "markers": [
+                {"text": text, "row": row}
+                for text, row in LONG_PRINT_RELIABILITY_MARKERS
+            ],
+        }
+    )
+    render_settings_hash = _stable_json_sha256(
+        {
+            "source": LONG_PRINT_RELIABILITY_SOURCE,
+            "paperMode": paper_mode,
+            "density": density,
+        }
+    )
+    preview = client.create_raster_preview(
+        document_hash=document_hash,
+        render_settings_hash=render_settings_hash,
+        profile_id=profile_id,
+        width_dots=width_dots,
+        height_dots=LONG_PRINT_RELIABILITY_HEIGHT_DOTS,
+        packed_raster=packed_raster,
+    )
+    job_status = client.print_preview(
+        preview=preview,
+        device_id=device_id,
+        profile_id=profile_id,
+        paper_mode=paper_mode,
+        density=density,
+        timeout=LONG_PRINT_RELIABILITY_PRINT_TIMEOUT_SECONDS,
+    )
+    _validate_started_long_print_job(
+        job_status=job_status,
+        stage_a_summary=stage_a_summary,
+    )
+    return _long_print_execution_summary(
+        job_status=job_status,
+        profile_id=profile_id,
+        device_fingerprint=_required_json_string(
+            _required_json_object(
+                trusted_printer_summary,
+                "device",
+                "trusted-printer-record",
+            ),
+            "fingerprint",
+            "trusted-printer-record.device",
+        ),
+    )
+
+
 def record_long_print_reliability_artifact(
     *,
     stage_a_artifact_path: Path,
@@ -1580,6 +1811,17 @@ def _require_stage_a_artifact_files(archive: ZipFile) -> None:
         STAGE_A_ARTIFACT_REQUIRED_FILES,
         label="artifact",
     )
+
+
+def _read_stage_a_profile(artifact_path: Path) -> dict[str, object]:
+    try:
+        with ZipFile(artifact_path) as archive:
+            profile = _read_zip_json_object(archive, "profile.json")
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("artifact not found") from exc
+    except BadZipFile as exc:
+        raise HardwareTestCliError("artifact is not a ZIP file") from exc
+    return profile
 
 
 def _require_artifact_files(
@@ -2224,8 +2466,112 @@ def _validate_confirmed_long_print_job(
             raise HardwareTestCliError("long-print reliability operator checklist did not pass")
 
 
+def _validate_started_long_print_job(
+    *,
+    job_status: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+) -> None:
+    state = _required_json_string(job_status, "state", "job-status")
+    if state != "completed_unverified":
+        raise HardwareTestCliError("long-print reliability print did not complete transfer")
+    if _required_json_string(job_status, "completionLevel", "job-status") != "unverified":
+        raise HardwareTestCliError("long-print reliability print has unexpected completion level")
+    if not _required_json_bool(job_status, "requiresUserCheck", "job-status"):
+        raise HardwareTestCliError("long-print reliability print skipped operator check")
+    if (
+        _required_json_string(job_status, "source", "job-status")
+        != LONG_PRINT_RELIABILITY_SOURCE
+    ):
+        raise HardwareTestCliError("long-print reliability print source is invalid")
+    if (
+        _required_json_string(job_status, "deviceId", "job-status")
+        != _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("long-print reliability print device does not match Stage A")
+    if "confirm_complete" not in _required_json_string_list(
+        job_status,
+        "safeActions",
+        "job-status",
+    ):
+        raise HardwareTestCliError("long-print reliability print cannot be operator-confirmed")
+
+    bands_sent = _required_json_int(job_status, "bandsSent", "job-status")
+    total_bands = _required_json_int(job_status, "totalBands", "job-status")
+    rows_sent = _required_json_int(job_status, "rowsSent", "job-status")
+    total_rows = _required_json_int(job_status, "totalRows", "job-status")
+    bytes_sent = _required_json_int(job_status, "bytesSent", "job-status")
+    total_bytes = _required_json_int(job_status, "totalBytes", "job-status")
+    tail_rows = _required_json_int(job_status, "tailBlankRowsDots", "job-status")
+    if bands_sent != total_bands or rows_sent != total_rows or bytes_sent != total_bytes:
+        raise HardwareTestCliError("long-print reliability print did not send all planned data")
+    if total_bands < LONG_PRINT_RELIABILITY_MIN_BANDS:
+        raise HardwareTestCliError("long-print reliability print is not banded enough")
+    if total_rows < LONG_PRINT_RELIABILITY_MIN_ROWS:
+        raise HardwareTestCliError("long-print reliability print is too short")
+    if tail_rows < LONG_PRINT_RELIABILITY_MIN_TAIL_ROWS:
+        raise HardwareTestCliError("long-print reliability print lacks protected tail rows")
+
+
+def _long_print_execution_summary(
+    *,
+    job_status: Mapping[str, object],
+    profile_id: str,
+    device_fingerprint: str,
+) -> dict[str, object]:
+    return {
+        "status": "long_print_reliability_print_started",
+        "jobId": _required_json_string(job_status, "jobId", "job-status"),
+        "profileId": profile_id,
+        "device": {
+            "idRedacted": True,
+            "fingerprint": device_fingerprint,
+        },
+        "state": _required_json_string(job_status, "state", "job-status"),
+        "completionLevel": _required_json_string(
+            job_status,
+            "completionLevel",
+            "job-status",
+        ),
+        "completionConfidence": _required_json_string(
+            job_status,
+            "completionConfidence",
+            "job-status",
+        ),
+        "requiresUserCheck": _required_json_bool(
+            job_status,
+            "requiresUserCheck",
+            "job-status",
+        ),
+        "bandsSent": _required_json_int(job_status, "bandsSent", "job-status"),
+        "totalBands": _required_json_int(job_status, "totalBands", "job-status"),
+        "rowsSent": _required_json_int(job_status, "rowsSent", "job-status"),
+        "totalRows": _required_json_int(job_status, "totalRows", "job-status"),
+        "bytesSent": _required_json_int(job_status, "bytesSent", "job-status"),
+        "totalBytes": _required_json_int(job_status, "totalBytes", "job-status"),
+        "tailBlankRowsDots": _required_json_int(
+            job_status,
+            "tailBlankRowsDots",
+            "job-status",
+        ),
+        "confirmationRequired": True,
+        "nextRequiredStage": "operator_confirmation_then_record_long_print_reliability",
+        "stableSupportClaimEnabled": False,
+        "agentDirectPrintingEnabled": False,
+        "rasterBytesIncluded": False,
+    }
+
+
 def _device_fingerprint(device_id: str) -> str:
     return f"sha256:{hashlib.sha256(device_id.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _stable_json_sha256(payload: Mapping[str, object]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _sha256_hex(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _safe_filename_part(value: str) -> str:
@@ -2296,6 +2642,35 @@ def _build_tiny_visual_card_raster(width_dots: int, height_dots: int) -> bytes:
     for y in (146, 147):
         for x in range(24, width_dots - 24, 4):
             _set_raster_pixel(raster, width_dots, x, y)
+
+    return bytes(raster)
+
+
+def _build_long_print_reliability_raster(width_dots: int, height_dots: int) -> bytes:
+    row_bytes = width_dots // 8
+    raster = bytearray(row_bytes * height_dots)
+    for text, y in LONG_PRINT_RELIABILITY_MARKERS:
+        _draw_text(
+            raster,
+            width_dots=width_dots,
+            text=text,
+            x=24,
+            y=y,
+            scale=2,
+        )
+        for rule_y in range(y + 22, min(y + 24, height_dots)):
+            for x in range(24, width_dots - 24, 3):
+                _set_raster_pixel(raster, width_dots, x, rule_y)
+        for tick_y in range(y, min(y + 36, height_dots), 4):
+            for x in range(0, 5):
+                _set_raster_pixel(raster, width_dots, x, tick_y)
+            for x in range(width_dots - 5, width_dots):
+                _set_raster_pixel(raster, width_dots, x, tick_y)
+
+    for y in range(0, height_dots, 400):
+        for x in range(12, width_dots - 12, 32):
+            _set_raster_pixel(raster, width_dots, x, y)
+            _set_raster_pixel(raster, width_dots, x, min(y + 1, height_dots - 1))
 
     return bytes(raster)
 

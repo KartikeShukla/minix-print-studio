@@ -59,6 +59,10 @@ pnpm release-package-check
   validation, confirmed long-print job validation, redacted device identity,
   omission of operator free text and raster bytes, and stable support plus agent
   direct printing remaining disabled.
+- Long-print reliability print-execution tests cover trusted-record chain
+  validation, deterministic marker fixture submission through daemon preview and
+  print APIs, status-only stdout, omission of raster payloads from stdout, and
+  the dedicated long-print timeout for `/v1/jobs/print`.
 - Offline evidence-summary tests cover maintainer-shareable Stage A summaries
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
@@ -94,9 +98,13 @@ daemon on `127.0.0.1:39282` completed:
   confirmed
   `job_86adfffe80f44b2eb919eabf52439070`, and validated the trusted-printer
   record path for manual continuous printing only. The generated record keeps
-  long-print, stable support, and agent direct printing disabled; long-print
-  reliability physical evidence remains pending, though the Stage D artifact
-  recording command is implemented.
+  long-print, stable support, and agent direct printing disabled.
+- One Stage D physical long-print reliability run completed through the END
+  marker on the same non-mock daemon with job
+  `job_004ed6c044ff434abed1381626ea5c84`, then operator confirmation and
+  `record-long-print-reliability` produced the local Stage D artifact. Stable
+  support claims, long-print trust, and agent direct printing remain disabled
+  until an explicit support-gating update consumes that evidence.
 
 ## Release Evidence Gate
 

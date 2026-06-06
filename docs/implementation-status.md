@@ -208,6 +208,12 @@ Public development is on `main`; implementation slices use short-lived
   the Stage A/B/C/trusted-record chain, redacts device identity, excludes
   operator free text and raster bytes, and keeps stable support plus agent direct
   printing disabled.
+- `minix-hardware-test print-long-print-reliability` validates the same
+  Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
+  low-coverage marker fixture, submits it through `/v1/render/preview` and
+  `/v1/jobs/print` with a dedicated 10-minute print timeout, and emits only a
+  status line on stdout. The confirmed job id is read from the daemon job list or
+  desktop print status before artifact recording.
 
 ## Current Verification
 
@@ -300,6 +306,9 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for Stage D long-print reliability artifact recording
   from a confirmed long-print job while keeping stable support and agent direct
   printing disabled.
+- TDD red/green checks for Stage D long-print reliability print execution
+  through the daemon preview and print APIs while keeping stdout status-only and
+  using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for required public package metadata in open-source readiness validation.
@@ -357,9 +366,15 @@ Public development is on `main`; implementation slices use short-lived
   physical evidence chain and produced a record with
   `trusted_for_manual_continuous_printing`, manual continuous printing enabled,
   and long-print, stable support, and agent direct printing still disabled.
-- Stage D long-print reliability artifact recording is implemented in the CLI,
-  but physical long-print reliability evidence for the MiniX device is still
-  pending.
+- Stage D long-print reliability print execution completed on 2026-06-06 against
+  the non-mock daemon on `127.0.0.1:39282`; job
+  `job_004ed6c044ff434abed1381626ea5c84` sent 32/32 bands, 8160/8160 rows,
+  and 391680/391680 bytes, was operator-confirmed through the END marker, and
+  produced local artifact
+  `hardware-test-long-print-reliability-job_004ed6c044ff434abed1381626ea5c84.zip`
+  outside the repository.
+  Stable support claims, long-print trust, and agent direct printing still
+  require an explicit support-gating update.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -369,7 +384,6 @@ Public development is on `main`; implementation slices use short-lived
 
 1. Surface the local trusted-printer record in the desktop setup flow without
    enabling agent direct printing or long-print trust.
-2. Add a dedicated long-print reliability execution path that prints the marker
-   fixture and records a reviewed Stage D artifact from physical output.
-3. Gate stable support claims on reviewed Stage D evidence without enabling
+2. Gate stable support claims on reviewed Stage D evidence without enabling
    agent direct printing by default.
+3. Surface the reviewed Stage D result in the desktop setup/support flow.

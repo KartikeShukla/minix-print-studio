@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import io
 import json
@@ -1056,6 +1057,124 @@ def test_hardware_test_cli_records_long_print_reliability_artifact_without_stabl
     assert "END LP-TEST checksum" not in encoded_artifact
 
 
+def test_hardware_test_cli_prints_long_print_reliability_fixture_without_unlock(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    stdout = io.StringIO()
+    calls: list[tuple[str, str, dict[str, object] | None]] = []
+    render_request: dict[str, object] = {}
+
+    def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> HttpResponse:
+        decoded_body = json.loads(body or b"{}") if body is not None else None
+        calls.append((method, url, decoded_body))
+        if url.endswith("/v1/render/preview"):
+            assert decoded_body is not None
+            assert timeout == 10.0
+            render_request.update(decoded_body)
+            raster = base64.b64decode(str(decoded_body["rasterBase64"]), validate=True)
+            assert decoded_body["profileId"] == "seznik-minix-s1-lyin48d-gy"
+            assert decoded_body["widthDots"] == 384
+            assert decoded_body["heightDots"] == 8000
+            assert len(raster) == 384000
+            assert "mock-minix-0194" not in json.dumps(decoded_body, sort_keys=True)
+            return HttpResponse(
+                status=200,
+                headers={"content-type": "application/json"},
+                body=json.dumps(
+                    {
+                        "previewId": "prev_long_print_fixture",
+                        "approvalToken": "appr_long_print_fixture",
+                        "documentHash": decoded_body["documentHash"],
+                        "renderSettingsHash": decoded_body["renderSettingsHash"],
+                        "rasterHash": "sha256:preview-raster",
+                        "profileId": decoded_body["profileId"],
+                        "widthDots": decoded_body["widthDots"],
+                        "heightDots": decoded_body["heightDots"],
+                        "safety": {"allowed": True, "errors": []},
+                        "createdAt": "2026-06-06T12:30:00Z",
+                        "expiresAt": "2026-06-06T12:40:00Z",
+                    }
+                ).encode("utf-8"),
+            )
+        if url.endswith("/v1/jobs/print"):
+            assert timeout == 600.0
+            assert decoded_body == {
+                "previewId": "prev_long_print_fixture",
+                "approvalToken": "appr_long_print_fixture",
+                "documentHash": render_request["documentHash"],
+                "renderSettingsHash": render_request["renderSettingsHash"],
+                "profileId": "seznik-minix-s1-lyin48d-gy",
+                "paperMode": "continuous",
+                "density": "medium",
+                "copies": 1,
+                "source": "hardware-test-long-print-reliability",
+                "deviceId": "mock-minix-0194",
+            }
+            return HttpResponse(
+                status=200,
+                headers={"content-type": "application/json"},
+                body=json.dumps(
+                    {
+                        "jobId": "job_long_print_started",
+                        "previewId": "prev_long_print_fixture",
+                        "planId": "plan_job_long_print_started",
+                        "deviceId": "mock-minix-0194",
+                        "state": "completed_unverified",
+                        "phase": "waiting_for_user_confirmation",
+                        "completionLevel": "unverified",
+                        "completionConfidence": "ble_transfer_completed_final_ack_unverified",
+                        "requiresUserCheck": True,
+                        "source": "hardware-test-long-print-reliability",
+                        "copies": 1,
+                        "operatorConfirmation": None,
+                        "bandsSent": 32,
+                        "totalBands": 32,
+                        "rowsSent": 8160,
+                        "totalRows": 8160,
+                        "bytesSent": 391680,
+                        "totalBytes": 391680,
+                        "tailBlankRowsDots": 160,
+                        "safeActions": ["confirm_complete", "feed_paper", "reprint_from_start"],
+                    }
+                ).encode("utf-8"),
+            )
+        raise AssertionError(f"unexpected daemon request: {method} {url}")
+
+    exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "print-long-print-reliability",
+            "--stage-a-artifact",
+            str(chain["stage_a"]),
+            "--protocol-sanity-artifact",
+            str(chain["protocol_sanity"]),
+            "--tiny-visual-card-artifact",
+            str(chain["tiny_visual_card"]),
+            "--trusted-printer-record",
+            str(chain["trusted_printer"]),
+        ],
+        stdout=stdout,
+        transport=transport,
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue().strip() == "long-print-reliability-print-started"
+    assert [call[1] for call in calls] == [
+        "http://127.0.0.1:39281/v1/render/preview",
+        "http://127.0.0.1:39281/v1/jobs/print",
+    ]
+    assert "mock-minix-0194" not in stdout.getvalue()
+    assert "rasterBase64" not in stdout.getvalue()
+
+
 def test_hardware_test_cli_writes_shareable_evidence_summary_without_private_artifact_data(
     tmp_path: Path,
 ) -> None:
@@ -1261,6 +1380,78 @@ def _confirmed_long_print_transport(
             }
         ).encode("utf-8"),
     )
+
+
+def _create_trusted_printer_chain(tmp_path: Path) -> dict[str, object]:
+    stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    protocol_output_dir = tmp_path / "stage-b"
+    tiny_output_dir = tmp_path / "stage-c"
+    trusted_output_dir = tmp_path / "trusted"
+    _write_stage_a_artifact(stage_a_artifact_path)
+    protocol_exit_code = run(
+        [
+            "record-protocol-sanity",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--output-dir",
+            str(protocol_output_dir),
+            "--confirmed-at",
+            "2026-06-06T12:00:00Z",
+            "--operator-note",
+            "Protocol commands completed without paper motion or fatal error.",
+            "--no-paper-moved",
+            "--no-error",
+        ],
+        stdout=io.StringIO(),
+    )
+    protocol_artifact_path = protocol_output_dir / "hardware-test-protocol-sanity.zip"
+    tiny_exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "record-tiny-visual-card",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--job-id",
+            "job_confirmed",
+            "--output-dir",
+            str(tiny_output_dir),
+        ],
+        stdout=io.StringIO(),
+        transport=_confirmed_tiny_card_transport,
+    )
+    tiny_artifact_path = tiny_output_dir / "hardware-test-tiny-visual-card-job_confirmed.zip"
+    trusted_exit_code = run(
+        [
+            "record-trusted-printer",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--output-dir",
+            str(trusted_output_dir),
+        ],
+        stdout=io.StringIO(),
+    )
+    device_fingerprint = f"sha256:{hashlib.sha256(b'mock-minix-0194').hexdigest()[:16]}"
+    trusted_record_path = (
+        trusted_output_dir
+        / f"trusted-printer-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    assert protocol_exit_code == 0
+    assert tiny_exit_code == 0
+    assert trusted_exit_code == 0
+    return {
+        "stage_a": stage_a_artifact_path,
+        "protocol_sanity": protocol_artifact_path,
+        "tiny_visual_card": tiny_artifact_path,
+        "trusted_printer": trusted_record_path,
+        "device_fingerprint": device_fingerprint,
+    }
 
 
 def _write_stage_a_artifact(
