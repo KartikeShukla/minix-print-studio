@@ -44,8 +44,10 @@ def test_release_packaging_check_requires_packaging_scripts() -> None:
         "package.json missing build:sidecars script",
         "package.json missing package:mac script",
         "package.json missing package:win script",
+        "package.json missing package:win-installer script",
         "apps/desktop/package.json missing package:mac script",
         "apps/desktop/package.json missing package:win script",
+        "apps/desktop/package.json missing package:win-installer script",
     ]
 
 
@@ -70,10 +72,35 @@ def test_release_packaging_check_requires_windows_x64_package_command() -> None:
         desktop_scripts={
             "package:mac": validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS["package:mac"],
             "package:win": current_host_arch_command,
+            "package:win-installer": validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS[
+                "package:win-installer"
+            ],
         },
     )
 
     assert issues == ["apps/desktop/package.json missing package:win script"]
+
+
+def test_release_packaging_check_requires_windows_installer_package_command() -> None:
+    validator = _load_validator()
+
+    issues = validator.validate_package_scripts(
+        root_scripts={
+            **validator.ROOT_REQUIRED_PACKAGE_SCRIPTS,
+            "package:win-installer": "pnpm --filter @minix/desktop package:win",
+        },
+        desktop_scripts={
+            **validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS,
+            "package:win-installer": validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS[
+                "package:win"
+            ],
+        },
+    )
+
+    assert issues == [
+        "package.json missing package:win-installer script",
+        "apps/desktop/package.json missing package:win-installer script",
+    ]
 
 
 def test_release_packaging_check_requires_desktop_integration_configs_source_alias() -> None:
@@ -101,12 +128,19 @@ def test_release_packaging_check_requires_windows_package_workflow() -> None:
     issues = validator.validate_release_package_workflow_text(
         _complete_release_workflow_text()
         .replace("          - os: windows-latest\n", "")
+        .replace(
+            "            artifact_name: minix-print-studio-windows-installer-unsigned\n",
+            "",
+        )
         .replace("      - run: pnpm package:win\n", "")
+        .replace("      - run: pnpm package:win-installer\n", "")
     )
 
     assert issues == [
         "release package workflow missing Windows runner",
         "release package workflow missing command: pnpm package:win",
+        "release package workflow missing command: pnpm package:win-installer",
+        "release package workflow missing Windows unsigned installer artifact name",
     ]
 
 
@@ -140,11 +174,16 @@ def test_release_packaging_check_requires_platform_named_artifacts() -> None:
         _complete_release_workflow_text()
         .replace("minix-print-studio-macos-unsigned", "minix-print-studio-unsigned")
         .replace("minix-print-studio-windows-unsigned", "minix-print-studio-unsigned")
+        .replace(
+            "minix-print-studio-windows-installer-unsigned",
+            "minix-print-studio-unsigned",
+        )
     )
 
     assert issues == [
         "release package workflow missing macOS unsigned artifact name",
         "release package workflow missing Windows unsigned artifact name",
+        "release package workflow missing Windows unsigned installer artifact name",
     ]
 
 
@@ -381,6 +420,8 @@ jobs:
             artifact_name: minix-print-studio-macos-unsigned
           - os: windows-latest
             artifact_name: minix-print-studio-windows-unsigned
+          - os: windows-latest
+            artifact_name: minix-print-studio-windows-installer-unsigned
     steps:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -390,6 +431,7 @@ jobs:
       - run: pnpm release-package-check
       - run: pnpm package:mac
       - run: pnpm package:win
+      - run: pnpm package:win-installer
       - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
       - uses: actions/upload-artifact@v4
         with:

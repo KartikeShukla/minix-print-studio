@@ -105,8 +105,8 @@ Only continue if the readiness output reports that Stage A can scan from the cur
 host context:
 
 ```bash
-scripts/hardware-test.sh scan
-scripts/hardware-test.sh export-read-only --device-id <device-id> --output-dir ./hardware-artifacts
+scripts/hardware-test.sh scan --require-host-ready
+scripts/hardware-test.sh export-read-only --device-id <device-id> --require-host-ready --output-dir ./hardware-artifacts
 scripts/hardware-test.sh inspect-artifact ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh protocol-sanity-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh tiny-visual-card-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
@@ -135,8 +135,9 @@ See [docs/mcp-integrations.md](docs/mcp-integrations.md).
 ## Release and Validation
 
 Release work is evidence-driven. Unsigned package validation is currently available
-for macOS and Windows, while signing, notarization, installer publishing, and stable
-hardware support remain pending.
+for macOS and Windows, and Windows unsigned installer evidence is produced on
+Windows runners. Signing, notarization, installer publishing, and stable hardware
+support remain pending.
 
 Use the release docs for package evidence capture:
 

@@ -48,6 +48,10 @@ jobs:
             os: windows-latest
             package_command: pnpm package:win
             artifact_name: minix-print-studio-windows-unsigned
+          - name: Windows unsigned installer
+            os: windows-latest
+            package_command: pnpm package:win-installer
+            artifact_name: minix-print-studio-windows-installer-unsigned
 
     steps:
       - uses: actions/checkout@v4

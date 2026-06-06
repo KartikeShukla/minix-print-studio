@@ -16,6 +16,9 @@ def test_release_evidence_check_accepts_successful_platform_artifacts(tmp_path: 
     _write_workflow_run_json(evidence_dir / "workflow-run.json", conclusion="success")
     _write_mac_artifact(evidence_dir / "minix-print-studio-macos-unsigned")
     _write_windows_artifact(evidence_dir / "minix-print-studio-windows-unsigned")
+    _write_windows_installer_artifact(
+        evidence_dir / "minix-print-studio-windows-installer-unsigned"
+    )
 
     issues = validator.validate_release_evidence(
         evidence_dir,
@@ -23,6 +26,26 @@ def test_release_evidence_check_accepts_successful_platform_artifacts(tmp_path: 
     )
 
     assert issues == []
+
+
+def test_release_evidence_check_requires_windows_installer_artifact(
+    tmp_path: Path,
+) -> None:
+    validator = _load_validator()
+    evidence_dir = tmp_path / "release-evidence"
+    _write_workflow_run_json(evidence_dir / "workflow-run.json", conclusion="success")
+    _write_mac_artifact(evidence_dir / "minix-print-studio-macos-unsigned")
+    _write_windows_artifact(evidence_dir / "minix-print-studio-windows-unsigned")
+
+    issues = validator.validate_release_evidence(
+        evidence_dir,
+        workflow_run_json=evidence_dir / "workflow-run.json",
+    )
+
+    assert issues == [
+        "missing Windows installer artifact directory: "
+        "minix-print-studio-windows-installer-unsigned"
+    ]
 
 
 def test_release_evidence_check_requires_windows_package_and_sidecars(tmp_path: Path) -> None:
@@ -34,6 +57,9 @@ def test_release_evidence_check_requires_windows_package_and_sidecars(tmp_path: 
         evidence_dir / "minix-print-studio-windows-unsigned",
         include_app_exe=False,
         include_mcp_sidecar=False,
+    )
+    _write_windows_installer_artifact(
+        evidence_dir / "minix-print-studio-windows-installer-unsigned"
     )
 
     issues = validator.validate_release_evidence(
@@ -70,6 +96,9 @@ def test_release_evidence_check_rejects_failed_run_and_forbidden_artifacts(
     _write_mac_artifact(evidence_dir / "minix-print-studio-macos-unsigned")
     windows_dir = evidence_dir / "minix-print-studio-windows-unsigned"
     _write_windows_artifact(windows_dir)
+    _write_windows_installer_artifact(
+        evidence_dir / "minix-print-studio-windows-installer-unsigned"
+    )
     (windows_dir / "builder-debug.yml").write_text("debug", encoding="utf-8")
     (windows_dir / ".icon-ico" / "icon.ico").parent.mkdir(parents=True)
     (windows_dir / ".icon-ico" / "icon.ico").write_text("cache", encoding="utf-8")
@@ -156,6 +185,15 @@ def _write_windows_artifact(
     if include_mcp_sidecar:
         files["win-unpacked/resources/sidecars/minix-mcp.exe"] = b"mcp.exe"
     _write_artifact_files(path, files)
+
+
+def _write_windows_installer_artifact(path: Path) -> None:
+    _write_artifact_files(
+        path,
+        {
+            "MiniX Print Studio-0.1.0-win-x64.exe": b"installer.exe",
+        },
+    )
 
 
 def _write_artifact_files(path: Path, files: dict[str, bytes]) -> None:

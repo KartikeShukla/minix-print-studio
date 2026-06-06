@@ -33,6 +33,7 @@
     "build:sidecars": "node scripts/run_python.mjs scripts/build_sidecars.py",
     "package:mac": "pnpm --filter @minix/desktop package:mac",
     "package:win": "pnpm --filter @minix/desktop package:win",
+    "package:win-installer": "pnpm --filter @minix/desktop package:win-installer",
     "format": "prettier --check .",
     "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm open-source-check && pnpm source-package-check && pnpm release-package-check"
   },
