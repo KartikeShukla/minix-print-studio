@@ -437,6 +437,260 @@ def test_hardware_test_cli_plans_tiny_visual_card_preflight_from_stage_a_artifac
     }
 
 
+def test_hardware_test_cli_records_tiny_visual_card_artifact_from_confirmed_job(
+    tmp_path: Path,
+) -> None:
+    stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    protocol_output_dir = tmp_path / "stage-b"
+    output_dir = tmp_path / "stage-c"
+    _write_stage_a_artifact(stage_a_artifact_path)
+    protocol_stdout = io.StringIO()
+    protocol_exit_code = run(
+        [
+            "record-protocol-sanity",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--output-dir",
+            str(protocol_output_dir),
+            "--confirmed-at",
+            "2026-06-06T12:00:00Z",
+            "--operator-note",
+            "Wake, density, and paper mode commands completed without error.",
+            "--no-paper-moved",
+            "--no-error",
+        ],
+        stdout=protocol_stdout,
+    )
+    protocol_artifact_path = Path(protocol_stdout.getvalue().strip())
+    assert protocol_exit_code == 0
+    calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
+
+    def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> HttpResponse:
+        calls.append((method, url, body, headers, timeout))
+        return HttpResponse(
+            status=200,
+            headers={"content-type": "application/json"},
+            body=json.dumps(
+                {
+                    "jobId": "job_confirmed",
+                    "previewId": "prev_tiny_card",
+                    "planId": "plan_tiny_card",
+                    "deviceId": "mock-minix-0194",
+                    "state": "confirmed_complete",
+                    "phase": "operator_confirmed",
+                    "completionLevel": "verified",
+                    "completionConfidence": "operator_paper_output_confirmed",
+                    "requiresUserCheck": False,
+                    "source": "ui",
+                    "copies": 1,
+                    "operatorConfirmation": {
+                        "confirmedAt": "2026-06-06T12:34:56Z",
+                        "printedTextReadable": True,
+                        "endMarkerVisible": True,
+                        "noOverheat": True,
+                        "noDisconnect": True,
+                        "operatorNote": "MINIX TEST 7K4P readable.",
+                        "outcome": "confirmed_complete",
+                    },
+                    "bandsSent": 2,
+                    "totalBands": 2,
+                    "rowsSent": 160,
+                    "totalRows": 160,
+                    "bytesSent": 7680,
+                    "totalBytes": 7680,
+                    "tailBlankRowsDots": 0,
+                    "safeActions": ["reprint_on_user_request"],
+                }
+            ).encode("utf-8"),
+        )
+
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "--base-url",
+            "http://127.0.0.1:39281",
+            "--token",
+            "secret-token",
+            "record-tiny-visual-card",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--job-id",
+            "job_confirmed",
+            "--output-dir",
+            str(output_dir),
+        ],
+        stdout=stdout,
+        transport=transport,
+    )
+
+    artifact_path = Path(stdout.getvalue().strip())
+    assert exit_code == 0
+    assert calls == [
+        (
+            "GET",
+            "http://127.0.0.1:39281/v1/jobs/job_confirmed",
+            None,
+            {"Authorization": "Bearer secret-token"},
+            10.0,
+        )
+    ]
+    assert artifact_path.parent == output_dir
+    assert artifact_path.name == "hardware-test-tiny-visual-card-job_confirmed.zip"
+    with ZipFile(artifact_path) as archive:
+        assert set(archive.namelist()) == {
+            "device.json",
+            "profile.json",
+            "stage-a-summary.json",
+            "protocol-sanity-summary.json",
+            "tiny-visual-card-preflight.json",
+            "job-status.json",
+            "print-transfer-manifest.json",
+            "band-manifest.json",
+            "finalizer-result.json",
+            "safety-report.json",
+            "user-confirmation.json",
+            "app-version.json",
+            "README.md",
+        }
+        transfer_manifest = json.loads(archive.read("print-transfer-manifest.json"))
+        protocol_summary = json.loads(archive.read("protocol-sanity-summary.json"))
+        user_confirmation = json.loads(archive.read("user-confirmation.json"))
+        band_manifest = json.loads(archive.read("band-manifest.json"))
+        safety_report = json.loads(archive.read("safety-report.json"))
+        assert b"raster" not in archive.read("job-status.json").lower()
+
+    assert transfer_manifest == {
+        "stage": "tiny_visual_test_card",
+        "status": "confirmed_complete",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "jobId": "job_confirmed",
+        "requiredPriorStage": "protocol_sanity_test",
+        "nextRequiredStage": "long_print_reliability",
+        "printCommandsSent": True,
+        "rasterBytesIncluded": False,
+        "operatorConfirmed": True,
+        "completionLevel": "verified",
+        "priorStageArtifactSha256": protocol_summary["artifactSha256"],
+    }
+    assert protocol_summary == {
+        "stage": "protocol_sanity_test",
+        "status": "confirmed_complete",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "confirmedAt": "2026-06-06T12:00:00Z",
+        "artifactSha256": hashlib.sha256(protocol_artifact_path.read_bytes()).hexdigest(),
+    }
+    assert user_confirmation["outcome"] == "confirmed_complete"
+    assert user_confirmation["operatorNote"] == "MINIX TEST 7K4P readable."
+    assert band_manifest == {
+        "bandsSent": 2,
+        "totalBands": 2,
+        "rowsSent": 160,
+        "totalRows": 160,
+        "bytesSent": 7680,
+        "totalBytes": 7680,
+        "rasterBytesIncluded": False,
+    }
+    assert safety_report == {
+        "stage": "tiny_visual_test_card",
+        "printingLocked": True,
+        "certificationComplete": False,
+        "requiresLongPrintReliability": True,
+        "rasterBytesIncluded": False,
+        "unlocksPrinting": False,
+    }
+
+
+def test_hardware_test_cli_records_protocol_sanity_artifact_from_operator_check(
+    tmp_path: Path,
+) -> None:
+    stage_a_artifact_path = tmp_path / "hardware-test-stage-a.zip"
+    output_dir = tmp_path / "stage-b"
+    _write_stage_a_artifact(stage_a_artifact_path)
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "record-protocol-sanity",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--output-dir",
+            str(output_dir),
+            "--confirmed-at",
+            "2026-06-06T12:00:00Z",
+            "--operator-note",
+            "Wake, density, and paper mode commands completed without error.",
+            "--no-paper-moved",
+            "--no-error",
+        ],
+        stdout=stdout,
+    )
+
+    artifact_path = Path(stdout.getvalue().strip())
+    assert exit_code == 0
+    assert artifact_path.parent == output_dir
+    assert artifact_path.name == "hardware-test-protocol-sanity.zip"
+    with ZipFile(artifact_path) as archive:
+        assert set(archive.namelist()) == {
+            "device.json",
+            "profile.json",
+            "stage-a-summary.json",
+            "protocol-sanity-preflight.json",
+            "commands.log",
+            "print-transfer-manifest.json",
+            "finalizer-result.json",
+            "safety-report.json",
+            "user-confirmation.json",
+            "app-version.json",
+            "README.md",
+        }
+        transfer_manifest = json.loads(archive.read("print-transfer-manifest.json"))
+        user_confirmation = json.loads(archive.read("user-confirmation.json"))
+        safety_report = json.loads(archive.read("safety-report.json"))
+        commands_log = archive.read("commands.log").decode("utf-8")
+
+    assert transfer_manifest == {
+        "stage": "protocol_sanity_test",
+        "status": "confirmed_complete",
+        "deviceId": "mock-minix-0194",
+        "profileId": "seznik-minix-s1-lyin48d-gy",
+        "requiredPriorStage": "read_only_verification",
+        "nextRequiredStage": "tiny_visual_test_card",
+        "printCommandsSent": True,
+        "rasterBytesIncluded": False,
+        "operatorConfirmed": True,
+        "completionLevel": "verified",
+    }
+    assert user_confirmation == {
+        "confirmedAt": "2026-06-06T12:00:00Z",
+        "noPaperMoved": True,
+        "noError": True,
+        "operatorNote": "Wake, density, and paper mode commands completed without error.",
+        "outcome": "confirmed_complete",
+    }
+    assert safety_report == {
+        "stage": "protocol_sanity_test",
+        "printingLocked": True,
+        "certificationComplete": False,
+        "requiresTinyVisualCard": True,
+        "rasterBytesIncluded": False,
+        "unlocksPrinting": False,
+    }
+    assert "wake" in commands_log
+    assert "set_density" in commands_log
+    assert "set_paper_mode" in commands_log
+
+
 def test_hardware_test_cli_writes_shareable_evidence_summary_without_private_artifact_data(
     tmp_path: Path,
 ) -> None:

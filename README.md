@@ -22,8 +22,9 @@ The current development branch has document editing, daemon-backed preview and
 planning, MCP integration scaffolding, unsigned macOS and Windows package
 evidence, community governance docs, Stage A physical read-only verification, and
 an experimental user-initiated BLE transport path with operator confirmation
-recording. Trusted printing remains gated until the staged certification flow
-produces reviewed evidence.
+recording. Stage B/C hardware-test artifact recording is implemented for reviewed
+physical runs. Trusted printing remains gated until the staged certification flow
+produces reviewed evidence and long-print reliability passes.
 
 ## Safety Model
 
@@ -48,8 +49,9 @@ The first profile target is `seznik-minix-s1-lyin48d-gy`. The profile data is tr
 in the repository, but stable support still requires physical evidence:
 
 - Stage A read-only identity and BLE-shape verification.
-- Stage B physical protocol sanity after the offline preflight passes.
-- Stage C tiny visual test card confirmation.
+- Stage B physical protocol sanity artifact after the offline preflight passes.
+- Stage C tiny visual test card artifact from a confirmed Stage B artifact and
+  operator-verified daemon job.
 - Long-print reliability before stable support claims.
 
 Do not treat BLE discovery, a matching name, a matching service UUID, or an

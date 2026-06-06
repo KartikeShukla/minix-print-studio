@@ -35,6 +35,9 @@ New profiles must include:
 - Conservative long-print thermal pacing defaults.
 - A hardware-test artifact with user paths and device identifiers redacted before sharing.
 - A Stage A evidence summary for maintainer review before sharing a full artifact ZIP.
+- Stage B/C physical evidence recorded through `record-protocol-sanity` and
+  `record-tiny-visual-card`, with Stage C chained to the confirmed Stage B
+  artifact.
 
 Profiles must not unlock printing from detection alone. Printing remains gated by the
 certification stages in [hardware-certification.md](hardware-certification.md).

@@ -47,6 +47,10 @@ pnpm release-package-check
 - Offline certification-preflight tests cover Stage B protocol command metadata
   and Stage C tiny-card metadata without sending BLE writes or including printable
   raster bytes.
+- Hardware artifact-recording tests cover Stage B protocol-sanity ZIP creation,
+  Stage C tiny-card ZIP creation from a confirmed daemon job, confirmed Stage B
+  artifact validation, artifact SHA-256 chaining, and locked-printing safety
+  reports.
 - Offline evidence-summary tests cover maintainer-shareable Stage A summaries
   with hashed device fingerprints and explicit omission of artifact paths, raw
   logs, command hex payloads, bearer tokens, and raster bytes.
@@ -76,7 +80,8 @@ daemon on `127.0.0.1:39282` completed:
   `tiny-visual-card-preflight`, and `evidence-summary`
 - One experimental tiny-card `/v1/jobs/print` transfer that reported
   `completed_unverified`; operator paper-output confirmation recording is
-  implemented, but reviewed Stage C artifact evidence remains required.
+  implemented, and Stage B/C artifact-recording commands are available, but
+  reviewed Stage B/C artifact evidence remains required.
 
 ## Release Evidence Gate
 

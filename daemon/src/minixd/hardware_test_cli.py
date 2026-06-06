@@ -8,12 +8,13 @@ import platform
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO, cast
-from zipfile import BadZipFile, ZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from minixd.protocol.aiyin import (
     build_raster_command,
@@ -129,6 +130,9 @@ class HardwareTestClient:
         artifact_path = output_dir / filename
         artifact_path.write_bytes(response.body)
         return artifact_path
+
+    def get_job_status(self, *, job_id: str) -> dict[str, object]:
+        return self._request_json("GET", f"/v1/jobs/{urllib.parse.quote(job_id, safe='')}")
 
     def _request_json(
         self,
@@ -254,6 +258,27 @@ def run(
             )
             stdout.write("\n")
             return 0
+        if args.command == "record-protocol-sanity":
+            artifact_path = record_protocol_sanity_artifact(
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                output_dir=Path(args.output_dir),
+                confirmed_at=args.confirmed_at,
+                operator_note=args.operator_note,
+                no_paper_moved=args.no_paper_moved,
+                no_error=args.no_error,
+            )
+            stdout.write(f"{artifact_path}\n")
+            return 0
+        if args.command == "record-tiny-visual-card":
+            job_status = client.get_job_status(job_id=args.job_id)
+            artifact_path = record_tiny_visual_card_artifact(
+                stage_a_artifact_path=Path(args.stage_a_artifact),
+                protocol_sanity_artifact_path=Path(args.protocol_sanity_artifact),
+                job_status=job_status,
+                output_dir=Path(args.output_dir),
+            )
+            stdout.write(f"{artifact_path}\n")
+            return 0
     except HardwareTestCliError as exc:
         stderr.write(f"{exc}\n")
         return 2
@@ -331,6 +356,66 @@ def _build_parser() -> argparse.ArgumentParser:
     evidence_summary_parser.add_argument(
         "artifact_path",
         help="Path to a Stage A hardware-test ZIP.",
+    )
+
+    record_tiny_parser = subparsers.add_parser(
+        "record-tiny-visual-card",
+        help="Record a confirmed Stage C tiny visual card run as a hardware-test ZIP.",
+    )
+    record_tiny_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP used for this physical run.",
+    )
+    record_tiny_parser.add_argument(
+        "--protocol-sanity-artifact",
+        required=True,
+        help="Path to the confirmed Stage B protocol-sanity hardware-test ZIP.",
+    )
+    record_tiny_parser.add_argument(
+        "--job-id",
+        required=True,
+        help="Confirmed daemon print job id for the tiny visual card.",
+    )
+    record_tiny_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the Stage C hardware-test ZIP artifact.",
+    )
+
+    record_protocol_parser = subparsers.add_parser(
+        "record-protocol-sanity",
+        help="Record a confirmed Stage B protocol sanity run as a hardware-test ZIP.",
+    )
+    record_protocol_parser.add_argument(
+        "--stage-a-artifact",
+        required=True,
+        help="Path to the Stage A hardware-test ZIP used for this physical run.",
+    )
+    record_protocol_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the Stage B hardware-test ZIP artifact.",
+    )
+    record_protocol_parser.add_argument(
+        "--confirmed-at",
+        required=True,
+        help="UTC timestamp for the operator confirmation.",
+    )
+    record_protocol_parser.add_argument(
+        "--operator-note",
+        required=True,
+        help="Operator note describing the protocol sanity run result.",
+    )
+    record_protocol_parser.add_argument(
+        "--no-paper-moved",
+        action="store_true",
+        help="Confirm the protocol sanity commands did not move paper.",
+    )
+    record_protocol_parser.add_argument(
+        "--no-error",
+        action="store_true",
+        help="Confirm the printer reported no fatal error during the protocol sanity run.",
     )
     return parser
 
@@ -799,11 +884,252 @@ def build_shareable_evidence_summary(artifact_path: Path) -> dict[str, object]:
     }
 
 
+def record_tiny_visual_card_artifact(
+    *,
+    stage_a_artifact_path: Path,
+    protocol_sanity_artifact_path: Path,
+    job_status: Mapping[str, object],
+    output_dir: Path,
+) -> Path:
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    preflight = plan_tiny_visual_card_preflight(stage_a_artifact_path)
+    protocol_sanity_summary = _inspect_protocol_sanity_artifact(
+        artifact_path=protocol_sanity_artifact_path,
+        stage_a_summary=stage_a_summary,
+    )
+    _validate_confirmed_tiny_visual_job(
+        job_status=job_status,
+        stage_a_summary=stage_a_summary,
+    )
+
+    job_id = _required_json_string(job_status, "jobId", "job-status")
+    device_id = _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+    operator_confirmation = _required_json_object(
+        job_status,
+        "operatorConfirmation",
+        "job-status",
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = output_dir / f"hardware-test-tiny-visual-card-{_safe_filename_part(job_id)}.zip"
+    with ZipFile(artifact_path, "w", ZIP_DEFLATED) as archive:
+        with ZipFile(stage_a_artifact_path) as stage_a_archive:
+            archive.writestr("device.json", stage_a_archive.read("device.json"))
+            archive.writestr("profile.json", stage_a_archive.read("profile.json"))
+            archive.writestr("app-version.json", stage_a_archive.read("app-version.json"))
+        archive.writestr("stage-a-summary.json", json.dumps(stage_a_summary, indent=2))
+        archive.writestr(
+            "protocol-sanity-summary.json",
+            json.dumps(protocol_sanity_summary, indent=2),
+        )
+        archive.writestr("tiny-visual-card-preflight.json", json.dumps(preflight, indent=2))
+        archive.writestr("job-status.json", json.dumps(dict(job_status), indent=2))
+        archive.writestr(
+            "print-transfer-manifest.json",
+            json.dumps(
+                {
+                    "stage": "tiny_visual_test_card",
+                    "status": "confirmed_complete",
+                    "deviceId": device_id,
+                    "profileId": profile_id,
+                    "jobId": job_id,
+                    "requiredPriorStage": "protocol_sanity_test",
+                    "nextRequiredStage": "long_print_reliability",
+                    "printCommandsSent": True,
+                    "rasterBytesIncluded": False,
+                    "operatorConfirmed": True,
+                    "completionLevel": "verified",
+                    "priorStageArtifactSha256": _required_json_string(
+                        protocol_sanity_summary,
+                        "artifactSha256",
+                        "protocol-sanity-summary",
+                    ),
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "band-manifest.json",
+            json.dumps(
+                {
+                    "bandsSent": _required_json_int(job_status, "bandsSent", "job-status"),
+                    "totalBands": _required_json_int(job_status, "totalBands", "job-status"),
+                    "rowsSent": _required_json_int(job_status, "rowsSent", "job-status"),
+                    "totalRows": _required_json_int(job_status, "totalRows", "job-status"),
+                    "bytesSent": _required_json_int(job_status, "bytesSent", "job-status"),
+                    "totalBytes": _required_json_int(job_status, "totalBytes", "job-status"),
+                    "rasterBytesIncluded": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "finalizer-result.json",
+            json.dumps(
+                {
+                    "state": _required_json_string(job_status, "state", "job-status"),
+                    "phase": _required_json_string(job_status, "phase", "job-status"),
+                    "completionConfidence": _required_json_string(
+                        job_status,
+                        "completionConfidence",
+                        "job-status",
+                    ),
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "safety-report.json",
+            json.dumps(
+                {
+                    "stage": "tiny_visual_test_card",
+                    "printingLocked": True,
+                    "certificationComplete": False,
+                    "requiresLongPrintReliability": True,
+                    "rasterBytesIncluded": False,
+                    "unlocksPrinting": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "user-confirmation.json",
+            json.dumps(operator_confirmation, indent=2),
+        )
+        archive.writestr(
+            "README.md",
+            (
+                "MiniX Print Studio Stage C tiny visual card hardware-test artifact. "
+                "This archive records operator-confirmed paper output and intentionally "
+                "excludes raw raster bytes.\n"
+            ),
+        )
+    return artifact_path
+
+
+def record_protocol_sanity_artifact(
+    *,
+    stage_a_artifact_path: Path,
+    output_dir: Path,
+    confirmed_at: str,
+    operator_note: str,
+    no_paper_moved: bool,
+    no_error: bool,
+) -> Path:
+    if not (no_paper_moved and no_error):
+        raise HardwareTestCliError(
+            "protocol sanity confirmation requires no paper movement and no error"
+        )
+
+    stage_a_summary = inspect_stage_a_artifact(stage_a_artifact_path)
+    preflight = plan_protocol_sanity_preflight(stage_a_artifact_path)
+    device_id = _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    profile_id = _required_json_string(
+        stage_a_summary,
+        "profileId",
+        "print-transfer-manifest.json",
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = output_dir / "hardware-test-protocol-sanity.zip"
+    with ZipFile(artifact_path, "w", ZIP_DEFLATED) as archive:
+        with ZipFile(stage_a_artifact_path) as stage_a_archive:
+            archive.writestr("device.json", stage_a_archive.read("device.json"))
+            archive.writestr("profile.json", stage_a_archive.read("profile.json"))
+            archive.writestr("app-version.json", stage_a_archive.read("app-version.json"))
+        archive.writestr("stage-a-summary.json", json.dumps(stage_a_summary, indent=2))
+        archive.writestr("protocol-sanity-preflight.json", json.dumps(preflight, indent=2))
+        archive.writestr("commands.log", _protocol_commands_log(preflight))
+        archive.writestr(
+            "print-transfer-manifest.json",
+            json.dumps(
+                {
+                    "stage": "protocol_sanity_test",
+                    "status": "confirmed_complete",
+                    "deviceId": device_id,
+                    "profileId": profile_id,
+                    "requiredPriorStage": "read_only_verification",
+                    "nextRequiredStage": "tiny_visual_test_card",
+                    "printCommandsSent": True,
+                    "rasterBytesIncluded": False,
+                    "operatorConfirmed": True,
+                    "completionLevel": "verified",
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "finalizer-result.json",
+            json.dumps(
+                {
+                    "status": "confirmed_complete",
+                    "finalOkSeen": no_error,
+                    "paperMoved": not no_paper_moved,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "safety-report.json",
+            json.dumps(
+                {
+                    "stage": "protocol_sanity_test",
+                    "printingLocked": True,
+                    "certificationComplete": False,
+                    "requiresTinyVisualCard": True,
+                    "rasterBytesIncluded": False,
+                    "unlocksPrinting": False,
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "user-confirmation.json",
+            json.dumps(
+                {
+                    "confirmedAt": confirmed_at,
+                    "noPaperMoved": no_paper_moved,
+                    "noError": no_error,
+                    "operatorNote": operator_note,
+                    "outcome": "confirmed_complete",
+                },
+                indent=2,
+            ),
+        )
+        archive.writestr(
+            "README.md",
+            (
+                "MiniX Print Studio Stage B protocol sanity hardware-test artifact. "
+                "This archive records operator-confirmed protocol command behavior and "
+                "does not include raster bytes.\n"
+            ),
+        )
+    return artifact_path
+
+
 def _require_stage_a_artifact_files(archive: ZipFile) -> None:
+    _require_artifact_files(
+        archive,
+        STAGE_A_ARTIFACT_REQUIRED_FILES,
+        label="artifact",
+    )
+
+
+def _require_artifact_files(
+    archive: ZipFile,
+    required_files: Sequence[str],
+    *,
+    label: str,
+) -> None:
     artifact_files = set(archive.namelist())
-    for filename in STAGE_A_ARTIFACT_REQUIRED_FILES:
+    for filename in required_files:
         if filename not in artifact_files:
-            raise HardwareTestCliError(f"artifact missing required file: {filename}")
+            raise HardwareTestCliError(f"{label} missing required file: {filename}")
 
 
 def _read_zip_json_object(archive: ZipFile, filename: str) -> dict[str, object]:
@@ -911,6 +1237,210 @@ def _json_list_length(
     if not isinstance(field_value, list):
         raise HardwareTestCliError(f"artifact missing required list: {filename}.{field}")
     return len(field_value)
+
+
+def _inspect_protocol_sanity_artifact(
+    *,
+    artifact_path: Path,
+    stage_a_summary: Mapping[str, object],
+) -> dict[str, object]:
+    try:
+        artifact_sha256 = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        with ZipFile(artifact_path) as archive:
+            _require_artifact_files(
+                archive,
+                (
+                    "print-transfer-manifest.json",
+                    "safety-report.json",
+                    "user-confirmation.json",
+                ),
+                label="protocol sanity artifact",
+            )
+            transfer_manifest = _read_zip_json_object(
+                archive,
+                "print-transfer-manifest.json",
+            )
+            safety_report = _read_zip_json_object(archive, "safety-report.json")
+            user_confirmation = _read_zip_json_object(archive, "user-confirmation.json")
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("protocol sanity artifact not found") from exc
+    except BadZipFile as exc:
+        raise HardwareTestCliError("protocol sanity artifact is not a ZIP file") from exc
+
+    _validate_protocol_sanity_artifact(
+        transfer_manifest=transfer_manifest,
+        safety_report=safety_report,
+        user_confirmation=user_confirmation,
+        stage_a_summary=stage_a_summary,
+    )
+    return {
+        "stage": "protocol_sanity_test",
+        "status": "confirmed_complete",
+        "deviceId": _required_json_string(
+            transfer_manifest,
+            "deviceId",
+            "print-transfer-manifest.json",
+        ),
+        "profileId": _required_json_string(
+            transfer_manifest,
+            "profileId",
+            "print-transfer-manifest.json",
+        ),
+        "confirmedAt": _required_json_string(
+            user_confirmation,
+            "confirmedAt",
+            "user-confirmation.json",
+        ),
+        "artifactSha256": artifact_sha256,
+    }
+
+
+def _validate_protocol_sanity_artifact(
+    *,
+    transfer_manifest: Mapping[str, object],
+    safety_report: Mapping[str, object],
+    user_confirmation: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+) -> None:
+    if (
+        _required_json_string(transfer_manifest, "stage", "print-transfer-manifest.json")
+        != "protocol_sanity_test"
+    ):
+        raise HardwareTestCliError("protocol sanity artifact has wrong stage")
+    if (
+        _required_json_string(transfer_manifest, "status", "print-transfer-manifest.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("protocol sanity artifact is not confirmed complete")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "nextRequiredStage",
+            "print-transfer-manifest.json",
+        )
+        != "tiny_visual_test_card"
+    ):
+        raise HardwareTestCliError("protocol sanity artifact is not ready for Stage C")
+    if (
+        _required_json_string(transfer_manifest, "deviceId", "print-transfer-manifest.json")
+        != _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("protocol sanity artifact device does not match Stage A")
+    if (
+        _required_json_string(transfer_manifest, "profileId", "print-transfer-manifest.json")
+        != _required_json_string(stage_a_summary, "profileId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("protocol sanity artifact profile does not match Stage A")
+    if not _required_json_bool(
+        transfer_manifest,
+        "printCommandsSent",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("protocol sanity artifact did not send commands")
+    if _required_json_bool(
+        transfer_manifest,
+        "rasterBytesIncluded",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("protocol sanity artifact unexpectedly includes raster bytes")
+    if not _required_json_bool(
+        transfer_manifest,
+        "operatorConfirmed",
+        "print-transfer-manifest.json",
+    ):
+        raise HardwareTestCliError("protocol sanity artifact lacks operator confirmation")
+    if (
+        _required_json_string(
+            transfer_manifest,
+            "completionLevel",
+            "print-transfer-manifest.json",
+        )
+        != "verified"
+    ):
+        raise HardwareTestCliError("protocol sanity artifact is not verified")
+
+    if not _required_json_bool(safety_report, "printingLocked", "safety-report.json"):
+        raise HardwareTestCliError("protocol sanity artifact safety unlocked printing")
+    if _required_json_bool(safety_report, "certificationComplete", "safety-report.json"):
+        raise HardwareTestCliError("protocol sanity artifact prematurely completed certification")
+    if _required_json_bool(safety_report, "unlocksPrinting", "safety-report.json"):
+        raise HardwareTestCliError("protocol sanity artifact unlocks printing")
+    if _required_json_bool(safety_report, "rasterBytesIncluded", "safety-report.json"):
+        raise HardwareTestCliError("protocol sanity safety report includes raster bytes")
+
+    if (
+        _required_json_string(user_confirmation, "outcome", "user-confirmation.json")
+        != "confirmed_complete"
+    ):
+        raise HardwareTestCliError("protocol sanity operator confirmation is incomplete")
+    if not _required_json_bool(user_confirmation, "noPaperMoved", "user-confirmation.json"):
+        raise HardwareTestCliError("protocol sanity operator reported paper movement")
+    if not _required_json_bool(user_confirmation, "noError", "user-confirmation.json"):
+        raise HardwareTestCliError("protocol sanity operator reported an error")
+
+
+def _validate_confirmed_tiny_visual_job(
+    *,
+    job_status: Mapping[str, object],
+    stage_a_summary: Mapping[str, object],
+) -> None:
+    if _required_json_string(job_status, "state", "job-status") != "confirmed_complete":
+        raise HardwareTestCliError("tiny visual card job is not confirmed complete")
+    if _required_json_string(job_status, "completionLevel", "job-status") != "verified":
+        raise HardwareTestCliError("tiny visual card job is not verified")
+    if (
+        _required_json_string(job_status, "completionConfidence", "job-status")
+        != "operator_paper_output_confirmed"
+    ):
+        raise HardwareTestCliError("tiny visual card job lacks operator confirmation")
+    if (
+        _required_json_string(job_status, "deviceId", "job-status")
+        != _required_json_string(stage_a_summary, "deviceId", "print-transfer-manifest.json")
+    ):
+        raise HardwareTestCliError("tiny visual card job device does not match Stage A artifact")
+
+    confirmation = _required_json_object(job_status, "operatorConfirmation", "job-status")
+    if _required_json_string(confirmation, "outcome", "job-status.operatorConfirmation") != (
+        "confirmed_complete"
+    ):
+        raise HardwareTestCliError("tiny visual card operator confirmation is incomplete")
+    for field in (
+        "printedTextReadable",
+        "endMarkerVisible",
+        "noOverheat",
+        "noDisconnect",
+    ):
+        if not _required_json_bool(confirmation, field, "job-status.operatorConfirmation"):
+            raise HardwareTestCliError("tiny visual card operator checklist did not pass")
+
+
+def _safe_filename_part(value: str) -> str:
+    return "".join(
+        character if character.isalnum() or character in "-_" else "_"
+        for character in value
+    )
+
+
+def _protocol_commands_log(preflight: Mapping[str, object]) -> str:
+    commands = preflight.get("commands")
+    if not isinstance(commands, list):
+        raise HardwareTestCliError("protocol preflight missing command list")
+    lines: list[str] = []
+    for command in commands:
+        if not isinstance(command, dict):
+            raise HardwareTestCliError("protocol preflight command is invalid")
+        payload_bytes = _required_json_int(
+            command,
+            "payloadBytes",
+            "protocol-sanity-preflight.commands",
+        )
+        lines.append(
+            f"{_required_json_int(command, 'index', 'protocol-sanity-preflight.commands')} "
+            f"{_required_json_string(command, 'name', 'protocol-sanity-preflight.commands')} "
+            f"payloadBytes={payload_bytes} "
+            f"hex={_required_json_string(command, 'hex', 'protocol-sanity-preflight.commands')}"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def _protocol_command(index: int, name: str, payload: bytes) -> dict[str, object]:

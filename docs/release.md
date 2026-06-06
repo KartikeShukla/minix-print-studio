@@ -27,8 +27,10 @@ Hardware gates are separate from CI and require the physical printer:
 
 - Stage A read-only verification artifact exported and inspected.
 - Stage A evidence summary generated and reviewed before sharing full artifacts.
-- Stage B protocol sanity preflight reviewed before physical run.
-- Tiny visual test card confirmed by the user.
+- Stage B protocol sanity preflight reviewed before physical run, then recorded
+  with `record-protocol-sanity`.
+- Tiny visual test card confirmed by the user and recorded with
+  `record-tiny-visual-card` from the confirmed Stage B artifact.
 - Long-print reliability test completed before stable support claims.
 
 Use `darwin` on macOS and `win32` on Windows. PyInstaller does not
