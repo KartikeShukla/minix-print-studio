@@ -82,11 +82,17 @@ Public development is on `main`; implementation slices use short-lived
   details visible when print planning is refused by the daemon.
 - Renderer daemon client method for approved preview printing through `/v1/jobs/print`.
 - Renderer Print action that sends the approved preview to the mock queue and surfaces `completed_unverified`, user-check requirement, progress, and safe recovery actions.
-- MCP daemon HTTP client for bearer-authenticated daemon health and document-preview requests.
+- MCP daemon HTTP client for bearer-authenticated daemon health, document-preview,
+  and print-job status requests.
 - MCP core tool handlers for daemon status, document preview, and note preview flows that return approval-required responses without exposing approval tokens.
 - MCP print-note responses include explicit agent policy decisions and daemon
   preview safety metrics while keeping approval tokens redacted.
-- FastMCP stdio server wrapper that registers `get_daemon_status`, `preview_document`, and `print_note` against the core MCP tool handlers.
+- MCP `get_job_status` returns redacted daemon job state, completion confidence,
+  progress, and safe recovery actions without exposing approval tokens, raster
+  data, or raw segment payloads.
+- FastMCP stdio server wrapper that registers `get_daemon_status`,
+  `get_job_status`, `preview_document`, and `print_note` against the core MCP
+  tool handlers.
 - `minix-mcp` CLI entrypoint now runs the FastMCP stdio server instead of returning a static app-not-running response.
 - Mock-first BLE discovery service that classifies profile/service/name matches as `detected_unverified` without granting print permission.
 - Read-only device verification flow that matches model and firmware against the printer profile while keeping printing locked until protocol sanity testing.
@@ -210,7 +216,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for packaged daemon/MCP sidecar path resolution without repo-local Python or source-path dependencies.
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for MCP approval-required policy decisions, safety metric
-  propagation, and approval-token redaction in print-note responses.
+  propagation, approval-token redaction in print-note responses, and redacted
+  job-status lookup through the stdio server.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
 - TDD red/green checks for virtual segment-boundary transport disconnects reporting

@@ -15,6 +15,16 @@ DEFAULT_AGENT_POLICY: JsonObject = {
     "requireTrustedPrinter": True,
     "rateLimitJobsPerMinute": 3,
 }
+JOB_STATUS_REDACTED_KEYS = frozenset(
+    {
+        "approvalToken",
+        "approval_token",
+        "raster",
+        "rasterBase64",
+        "rawRaster",
+        "segments",
+    }
+)
 
 
 class DaemonClient(Protocol):
@@ -26,6 +36,8 @@ class DaemonClient(Protocol):
         document: JsonObject,
         render_settings: JsonObject,
     ) -> JsonObject: ...
+
+    def get_job_status(self, job_id: str) -> JsonObject: ...
 
 
 def get_daemon_status_tool(client: DaemonClient) -> JsonObject:
@@ -70,6 +82,23 @@ def print_note_tool(
         preview,
         policy_decision=_agent_policy_decision(tool_name="print_note"),
     )
+
+
+def get_job_status_tool(client: DaemonClient, *, job_id: str) -> JsonObject:
+    try:
+        job = client.get_job_status(job_id)
+    except DaemonUnavailable:
+        return build_app_not_running_response()
+
+    return {"status": "ok", "job": _redacted_job_status(job)}
+
+
+def _redacted_job_status(job: JsonObject) -> JsonObject:
+    return {
+        key: value
+        for key, value in job.items()
+        if key not in JOB_STATUS_REDACTED_KEYS
+    }
 
 
 def _approval_required_response(

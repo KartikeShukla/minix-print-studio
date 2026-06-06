@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from typing import cast
+from urllib.parse import quote
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
@@ -58,6 +59,9 @@ class DaemonHttpClient:
             "/v1/render/document-preview",
             body={"document": document, "renderSettings": render_settings},
         )
+
+    def get_job_status(self, job_id: str) -> JsonObject:
+        return self._request("GET", f"/v1/jobs/{quote(job_id, safe='')}")
 
     def _request(
         self,

@@ -89,3 +89,41 @@ def test_daemon_http_client_gets_health_with_auth_headers() -> None:
             5.0,
         )
     ]
+
+
+def test_daemon_http_client_gets_job_status_with_auth_headers() -> None:
+    calls: list[tuple[str, str, bytes | None, Mapping[str, str], float]] = []
+
+    def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> JsonObject:
+        calls.append((method, url, body, headers, timeout))
+        return {
+            "jobId": "job_123",
+            "state": "completed_unverified",
+            "completionLevel": "unverified",
+            "requiresUserCheck": True,
+            "safeActions": ["confirm_complete"],
+        }
+
+    client = DaemonHttpClient(
+        base_url="http://127.0.0.1:39281/",
+        token="secret-token",
+        transport=transport,
+        timeout=3.0,
+    )
+
+    assert client.get_job_status("job_123/unsafe id")["completionLevel"] == "unverified"
+    assert calls == [
+        (
+            "GET",
+            "http://127.0.0.1:39281/v1/jobs/job_123%2Funsafe%20id",
+            None,
+            {"Authorization": "Bearer secret-token"},
+            3.0,
+        )
+    ]
