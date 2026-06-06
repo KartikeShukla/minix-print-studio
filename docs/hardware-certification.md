@@ -37,8 +37,9 @@ scripts/hardware-test.sh host-readiness
 
 On macOS, this checks whether `system_profiler SPBluetoothDataType` exposes a
 Bluetooth controller to the current process. A `not_visible` result means Stage A
-cannot start from that host context yet; fix Bluetooth hardware visibility,
-permissions, or sandbox/access constraints before retrying `scan`.
+cannot start from that host context yet. The CLI JSON and Printer panel include
+`recommendedActions` for Bluetooth settings, unsandboxed execution, and adapter
+restart checks before retrying `scan`.
 
 ## Exporting The Stage A Artifact
 

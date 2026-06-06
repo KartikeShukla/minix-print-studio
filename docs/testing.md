@@ -25,9 +25,10 @@ pnpm release-package-check
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
 - Host-readiness tests cover the CLI diagnostic that distinguishes local
-  Bluetooth controller visibility failures from printer-level Stage A failures.
+  Bluetooth controller visibility failures from printer-level Stage A failures
+  and emits remediation actions for blocked hosts.
 - Desktop and renderer tests cover exposing that host-readiness result in the
-  Printer panel before Stage A scan attempts.
+  Printer panel before Stage A scan attempts, including recommended actions.
 - Offline certification-preflight tests cover Stage B protocol command metadata
   and Stage C tiny-card metadata without sending BLE writes or including printable
   raster bytes.

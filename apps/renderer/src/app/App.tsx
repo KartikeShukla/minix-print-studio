@@ -3455,6 +3455,7 @@ function HostBluetoothReadinessStatus({
   const result = workflow.status === "ready" ? workflow.result : null;
   const title = result ? formatHostReadinessStatus(result.status) : null;
   const primaryEvidence = result?.checks[0]?.evidence;
+  const recommendedActions = result?.recommendedActions ?? [];
 
   return (
     <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
@@ -3474,6 +3475,18 @@ function HostBluetoothReadinessStatus({
           <div className="text-muted-foreground">{result.detail}</div>
           {primaryEvidence ? (
             <div className="break-words font-mono text-xs">{primaryEvidence}</div>
+          ) : null}
+          {recommendedActions.length > 0 ? (
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">
+                Recommended actions
+              </div>
+              <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                {recommendedActions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
           <Badge variant={result.canAttemptStageA ? "success" : "warning"}>
             {result.canAttemptStageA

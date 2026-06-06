@@ -135,8 +135,8 @@
 - Renderer printer setup exposes `Export read-only artifact` after read-only verification so a hardware tester can capture the Stage A validation record without terminal steps.
 - Electron exposes an offline Stage A artifact inspector from the Printer panel that reuses the shared hardware-test CLI safety checks and shows the Stage B protocol sanity preflight without BLE writes.
 - Non-mock BLE scan now maps host Bluetooth-unavailable failures to a structured `503` response, and the renderer daemon client preserves daemon `detail` text so the UI can show actionable setup errors.
-- `minix-hardware-test host-readiness` reports whether the current host context exposes a Bluetooth controller before Stage A, with macOS `system_profiler SPBluetoothDataType` parsing for the no-controller-visible failure mode.
-- Electron exposes the shared host Bluetooth readiness diagnostic from the Printer panel before Stage A scan attempts.
+- `minix-hardware-test host-readiness` reports whether the current host context exposes a Bluetooth controller before Stage A, with macOS `system_profiler SPBluetoothDataType` parsing and recommended actions for the no-controller-visible failure mode.
+- Electron exposes the shared host Bluetooth readiness diagnostic and recommended actions from the Printer panel before Stage A scan attempts.
 - `minix-hardware-test` and `scripts/hardware-test.sh` provide repo-local Stage A scan and read-only artifact export commands for hardware testers running against a local daemon.
 - `minix-hardware-test inspect-artifact` validates exported Stage A hardware-test ZIPs offline and rejects artifacts that show print commands, raster bytes, unlocked printing, or completed certification.
 - `minix-hardware-test protocol-sanity-preflight` validates a Stage A artifact and emits the deterministic Stage B wake, density, and paper-mode command plan without contacting BLE.

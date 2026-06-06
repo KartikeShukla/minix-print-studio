@@ -194,6 +194,17 @@ def test_macos_bluetooth_readiness_reports_no_visible_controller() -> None:
         "controllerVisible": False,
         "canAttemptStageA": False,
         "detail": "macOS did not report a Bluetooth controller to this process.",
+        "recommendedActions": [
+            "Open macOS System Settings > Bluetooth and confirm Bluetooth is on.",
+            (
+                "Run MiniX Print Studio or scripts/hardware-test.sh from an unsandboxed "
+                "local session with Bluetooth access."
+            ),
+            (
+                "Reconnect any Bluetooth adapter or restart Bluetooth services, then rerun "
+                "host-readiness before Stage A."
+            ),
+        ],
         "checks": [
             {
                 "name": "system_profiler SPBluetoothDataType",
