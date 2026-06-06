@@ -76,6 +76,9 @@ Public development is on `main`; implementation slices use short-lived
 - Renderer image import uploads PNG/JPEG/WebP files to the opened daemon project's hash-addressed asset store, keeps the embedded data URL for local rendering, and persists daemon asset metadata on the document.
 - Renderer startup restores the last active daemon project session before falling back to the single-document localStorage cache, and clears that remembered session when the opened project is deleted.
 - Renderer shows a dismissible first-run Setup checklist that summarizes daemon, printer verification, Stage A artifact, and Agent Integration readiness without unlocking printing, and persists dismissal in localStorage.
+- Standalone and packaged renderer builds split React, editor/canvas, and UI
+  dependencies into stable named chunks so production builds stay below the
+  previous Vite chunk-warning threshold for the standalone renderer.
 - Renderer daemon client methods for authenticated document preview and approved print planning.
 - Renderer Preview action that generates a daemon-canonical preview, plans the approved preview, surfaces preview/plan metadata, and enables Print only after plan readiness.
 - Renderer safety panel keeps blocked preview coverage, warning, and error
@@ -273,6 +276,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
 - TDD red/green checks for renderer daemon-project session persistence, startup restore before local document cache fallback, and active-project session cleanup on delete.
 - TDD red/green checks for first-run Setup checklist visibility, local dismissal persistence, and storage corruption fallback.
+- TDD red/green checks for standalone renderer and packaged desktop renderer
+  Vite chunk splitting across React, editor/canvas, and UI dependencies.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: renderer loads after Projects/session/image-asset changes, the Image import button and Projects panel render, and the browser console only shows the React DevTools hint.
 - Playwright MCP smoke against `http://127.0.0.1:5173/`: Printer panel renders the `Inspect Stage A artifact` action after the Electron artifact-inspection bridge change, and the browser console only shows the React DevTools hint.
 - `scripts/hardware-test.sh --help`
@@ -286,6 +291,9 @@ Public development is on `main`; implementation slices use short-lived
 - `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
 - Non-mock Stage A scan attempt on 2026-06-05 against a separate daemon on `127.0.0.1:39282` returned `Bluetooth unavailable: Bluetooth is unsupported`; `system_profiler SPBluetoothDataType` reported no visible controller, so no physical printer validation was possible from this execution context even with the printer powered on.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
+- `pnpm build` completes without the previous renderer Vite chunk-size warning;
+  standalone renderer JS chunks are split into `index`, `react-vendor`,
+  `editor-vendor`, and `ui-vendor`, all under 500 kB before gzip.
 
 ## Next Implementation Slices
 

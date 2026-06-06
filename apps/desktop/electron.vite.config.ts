@@ -1,5 +1,6 @@
 import path from "node:path";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { rendererManualChunks } from "../renderer/buildChunks";
 
 export default defineConfig({
   main: {
@@ -19,7 +20,10 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: path.resolve(__dirname, "../renderer/index.html")
+        input: path.resolve(__dirname, "../renderer/index.html"),
+        output: {
+          manualChunks: rendererManualChunks
+        }
       }
     }
   }
