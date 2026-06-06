@@ -8,7 +8,7 @@ physical validation before a stable public release.
 | Platform | Status | Notes |
 | --- | --- | --- |
 | macOS | Development target | Unsigned local Electron package includes target-host daemon and MCP sidecars plus Bluetooth usage descriptions; signing and notarization are not complete. |
-| Windows | Unsigned package evidence captured | Release Package workflow run `27053365446` completed `pnpm package:win` on a Windows runner with bundled daemon/MCP sidecars; installer packaging and signing are pending. |
+| Windows | Unsigned package and installer workflow support | Release Package workflow builds the unpacked Windows app plus unsigned NSIS installer on Windows runners with bundled daemon/MCP sidecars; signing is pending. |
 | Linux | Developer-only | Not a first supported desktop release target. |
 
 ## Printer Profiles

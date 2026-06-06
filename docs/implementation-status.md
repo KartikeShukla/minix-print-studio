@@ -40,6 +40,9 @@ Public development is on `main`; implementation slices use short-lived
 - Release package workflow writes a deterministic `SHA256SUMS.txt` manifest for uploaded unsigned package artifacts, excludes electron-builder scratch files, and validators require the checksum script and workflow step.
 - Release package workflow supports manual dispatch and uploads distinct `minix-print-studio-macos-unsigned` / `minix-print-studio-windows-unsigned` evidence artifacts, with validators requiring the trigger, upload step, and artifact names.
 - Release evidence validator can check a downloaded manual workflow run for successful metadata, platform-named macOS/Windows artifacts, checksum coverage, bundled sidecars, and forbidden runtime/scratch paths before making Windows release claims.
+- Windows unsigned installer packaging is wired through `pnpm
+  package:win-installer`, the Release Package workflow, and the release
+  packaging/evidence validators as `minix-print-studio-windows-installer-unsigned`.
 - Public GitHub repository `KartikeShukla/minix-print-studio` is live with the implementation work merged into `main`.
 - Manual Release Package workflow run `27053365446` on public `main` commit `028ca71` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py` with the Bluetooth usage-description gate enabled.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
@@ -200,6 +203,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for release checksum manifest generation, relative CLI paths, source-package inclusion, and release workflow checksum wiring.
 - TDD red/green checks for release workflow manual dispatch and platform-named artifact evidence uploads.
 - TDD red/green checks for release workflow evidence validation across successful run metadata, Windows package/sidecar presence, checksum manifests, and forbidden artifact paths.
+- TDD red/green checks for unsigned Windows installer packaging scripts,
+  workflow artifact upload, and downloaded installer evidence validation.
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.

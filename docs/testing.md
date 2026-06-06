@@ -67,10 +67,12 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 ```
 
 This validates the successful workflow metadata, macOS and Windows unsigned package
-artifacts, checksum manifests, bundled sidecars, and forbidden artifact exclusions.
-The macOS artifact must include Bluetooth usage descriptions in `Info.plist` so
-first-run permission prompts explain local printer access. The current release
-evidence baseline is Release Package workflow run `27053365446`.
+artifacts, the unsigned Windows installer artifact, checksum manifests, bundled
+sidecars, and forbidden artifact exclusions. The macOS artifact must include
+Bluetooth usage descriptions in `Info.plist` so first-run permission prompts
+explain local printer access. The current pre-installer release evidence
+baseline is Release Package workflow run `27053365446`; newer Windows installer
+evidence must include `minix-print-studio-windows-installer-unsigned`.
 
 ## Public History Gate
 

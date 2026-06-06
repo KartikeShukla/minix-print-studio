@@ -11,12 +11,14 @@ from pathlib import Path
 REQUIRED_ARTIFACTS = {
     "macOS": "minix-print-studio-macos-unsigned",
     "Windows": "minix-print-studio-windows-unsigned",
+    "Windows installer": "minix-print-studio-windows-installer-unsigned",
 }
 WINDOWS_REQUIRED_PATHS = (
     Path("win-unpacked/MiniX Print Studio.exe"),
     Path("win-unpacked/resources/sidecars/minixd.exe"),
     Path("win-unpacked/resources/sidecars/minix-mcp.exe"),
 )
+WINDOWS_INSTALLER_GLOB = "MiniX Print Studio-*-win-x64.exe"
 FORBIDDEN_PREFIXES = (
     "runtime/",
     "logs/",
@@ -78,6 +80,11 @@ def validate_release_evidence(
     issues.extend(validate_workflow_run_json(workflow_run_json))
     issues.extend(validate_macos_artifact(evidence_dir / REQUIRED_ARTIFACTS["macOS"]))
     issues.extend(validate_windows_artifact(evidence_dir / REQUIRED_ARTIFACTS["Windows"]))
+    issues.extend(
+        validate_windows_installer_artifact(
+            evidence_dir / REQUIRED_ARTIFACTS["Windows installer"]
+        )
+    )
     return issues
 
 
@@ -132,6 +139,25 @@ def validate_windows_artifact(artifact_dir: Path) -> list[str]:
 
     issues.extend(validate_required_paths(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS))
     issues.extend(validate_checksum_manifest(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS))
+    return issues
+
+
+def validate_windows_installer_artifact(artifact_dir: Path) -> list[str]:
+    issues = validate_artifact_common(artifact_dir, label="Windows installer")
+    if issues and not artifact_dir.is_dir():
+        return issues
+
+    installer_paths = tuple(sorted(artifact_dir.glob(WINDOWS_INSTALLER_GLOB)))
+    if not installer_paths:
+        return [
+            *issues,
+            f"Windows installer artifact missing {WINDOWS_INSTALLER_GLOB}",
+        ]
+
+    required_paths = tuple(path.relative_to(artifact_dir) for path in installer_paths)
+    issues.extend(
+        validate_checksum_manifest(artifact_dir, "Windows installer", required_paths)
+    )
     return issues
 
 

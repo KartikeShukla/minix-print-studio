@@ -11,11 +11,13 @@ ROOT_REQUIRED_PACKAGE_SCRIPTS = {
     "build:sidecars": "node scripts/run_python.mjs scripts/build_sidecars.py",
     "package:mac": "pnpm --filter @minix/desktop package:mac",
     "package:win": "pnpm --filter @minix/desktop package:win",
+    "package:win-installer": "pnpm --filter @minix/desktop package:win-installer",
 }
 
 DESKTOP_REQUIRED_PACKAGE_SCRIPTS = {
     "package:mac": "pnpm build && pnpm --workspace-root build:sidecars --target-platform darwin && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --mac --dir --publish never",
     "package:win": "pnpm build && pnpm --workspace-root build:sidecars --target-platform win32 && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win --dir --x64 --publish never",
+    "package:win-installer": "pnpm build && pnpm --workspace-root build:sidecars --target-platform win32 && cross-env ELECTRON_CACHE=../../dist/electron-cache ELECTRON_BUILDER_CACHE=../../dist/electron-builder-cache electron-builder --config electron-builder.yml --win nsis --x64 --publish never",
 }
 
 BUILDER_CONFIG_PATH = Path("apps/desktop/electron-builder.yml")
@@ -71,6 +73,9 @@ RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES = {
     "minix-print-studio-windows-unsigned": (
         "release package workflow missing Windows unsigned artifact name"
     ),
+    "minix-print-studio-windows-installer-unsigned": (
+        "release package workflow missing Windows unsigned installer artifact name"
+    ),
 }
 
 RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
@@ -92,6 +97,10 @@ RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
     ),
     ("pnpm package:mac", "release package workflow missing command: pnpm package:mac"),
     ("pnpm package:win", "release package workflow missing command: pnpm package:win"),
+    (
+        "pnpm package:win-installer",
+        "release package workflow missing command: pnpm package:win-installer",
+    ),
     (
         "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
         "release package workflow missing command: "

@@ -36,11 +36,13 @@ cross-compile, so sidecar builds must run on the same operating system as the
 package target.
 
 The release package workflow at `.github/workflows/release-package.yml` runs
-unsigned package smokes on native macOS and Windows runners and supports manual
-`workflow_dispatch` runs for release evidence capture. Use that workflow to
-validate Windows sidecar binaries and package inclusion before making Windows
-release claims. The uploaded evidence artifacts are named
-`minix-print-studio-macos-unsigned` and `minix-print-studio-windows-unsigned`.
+unsigned package smokes on native macOS and Windows runners, builds an unsigned
+Windows installer, and supports manual `workflow_dispatch` runs for release
+evidence capture. Use that workflow to validate Windows sidecar binaries,
+package inclusion, and installer creation before making Windows release claims.
+The uploaded evidence artifacts are named `minix-print-studio-macos-unsigned`,
+`minix-print-studio-windows-unsigned`, and
+`minix-print-studio-windows-installer-unsigned`.
 The workflow also writes `dist/release/SHA256SUMS.txt` before uploading artifacts
 so downloaded unsigned packages can be checked against a deterministic SHA-256
 manifest. Electron-builder scratch files such as `builder-debug.yml` and
@@ -60,11 +62,12 @@ node scripts/run_python.mjs scripts/validate_release_evidence.py release-evidenc
 ```
 
 The evidence validator requires a successful manual `Release Package` run,
-platform-named macOS and Windows unsigned artifact directories, matching
-`SHA256SUMS.txt` manifests, bundled daemon/MCP sidecars, and no runtime state,
-diagnostics, hardware artifacts, or electron-builder scratch files. The macOS
-artifact must also include Bluetooth usage descriptions in `Info.plist` explaining
-that Bluetooth is used only to connect to the local MiniX thermal printer.
+platform-named macOS and Windows unsigned artifact directories, the unsigned
+Windows installer artifact, matching `SHA256SUMS.txt` manifests, bundled
+daemon/MCP sidecars, and no runtime state, diagnostics, hardware artifacts, or
+electron-builder scratch files. The macOS artifact must also include Bluetooth
+usage descriptions in `Info.plist` explaining that Bluetooth is used only to
+connect to the local MiniX thermal printer.
 
 ## Public History Gate
 
@@ -85,7 +88,8 @@ rewrite the still-private branch history with a reviewed plan and use
 - macOS: unsigned local Electron package via `pnpm package:mac`; signed release
   build and notarization before stable release.
 - Windows: unsigned Electron package via `pnpm package:win` on a Windows runner;
-  signed installer before stable release.
+  unsigned NSIS installer via `pnpm package:win-installer` on a Windows runner;
+  signing before stable release.
 - Daemon and MCP sidecars: built with PyInstaller into `dist/sidecars` and
   included in the packaged app as `resources/sidecars`; the daemon sidecar
   bundles the public printer profile data it needs at startup.
