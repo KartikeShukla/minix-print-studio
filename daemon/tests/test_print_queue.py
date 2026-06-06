@@ -106,6 +106,52 @@ def test_mock_print_queue_persists_job_and_redacted_segment_metadata(tmp_path: P
     assert '"raster":' not in stored
 
 
+def test_mock_print_queue_reports_partial_output_after_segment_boundary_disconnect() -> None:
+    preview_store = PreviewStore()
+    profile = load_profile()
+    raster = b"\x00" * 48 * 300
+    preview = preview_store.create(
+        document_hash="sha256:document",
+        render_settings_hash="sha256:settings",
+        raster=raster,
+        profile_id="seznik-minix-s1-lyin48d-gy",
+        width_dots=384,
+        height_dots=300,
+        safety={"allowed": True, "warnings": [], "metrics": {}},
+    )
+    queue = PrintQueue(
+        profiles=[profile],
+        preview_store=preview_store,
+        mock=True,
+        mock_disconnect_after_band_index=0,
+    )
+
+    job = queue.print_preview(
+        preview_id=preview.preview_id,
+        approval_token=preview.approval_token,
+        document_hash=preview.document_hash,
+        render_settings_hash=preview.render_settings_hash,
+        profile_id=preview.profile_id,
+        paper_mode="continuous",
+        density="medium",
+        copies=1,
+        source="ui",
+    )
+
+    assert job.state == "failed_partial_output"
+    assert job.phase == "transport_disconnected"
+    assert job.completion_level == "failed_partial_output"
+    assert job.completion_confidence == "mock_disconnect_after_band_0"
+    assert job.requires_user_check is True
+    assert job.bands_sent == 1
+    assert job.total_bands == 2
+    assert job.rows_sent == 256
+    assert job.total_rows == 460
+    assert job.bytes_sent == 12_288
+    assert job.total_bytes == 22_080
+    assert job.safe_actions == ["inspect_output", "clear_printer", "reprint_from_start"]
+
+
 def test_mock_print_queue_rejects_bad_approval_token_before_output() -> None:
     preview_store = PreviewStore()
     profile = load_profile()

@@ -1,3 +1,4 @@
+import base64
 import json
 from io import BytesIO
 from pathlib import Path
@@ -6,6 +7,25 @@ from zipfile import ZipFile
 from fastapi.testclient import TestClient
 
 from minixd.app import create_app
+
+
+def _create_preview(client: TestClient) -> dict[str, object]:
+    row_bytes = 48
+    content_height = 300
+    content_raster = bytes([0x55]) * row_bytes * content_height
+    response = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": content_height,
+            "rasterBase64": base64.b64encode(content_raster).decode("ascii"),
+            "safety": {"allowed": True, "warnings": [], "metrics": {}},
+        },
+    )
+    return response.json()
 
 
 def test_print_endpoint_queues_mock_job_and_exposes_status_and_segments() -> None:
@@ -247,3 +267,44 @@ def test_diagnostics_export_includes_redacted_job_and_segment_metadata() -> None
         archived_bundle = json.loads(archive.read("diagnostics.json"))
         assert archived_bundle["jobs"][0]["jobId"] == printed["jobId"]
         assert "approvalToken" not in archive.read("diagnostics.json").decode("utf-8")
+
+
+def test_diagnostics_explains_partial_output_after_mock_segment_disconnect() -> None:
+    client = TestClient(
+        create_app(
+            mock=True,
+            mock_print_disconnect_after_band_index=0,
+        )
+    )
+    preview = _create_preview(client)
+    printed = client.post(
+        "/v1/jobs/print",
+        json={
+            "previewId": preview["previewId"],
+            "approvalToken": preview["approvalToken"],
+            "documentHash": "sha256:document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "ui",
+        },
+    ).json()
+
+    response = client.post("/v1/diagnostics/export", json={"includeProjectContent": False})
+
+    assert response.status_code == 200
+    assert printed["state"] == "failed_partial_output"
+    bundle = response.json()
+    decision = bundle["jobs"][0]["completionDecision"]
+    assert decision == {
+        "level": "failed_partial_output",
+        "confidence": "mock_disconnect_after_band_0",
+        "phase": "transport_disconnected",
+        "requiresUserCheck": True,
+        "explanation": (
+            "Mock transport disconnected after band 0; printable bytes may have left "
+            "the printer. Do not auto-retry."
+        ),
+    }

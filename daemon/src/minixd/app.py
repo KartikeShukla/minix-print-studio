@@ -50,7 +50,12 @@ def _profile_root() -> Path:
     return PROJECT_ROOT / "profiles"
 
 
-def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
+def create_app(
+    *,
+    mock: bool = False,
+    data_dir: Path | None = None,
+    mock_print_disconnect_after_band_index: int | None = None,
+) -> FastAPI:
     app = FastAPI(title="MiniX Print Studio daemon", version=__version__)
     app.add_middleware(
         CORSMiddleware,
@@ -67,6 +72,7 @@ def create_app(*, mock: bool = False, data_dir: Path | None = None) -> FastAPI:
         preview_store=preview_store,
         mock=mock,
         job_store_path=(data_dir / "jobs.json") if data_dir is not None else None,
+        mock_disconnect_after_band_index=mock_print_disconnect_after_band_index,
     )
     discovery_service = PrinterDiscoveryService(
         profiles=profiles_data,
