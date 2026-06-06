@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from minixd.printing.planner import create_print_plan, reconstruct_raster_from_bands
 
 PROFILE_PATH = Path("profiles/seznik-minix-s1-lyin48d-gy/profile.json")
@@ -65,3 +67,29 @@ def test_print_plan_band_metadata_matches_payloads() -> None:
         assert band.payload_bytes == 8 + band.raster_byte_length
         assert band.raster_byte_offset == row_bytes * band.start_row
         assert band.sha256.startswith("sha256:")
+
+
+def test_print_plan_assigns_profile_backed_thermal_pacing_between_bands() -> None:
+    profile = load_profile()
+    row_bytes = 48
+    content_height = 300
+    dense_band = bytes([0x55]) * row_bytes * 256
+    blank_remainder = b"\x00" * row_bytes * (content_height - 256)
+    content_raster = dense_band + blank_remainder
+
+    package = create_print_plan(
+        job_id="job_paced",
+        preview_id="prev_paced",
+        document_hash="sha256:document",
+        content_raster=content_raster,
+        content_height_dots=content_height,
+        profile=profile,
+        paper_mode="continuous",
+        density="medium",
+    )
+
+    assert package.bands[0].black_dot_count == 48 * 256 * 4
+    assert package.bands[0].black_coverage == pytest.approx(0.5)
+    assert package.bands[0].cooldown_after_ms == 575
+    assert package.bands[1].black_dot_count == 0
+    assert package.bands[1].cooldown_after_ms == 0

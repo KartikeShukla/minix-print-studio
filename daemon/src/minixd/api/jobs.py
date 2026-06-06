@@ -116,6 +116,9 @@ def create_jobs_router(
                     "rasterByteOffset": segment.raster_byte_offset,
                     "rasterByteLength": segment.raster_byte_length,
                     "payloadBytes": segment.payload_bytes,
+                    "blackDotCount": segment.black_dot_count,
+                    "blackCoverage": segment.black_coverage,
+                    "cooldownAfterMs": segment.cooldown_after_ms,
                     "sha256": segment.sha256,
                 }
                 for segment in print_queue.get_segments(job_id)
@@ -160,6 +163,9 @@ def _serialize_plan_package(package: PrintPlanPackage) -> dict[str, object]:
                 "rasterByteOffset": band.raster_byte_offset,
                 "rasterByteLength": band.raster_byte_length,
                 "payloadBytes": band.payload_bytes,
+                "blackDotCount": band.black_dot_count,
+                "blackCoverage": band.black_coverage,
+                "cooldownAfterMs": band.cooldown_after_ms,
                 "sha256": band.sha256,
             }
             for band in package.bands

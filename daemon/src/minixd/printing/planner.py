@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,6 +14,9 @@ class RasterBand:
     raster_byte_offset: int
     raster_byte_length: int
     payload_bytes: int
+    black_dot_count: int
+    black_coverage: float
+    cooldown_after_ms: int
     sha256: str
     raster: bytes
 
@@ -62,6 +66,7 @@ def create_print_plan(
     row_bytes = _int_value(print_config, "rowBytes")
     max_band_height = _int_value(long_print_config, "defaultMaxBandHeightDots")
     long_print_threshold = _int_value(long_print_config, "longPrintThresholdDots")
+    thermal_pacing = _optional_dict_value(long_print_config, "thermalPacing")
     tail_rows = (
         _int_value(long_print_config, "appendTailBlankRowsContinuous")
         if paper_mode == "continuous"
@@ -87,6 +92,7 @@ def create_print_plan(
         transfer_raster,
         row_bytes=row_bytes,
         max_band_height=max_band_height,
+        thermal_pacing=thermal_pacing,
     )
 
     plan = PrintPlan(
@@ -132,6 +138,7 @@ def _segment_transfer_raster(
     *,
     row_bytes: int,
     max_band_height: int,
+    thermal_pacing: dict[str, Any] | None,
 ) -> list[RasterBand]:
     if row_bytes <= 0:
         raise ValueError("row_bytes must be positive")
@@ -149,6 +156,10 @@ def _segment_transfer_raster(
         byte_offset = start_row * row_bytes
         byte_length = height * row_bytes
         raster = transfer_raster[byte_offset : byte_offset + byte_length]
+        black_dot_count = sum(value.bit_count() for value in raster)
+        total_dots = row_bytes * 8 * height
+        black_coverage = black_dot_count / total_dots if total_dots else 0.0
+        is_last_band = start_row + height >= total_rows
         bands.append(
             RasterBand(
                 index=index,
@@ -157,6 +168,13 @@ def _segment_transfer_raster(
                 raster_byte_offset=byte_offset,
                 raster_byte_length=byte_length,
                 payload_bytes=8 + byte_length,
+                black_dot_count=black_dot_count,
+                black_coverage=black_coverage,
+                cooldown_after_ms=_cooldown_after_ms(
+                    black_coverage=black_coverage,
+                    is_last_band=is_last_band,
+                    thermal_pacing=thermal_pacing,
+                ),
                 sha256=_sha256(raster),
                 raster=raster,
             )
@@ -167,12 +185,44 @@ def _segment_transfer_raster(
     return bands
 
 
+def _cooldown_after_ms(
+    *,
+    black_coverage: float,
+    is_last_band: bool,
+    thermal_pacing: dict[str, Any] | None,
+) -> int:
+    if is_last_band or thermal_pacing is None or thermal_pacing.get("enabled") is False:
+        return 0
+    base_delay = _optional_int_value(thermal_pacing, "baseInterBandDelayMs") or 0
+    coverage_threshold = _optional_float_value(thermal_pacing, "cooldownBandCoverage")
+    ms_per_coverage_point = (
+        _optional_int_value(thermal_pacing, "cooldownMsPerCoveragePoint") or 0
+    )
+    max_cooldown = _optional_int_value(thermal_pacing, "maxCooldownMs")
+    cooldown = base_delay
+    if coverage_threshold is not None and black_coverage > coverage_threshold:
+        excess_ms = round((black_coverage - coverage_threshold) * ms_per_coverage_point, 6)
+        cooldown += math.ceil(excess_ms)
+    if max_cooldown is not None:
+        cooldown = min(cooldown, max_cooldown)
+    return max(0, cooldown)
+
+
 def _sha256(payload: bytes) -> str:
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
 
 
 def _dict_value(source: dict[str, Any], key: str) -> dict[str, Any]:
     value = source[key]
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    return value
+
+
+def _optional_dict_value(source: dict[str, Any], key: str) -> dict[str, Any] | None:
+    value = source.get(key)
+    if value is None:
+        return None
     if not isinstance(value, dict):
         raise ValueError(f"{key} must be an object")
     return value
@@ -190,3 +240,21 @@ def _int_value(source: dict[str, Any], key: str) -> int:
     if not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
     return value
+
+
+def _optional_int_value(source: dict[str, Any], key: str) -> int | None:
+    value = source.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer")
+    return value
+
+
+def _optional_float_value(source: dict[str, Any], key: str) -> float | None:
+    value = source.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int | float):
+        raise ValueError(f"{key} must be a number")
+    return float(value)

@@ -49,6 +49,9 @@ describe("daemon API client", () => {
           rasterByteOffset: 0,
           rasterByteLength: 12288,
           payloadBytes: 12296,
+          blackDotCount: 49152,
+          blackCoverage: 0.5,
+          cooldownAfterMs: 575,
           sha256: "sha256:band"
         }
       ]

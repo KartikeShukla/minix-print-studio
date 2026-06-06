@@ -24,6 +24,9 @@ pnpm release-package-check
   recomputation for raw raster previews, blocked-preview rejection before
   plan/print execution, and renderer display of blocked preview details while
   Print stays disabled.
+- Print planning tests cover profile-backed thermal pacing metadata for each
+  band, including black-dot coverage and cooldown delays exposed without raw
+  raster bytes.
 - Golden tests for canonical rendering and packed raster outputs.
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
 - Mock print-queue tests cover segment-boundary transport disconnects so printable

@@ -33,7 +33,33 @@
         "writeWithResponse": { "type": "boolean" }
       }
     },
-    "print": { "type": "object" },
+    "print": {
+      "type": "object",
+      "properties": {
+        "longPrint": {
+          "type": "object",
+          "properties": {
+            "thermalPacing": {
+              "type": "object",
+              "required": [
+                "enabled",
+                "baseInterBandDelayMs",
+                "cooldownBandCoverage",
+                "cooldownMsPerCoveragePoint",
+                "maxCooldownMs"
+              ],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "baseInterBandDelayMs": { "type": "integer", "minimum": 0 },
+                "cooldownBandCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+                "cooldownMsPerCoveragePoint": { "type": "integer", "minimum": 0 },
+                "maxCooldownMs": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
     "safety": { "type": "object" }
   }
 }

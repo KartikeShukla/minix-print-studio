@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyDiscoveredPrinter,
   healthResponseSchema,
+  printPlanResponseSchema,
   projectAssetResponseSchema,
   projectListResponseSchema,
   projectResponseSchema,
@@ -19,6 +20,8 @@ describe("printer profile contracts", () => {
     expect(parsed.print.widthDots).toBe(384);
     expect(parsed.print.rowBytes).toBe(48);
     expect(parsed.ble.writeWithResponse).toBe(true);
+    expect(parsed.print.longPrint.thermalPacing.baseInterBandDelayMs).toBe(125);
+    expect(parsed.print.longPrint.thermalPacing.cooldownBandCoverage).toBe(0.35);
     expect(parsed.readOnly.modelCommandHex).toBe("10 ff 20 f0");
     expect(parsed.readOnly.firmwareCommandHex).toBe("10 ff 20 f1");
   });
@@ -44,6 +47,48 @@ describe("printer profile contracts", () => {
 
     expect(support.level).toBe("detected_unverified");
     expect(support.reason).toBe("Service UUID matches; model query required.");
+  });
+});
+
+describe("print plan API contracts", () => {
+  it("validates redacted thermal pacing metadata for planned bands", () => {
+    const parsed = printPlanResponseSchema.parse({
+      plan: {
+        planId: "plan_job",
+        jobId: "job",
+        previewId: "prev",
+        documentHash: "sha256:document",
+        rasterHash: "sha256:raster",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        widthDots: 384,
+        contentHeightDots: 300,
+        tailBlankRowsDots: 160,
+        transferHeightDots: 460,
+        rowBytes: 48,
+        totalRasterBytes: 22080,
+        requiresLongPrintMode: false
+      },
+      totalBands: 2,
+      bands: [
+        {
+          index: 0,
+          startRow: 0,
+          heightDots: 256,
+          rasterByteOffset: 0,
+          rasterByteLength: 12288,
+          payloadBytes: 12296,
+          blackDotCount: 49152,
+          blackCoverage: 0.5,
+          cooldownAfterMs: 575,
+          sha256: "sha256:band"
+        }
+      ]
+    });
+
+    expect(parsed.bands[0].cooldownAfterMs).toBe(575);
+    expect("raster" in parsed.bands[0]).toBe(false);
   });
 });
 
