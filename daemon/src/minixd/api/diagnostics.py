@@ -211,6 +211,8 @@ def _job_diagnostics(job: PrintJob, print_queue: PrintQueue) -> dict[str, object
 
 
 def _completion_explanation(job: PrintJob) -> str:
+    if job.completion_confidence == "operator_paper_output_confirmed":
+        return "Operator confirmed the paper output after BLE transfer."
     prefix = "mock_disconnect_after_band_"
     if job.completion_confidence.startswith(prefix):
         band_index = job.completion_confidence.removeprefix(prefix)

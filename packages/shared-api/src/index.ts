@@ -98,6 +98,16 @@ export const printPlanResponseSchema = z.object({
   bands: z.array(printPlanBandSchema)
 });
 
+export const operatorConfirmationSchema = z.object({
+  confirmedAt: z.string(),
+  printedTextReadable: z.boolean(),
+  endMarkerVisible: z.boolean(),
+  noOverheat: z.boolean(),
+  noDisconnect: z.boolean(),
+  operatorNote: z.string().nullable(),
+  outcome: z.string()
+});
+
 export const printJobResponseSchema = z.object({
   jobId: z.string(),
   previewId: z.string(),
@@ -110,6 +120,7 @@ export const printJobResponseSchema = z.object({
   requiresUserCheck: z.boolean(),
   source: z.string(),
   copies: z.number().int().positive(),
+  operatorConfirmation: operatorConfirmationSchema.nullable().optional(),
   bandsSent: z.number().int().nonnegative(),
   totalBands: z.number().int().nonnegative(),
   rowsSent: z.number().int().nonnegative(),
@@ -276,6 +287,13 @@ export type RenderSettings = z.infer<typeof renderSettingsSchema>;
 export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
+export type OperatorConfirmationRequest = {
+  printedTextReadable: boolean;
+  endMarkerVisible: boolean;
+  noOverheat: boolean;
+  noDisconnect: boolean;
+  operatorNote?: string;
+};
 export type DiagnosticsExportResponse = z.infer<typeof diagnosticsExportResponseSchema>;
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;

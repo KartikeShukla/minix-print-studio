@@ -56,6 +56,9 @@ pnpm release-package-check
 - MCP profile-list tests cover supported-profile summaries that omit BLE UUIDs,
   read-only probe commands, and protocol payload details while keeping profile
   dimensions and agent safety limits available.
+- Operator confirmation tests cover daemon job state transition, HTTP
+  confirmation recording, diagnostics inclusion, renderer daemon-client calls,
+  and the print-status confirmation action.
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.
@@ -72,7 +75,8 @@ daemon on `127.0.0.1:39282` completed:
 - Offline `inspect-artifact`, `protocol-sanity-preflight`,
   `tiny-visual-card-preflight`, and `evidence-summary`
 - One experimental tiny-card `/v1/jobs/print` transfer that reported
-  `completed_unverified`; operator paper-output confirmation remains required.
+  `completed_unverified`; operator paper-output confirmation recording is
+  implemented, but reviewed Stage C artifact evidence remains required.
 
 ## Release Evidence Gate
 

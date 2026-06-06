@@ -32,6 +32,7 @@ import {
   type DocumentPreviewResponse,
   type HardwareTestExportRequest,
   type HealthResponse,
+  type OperatorConfirmationRequest,
   type ProjectAssetResponse,
   type ProjectAssetUploadRequest,
   type ProjectListResponse,
@@ -58,6 +59,10 @@ export type DaemonClient = {
   ) => Promise<DocumentPreviewResponse>;
   planApprovedPreview: (request: PrintPlanRequest) => Promise<PrintPlanResponse>;
   printApprovedPreview: (request: PrintPreviewRequest) => Promise<PrintJobResponse>;
+  confirmJobOutput: (
+    jobId: string,
+    request: OperatorConfirmationRequest
+  ) => Promise<PrintJobResponse>;
   exportDiagnostics?: (request: DiagnosticsExportRequest) => Promise<DiagnosticsExportResponse>;
   exportHardwareTest?: (deviceId: string) => Promise<Blob>;
   scanPrinters: () => Promise<PrinterScanResponse>;
@@ -142,6 +147,17 @@ export function createDaemonClient(): DaemonClient {
         },
         printJobResponseSchema.parse,
         "Daemon print job"
+      );
+    },
+    async confirmJobOutput(jobId, request) {
+      return requestDaemon(
+        `/v1/jobs/${encodeURIComponent(jobId)}/operator-confirmation`,
+        {
+          method: "POST",
+          body: request
+        },
+        printJobResponseSchema.parse,
+        "Daemon operator confirmation"
       );
     },
     async exportDiagnostics(request) {
