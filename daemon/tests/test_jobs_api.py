@@ -1,5 +1,6 @@
 import base64
 
+import pytest
 from fastapi.testclient import TestClient
 
 from minixd.app import create_app
@@ -47,6 +48,8 @@ def test_plan_job_endpoint_returns_segment_metadata_without_raw_raster() -> None
     assert body["bands"][0]["heightDots"] == 256
     assert body["bands"][0]["rasterByteLength"] == 12288
     assert body["bands"][0]["payloadBytes"] == 12296
+    assert body["bands"][0]["blackCoverage"] == pytest.approx(0.5)
+    assert body["bands"][0]["cooldownAfterMs"] == 575
     assert "raster" not in body["bands"][0]
 
 

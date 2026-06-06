@@ -43,7 +43,14 @@
       "appendTailBlankRowsContinuous": 160,
       "finalAckPolicy": "required_for_confirmed_optional_for_unverified",
       "supportsResume": false,
-      "pauseOnlyBetweenBands": true
+      "pauseOnlyBetweenBands": true,
+      "thermalPacing": {
+        "enabled": true,
+        "baseInterBandDelayMs": 125,
+        "cooldownBandCoverage": 0.35,
+        "cooldownMsPerCoveragePoint": 3000,
+        "maxCooldownMs": 2000
+      }
     }
   },
   "safety": {

@@ -54,6 +54,9 @@ Public development is on `main`; implementation slices use short-lived
 - Deterministic rendering coverage for rectangle and text elements.
 - Exact packed-raster test for a 384-dot document fixture.
 - Print planner that appends continuous-paper tail rows and segments raster data into profile-sized bands.
+- Print planner now attaches profile-backed thermal pacing metadata to each
+  band, including black-dot count, band coverage, and the cooldown delay that
+  later transport code must observe before the next band.
 - Virtual reconstruction coverage for a 10,000-dot raster.
 - Preview store that binds document hash, render settings hash, raster hash, and approval token.
 - `/v1/render/preview` endpoint that creates preview-bound approval artifacts.
@@ -212,6 +215,8 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for profile-backed thermal coverage safety reports,
   blocked-preview rejection at print plan/print boundaries, and renderer display
   of blocked preview safety details without enabling Print.
+- TDD red/green checks for profile-backed long-print thermal pacing metadata in
+  planner bands, daemon plan API responses, and shared TypeScript contracts.
 - TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
 - TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.

@@ -29,6 +29,15 @@ output can still generate a preview artifact for review, but a preview with
 The renderer keeps the blocked preview's coverage, warnings, and errors visible
 without enabling Print.
 
+## Thermal Pacing
+
+Long-print planning uses the selected profile's thermal pacing defaults before
+any BLE transport sends data. Each planned band records its black-dot count,
+black coverage, and `cooldownAfterMs` delay. The delay is redacted planning
+metadata, not proof that hardware has accepted the output; physical transport
+must still honor it and keep completion confidence conservative until the
+hardware certification stages pass.
+
 ## Runtime Boundaries
 
 - Electron renderers use context isolation, sandboxing, and a narrow preload API.

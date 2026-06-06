@@ -12,6 +12,8 @@ The first profile is `seznik-minix-s1-lyin48d-gy`.
 - Width: 384 dots
 - Default density: `medium`
 - Default paper mode: `continuous`
+- Thermal pacing: 125 ms base inter-band delay, with additional cooldown above
+  35% band coverage and a 2000 ms cap
 - Required next stage after read-only verification: protocol sanity test
 
 ## Support Levels
@@ -30,6 +32,7 @@ New profiles must include:
 - Model and firmware evidence from Stage A read-only verification.
 - BLE service, write characteristic, and notify characteristic identifiers.
 - Conservative print defaults and safety limits.
+- Conservative long-print thermal pacing defaults.
 - A hardware-test artifact with user paths and device identifiers redacted before sharing.
 - A Stage A evidence summary for maintainer review before sharing a full artifact ZIP.
 

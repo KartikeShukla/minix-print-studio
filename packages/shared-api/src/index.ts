@@ -68,6 +68,9 @@ export const printPlanBandSchema = z.object({
   rasterByteOffset: z.number().int().nonnegative(),
   rasterByteLength: z.number().int().nonnegative(),
   payloadBytes: z.number().int().nonnegative(),
+  blackDotCount: z.number().int().nonnegative(),
+  blackCoverage: z.number().min(0).max(1),
+  cooldownAfterMs: z.number().int().nonnegative(),
   sha256: z.string()
 });
 
@@ -245,7 +248,14 @@ export const printerProfileSchema = z.object({
       appendTailBlankRowsContinuous: z.number().int().nonnegative(),
       finalAckPolicy: z.literal("required_for_confirmed_optional_for_unverified"),
       supportsResume: z.boolean(),
-      pauseOnlyBetweenBands: z.boolean()
+      pauseOnlyBetweenBands: z.boolean(),
+      thermalPacing: z.object({
+        enabled: z.boolean(),
+        baseInterBandDelayMs: z.number().int().nonnegative(),
+        cooldownBandCoverage: z.number().min(0).max(1),
+        cooldownMsPerCoveragePoint: z.number().int().nonnegative(),
+        maxCooldownMs: z.number().int().nonnegative()
+      })
     })
   }),
   safety: z.object({
@@ -364,7 +374,14 @@ export const seznikMiniXProfile = {
       appendTailBlankRowsContinuous: 160,
       finalAckPolicy: "required_for_confirmed_optional_for_unverified",
       supportsResume: false,
-      pauseOnlyBetweenBands: true
+      pauseOnlyBetweenBands: true,
+      thermalPacing: {
+        enabled: true,
+        baseInterBandDelayMs: 125,
+        cooldownBandCoverage: 0.35,
+        cooldownMsPerCoveragePoint: 3000,
+        maxCooldownMs: 2000
+      }
     }
   },
   safety: {

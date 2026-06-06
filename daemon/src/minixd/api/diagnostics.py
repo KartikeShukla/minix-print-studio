@@ -165,6 +165,7 @@ def _profile_snapshot(profile: dict[str, Any]) -> dict[str, object]:
                     "appendTailBlankRowsContinuous"
                 ),
                 "finalAckPolicy": _string_or_none(long_print.get("finalAckPolicy")),
+                "thermalPacing": long_print.get("thermalPacing"),
             },
         },
         "safety": {
@@ -188,6 +189,9 @@ def _job_diagnostics(job: PrintJob, print_queue: PrintQueue) -> dict[str, object
             "rasterByteOffset": segment.raster_byte_offset,
             "rasterByteLength": segment.raster_byte_length,
             "payloadBytes": segment.payload_bytes,
+            "blackDotCount": segment.black_dot_count,
+            "blackCoverage": segment.black_coverage,
+            "cooldownAfterMs": segment.cooldown_after_ms,
             "sha256": segment.sha256,
         }
         for segment in print_queue.get_segments(job.job_id)

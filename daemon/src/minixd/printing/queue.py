@@ -290,6 +290,9 @@ def _serialize_segment(segment: RasterBand) -> dict[str, object]:
         "raster_byte_offset": segment.raster_byte_offset,
         "raster_byte_length": segment.raster_byte_length,
         "payload_bytes": segment.payload_bytes,
+        "black_dot_count": segment.black_dot_count,
+        "black_coverage": segment.black_coverage,
+        "cooldown_after_ms": segment.cooldown_after_ms,
         "sha256": segment.sha256,
     }
 
@@ -302,6 +305,9 @@ def _deserialize_segment(payload: dict[str, Any]) -> RasterBand:
         raster_byte_offset=_int(payload, "raster_byte_offset"),
         raster_byte_length=_int(payload, "raster_byte_length"),
         payload_bytes=_int(payload, "payload_bytes"),
+        black_dot_count=_int_or_default(payload, "black_dot_count", 0),
+        black_coverage=_float_or_default(payload, "black_coverage", 0.0),
+        cooldown_after_ms=_int_or_default(payload, "cooldown_after_ms", 0),
         sha256=_string(payload, "sha256"),
         raster=b"",
     )
@@ -326,6 +332,20 @@ def _int(payload: dict[str, Any], key: str) -> int:
     if not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
     return value
+
+
+def _int_or_default(payload: dict[str, Any], key: str, default: int) -> int:
+    value = payload.get(key, default)
+    if not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer")
+    return value
+
+
+def _float_or_default(payload: dict[str, Any], key: str, default: float) -> float:
+    value = payload.get(key, default)
+    if not isinstance(value, int | float):
+        raise ValueError(f"{key} must be a number")
+    return float(value)
 
 
 def _string_list(payload: dict[str, Any], key: str) -> list[str]:
