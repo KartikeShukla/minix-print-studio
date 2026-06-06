@@ -206,6 +206,24 @@ the confirmed Stage B artifact, verifies the daemon job is
 `printingLocked` true. It still does not complete certification; long-print
 reliability remains required before stable support claims.
 
+## Trusted Printer Record
+
+After Stage A, Stage B, and Stage C artifacts have been reviewed, record the
+local trust decision:
+
+```bash
+scripts/hardware-test.sh record-trusted-printer \
+  --stage-a-artifact <stage-a.zip> \
+  --protocol-sanity-artifact <hardware-test-protocol-sanity.zip> \
+  --tiny-visual-card-artifact <hardware-test-tiny-visual-card-job-id.zip> \
+  --output-dir <local-output-dir>
+```
+
+This writes `trusted-printer-<device-fingerprint>.json`. The record enables only
+`manual_continuous_printing`, stores a redacted device fingerprint plus SHA-256
+digests for the Stage A/B/C evidence chain, and keeps long-print, stable support
+claims, and agent direct printing disabled until long-print reliability passes.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A

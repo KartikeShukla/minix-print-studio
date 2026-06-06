@@ -15,7 +15,7 @@ physical validation before a stable public release.
 
 | Profile | Support Level | Printing Status | Required Evidence |
 | --- | --- | --- | --- |
-| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer, operator-confirmation recording, and Stage B/C artifact recording implemented; trusted printing remains certification-gated | Stage A physical artifact exists; reviewed Stage B protocol sanity artifact, reviewed Stage C tiny visual card artifact, and long-print reliability before stable support claims. |
+| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer, operator-confirmation recording, Stage B/C artifact recording, and local trusted-printer record generation implemented; stable support remains certification-gated | Stage A/B/C physical evidence exists locally; long-print reliability remains required before stable support claims, long-print trust, or agent direct printing. |
 
 ## Agent Integrations
 
@@ -35,9 +35,10 @@ physical validation before a stable public release.
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
 | Stage A shareable evidence summary | Implemented offline and shown in Electron artifact inspection | `minix-hardware-test evidence-summary` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |
-| Stage B physical protocol sanity | Artifact recording implemented; reviewed physical artifact still required | `minix-hardware-test record-protocol-sanity` |
+| Stage B physical protocol sanity | Artifact recording implemented; local reviewed artifact recorded on 2026-06-06 | `minix-hardware-test record-protocol-sanity` |
 | Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
-| Stage C physical tiny visual test card | Artifact recording implemented and requires a confirmed Stage B artifact plus a verified daemon job; reviewed physical artifact still required | `minix-hardware-test record-tiny-visual-card` |
+| Stage C physical tiny visual test card | Artifact recording implemented; local reviewed artifact recorded on 2026-06-06 from a confirmed daemon job | `minix-hardware-test record-tiny-visual-card` |
+| Trusted printer record | Implemented for manual continuous printing only; keeps long-print, stable support, and agent direct printing disabled | `minix-hardware-test record-trusted-printer` |
 | Long-print reliability | Pending | Future hardware-test artifact |
 
 Do not treat BLE detection, Stage A, or an unverified transfer alone as stable

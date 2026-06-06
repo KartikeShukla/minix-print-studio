@@ -12,12 +12,12 @@ not yet a stable public installer.
 - macOS advertisements for this unit may omit service UUIDs, so discovery must
   fall back from FF00-filtered scanning to name-prefix matching before read-only
   verification.
-- Stage B physical protocol sanity artifact review, Stage C reviewed tiny-card
-  artifact evidence, and long-print reliability runs are still pending.
+- Stage B physical protocol sanity and Stage C tiny-card artifact evidence exists
+  locally, but long-print reliability runs are still pending.
 - User-initiated physical BLE transfer is implemented as an experimental path,
   and operator paper-output confirmation can now be recorded on the job. Stage
-  B/C artifact-recording commands are implemented, but trusted support still
-  requires reviewed physical artifact evidence.
+  B/C artifact-recording and local trusted-printer record commands are
+  implemented, but stable support still requires long-print reliability evidence.
 - Only the Seznik MiniX profile is present.
 
 ## Packaging
@@ -34,8 +34,9 @@ not yet a stable public installer.
 
 ## Product Surface
 
-- The mock print flow and experimental physical BLE transport are implemented,
-  but trusted printer support remains certification-gated.
+- The mock print flow, experimental physical BLE transport, and manual continuous
+  trusted-printer record path are implemented, but long-print and agent-direct
+  trust remain certification-gated.
 - Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
   use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.

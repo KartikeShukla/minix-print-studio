@@ -23,8 +23,9 @@ planning, MCP integration scaffolding, unsigned macOS and Windows package
 evidence, community governance docs, Stage A physical read-only verification, and
 an experimental user-initiated BLE transport path with operator confirmation
 recording. Stage B/C hardware-test artifact recording is implemented for reviewed
-physical runs. Trusted printing remains gated until the staged certification flow
-produces reviewed evidence and long-print reliability passes.
+physical runs, and reviewed artifacts can produce a local trusted-printer record
+for manual continuous printing. Stable support, long-print trust, and agent
+direct printing remain gated until long-print reliability passes.
 
 ## Safety Model
 

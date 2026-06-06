@@ -289,6 +289,9 @@ Public development is on `main`; implementation slices use short-lived
   Stage C tiny-card hardware artifact recording from a confirmed daemon job,
   confirmed Stage B artifact validation, digest chaining, and locked-printing
   safety reports.
+- TDD red/green checks for trusted-printer JSON record creation from reviewed
+  Stage A/B/C artifacts while keeping long-print, stable support, and agent
+  direct printing disabled.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for required public package metadata in open-source readiness validation.
@@ -337,6 +340,15 @@ Public development is on `main`; implementation slices use short-lived
   `sha256:fa0f77ee9e7e43ea`; the app can now record operator paper-output
   confirmation, but a reviewed confirmation artifact is still required before
   certification.
+- Fresh non-mock physical evidence on 2026-06-06 exported a Stage A artifact,
+  recorded Stage B protocol sanity, printed and operator-confirmed a Stage C
+  `MINIX TEST 7K4P` tiny visual card as
+  `job_86adfffe80f44b2eb919eabf52439070`, and produced local untracked
+  Stage B/C hardware artifacts outside the repository.
+- The local trusted-printer record command was exercised against that Stage A/B/C
+  physical evidence chain and produced a record with
+  `trusted_for_manual_continuous_printing`, manual continuous printing enabled,
+  and long-print, stable support, and agent direct printing still disabled.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -344,10 +356,9 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Run reviewed physical Stage B protocol sanity and Stage C tiny-card
-   confirmation through the new hardware-test artifact commands.
-2. After reviewed Stage B and visual-card evidence exists, implement
-   trusted-printer confirmation while keeping long-print reliability as a
-   separate certification gate.
-3. Add the long-print reliability hardware artifact path before stable support
+1. Add the long-print reliability hardware artifact path before stable support
    claims.
+2. Surface the local trusted-printer record in the desktop setup flow without
+   enabling agent direct printing or long-print trust.
+3. Implement long-print reliability execution and reviewed artifact recording
+   for stable support claims.
