@@ -197,13 +197,29 @@ def _job_diagnostics(job: PrintJob, print_queue: PrintQueue) -> dict[str, object
         "confidence": job.completion_confidence,
         "phase": job.phase,
         "requiresUserCheck": job.requires_user_check,
-        "explanation": "Mock transport sent all planned bands but cannot verify physical output.",
+        "explanation": _completion_explanation(job),
     }
     serialized["timing"] = {
         "bleWrites": {"summary": "not captured in mock transport"},
         "notifications": {"summary": "not captured in mock transport"},
     }
     return serialized
+
+
+def _completion_explanation(job: PrintJob) -> str:
+    prefix = "mock_disconnect_after_band_"
+    if job.completion_confidence.startswith(prefix):
+        band_index = job.completion_confidence.removeprefix(prefix)
+        if job.completion_level == "failed_partial_output":
+            return (
+                f"Mock transport disconnected after band {band_index}; printable bytes may "
+                "have left the printer. Do not auto-retry."
+            )
+        return (
+            f"Mock transport disconnected before printable output after band {band_index}; "
+            "retry from the start is allowed."
+        )
+    return "Mock transport sent all planned bands but cannot verify physical output."
 
 
 def _build_read_only_hardware_test_archive(

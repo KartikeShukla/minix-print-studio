@@ -2,7 +2,8 @@
 
 ## Current Branch
 
-`codex/bootstrap-minix-print-studio`
+Public development is on `main`; implementation slices use short-lived
+`codex/*` branches and merge through reviewed pull requests.
 
 ## Completed Checkpoints
 
@@ -129,6 +130,9 @@
 - MCP stdio smoke helper launches the real Python MCP server against a mock daemon runtime handoff and validates daemon status without exposing daemon bearer tokens.
 - Claude Desktop Agent Integration can export a token-free `.mcpb` bundle containing a manifest, local shim bridge, and install README.
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
+- Mock print jobs can simulate a segment-boundary transport disconnect and report
+  `failed_partial_output` with exact bands, rows, bytes, user-check requirement,
+  and no-auto-retry recovery actions after printable bytes are sent.
 - Diagnostics export supports both JSON response and downloadable ZIP archive containing redacted `diagnostics.json` plus a README.
 - BLE read-only verification captures timing metadata for notify setup, notifications, writes, and notify teardown without recording raw command payloads.
 - `/v1/diagnostics/hardware-test` runs Stage A read-only verification and exports a hardware-test ZIP with device/profile snapshots, BLE discovery metadata, model/firmware response files, notification/command logs, safety report, and explicit evidence that no print commands or raster bytes were sent.
@@ -167,7 +171,7 @@
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.
 - GitHub Release Package workflow run `27053365446` on public `main` commit `028ca71`: macOS unsigned package completed in 2m44s, Windows unsigned package completed in 2m56s, and downloaded artifacts passed `node scripts/run_python.mjs scripts/validate_release_evidence.py` including bundled sidecars, checksum manifests, forbidden-path exclusions, and macOS Bluetooth usage descriptions.
-- Public `main` post-merge verification on merge commit `028ca71`: CI run `27052767548`, CodeQL run `27052767551`, and Release Package run `27052767547` completed successfully.
+- Public `main` post-merge verification on merge commit `26014e5`: CI run `27054166928`, CodeQL run `27054166929`, and Release Package run `27054166927` completed successfully.
 - Packaged daemon sidecar runtime smoke: `dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minixd` returned `/v1/health` with mock mode and profile registry `2026.06.04`.
 - `MINIX_MCP_BINARY_SMOKE="dist/release/mac-arm64/MiniX Print Studio.app/Contents/Resources/sidecars/minix-mcp" .venv/bin/python -m pytest mcp/tests/test_stdio_smoke.py::test_mcp_stdio_packaged_binary_smoke`
 - `.venv/bin/python -m ruff check daemon mcp`
@@ -194,6 +198,9 @@
 - TDD red/green checks for MCP stdio process smoke against a mock daemon runtime handoff.
 - TDD red/green checks for Claude Desktop `.mcpb` export ZIP contents, manifest metadata, token redaction, and renderer export action.
 - TDD red/green checks for disk-backed daemon job persistence, app restart job loading, and downloadable diagnostics archive contents.
+- TDD red/green checks for virtual segment-boundary transport disconnects reporting
+  `failed_partial_output` and diagnostics that explain why auto-retry is unsafe
+  after printable bytes may have left the printer.
 - TDD red/green checks for BLE read-only timing capture in the Bleak adapter, profile probe writes, printer API serialization, and shared API parsing.
 - TDD red/green checks for Stage A hardware-test ZIP export and renderer read-only artifact export action.
 - TDD red/green checks for Bluetooth-unavailable scan handling across the Bleak adapter, printer API, and renderer daemon client error messages.

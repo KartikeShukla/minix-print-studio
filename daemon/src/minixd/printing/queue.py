@@ -44,10 +44,12 @@ class PrintQueue:
         preview_store: PreviewStore,
         mock: bool,
         job_store_path: Path | None = None,
+        mock_disconnect_after_band_index: int | None = None,
     ) -> None:
         self._profiles = profiles
         self._preview_store = preview_store
         self._mock = mock
+        self._mock_disconnect_after_band_index = mock_disconnect_after_band_index
         self._jobs: dict[str, PrintJob] = {}
         self._segments: dict[str, list[RasterBand]] = {}
         self._job_store_path = job_store_path
@@ -128,6 +130,15 @@ class PrintQueue:
     ) -> PrintJob:
         if not self._mock:
             raise PrintRejectedError("real printer transport is not implemented yet")
+        if self._mock_disconnect_after_band_index is not None:
+            return self._mock_disconnect_job(
+                job_id=job_id,
+                preview_id=preview_id,
+                plan_package=plan_package,
+                source=source,
+                copies=copies,
+                disconnect_after_band_index=self._mock_disconnect_after_band_index,
+            )
         return PrintJob(
             job_id=job_id,
             preview_id=preview_id,
@@ -147,6 +158,50 @@ class PrintQueue:
             total_bytes=plan_package.plan.total_raster_bytes,
             tail_blank_rows_dots=plan_package.plan.tail_blank_rows_dots,
             safe_actions=["confirm_complete", "feed_paper", "reprint_from_start"],
+        )
+
+    def _mock_disconnect_job(
+        self,
+        *,
+        job_id: str,
+        preview_id: str,
+        plan_package: PrintPlanPackage,
+        source: str,
+        copies: int,
+        disconnect_after_band_index: int,
+    ) -> PrintJob:
+        sent_bands = _sent_bands_for_disconnect(
+            plan_package.bands,
+            disconnect_after_band_index,
+        )
+        printable_bytes_sent = sum(segment.raster_byte_length for segment in sent_bands)
+        printable_rows_sent = sum(segment.height_dots for segment in sent_bands)
+        partial_output = printable_bytes_sent > 0
+        return PrintJob(
+            job_id=job_id,
+            preview_id=preview_id,
+            plan_id=plan_package.plan.plan_id,
+            state="failed_partial_output" if partial_output else "failed_before_output",
+            phase="transport_disconnected",
+            completion_level=(
+                "failed_partial_output" if partial_output else "failed_before_output"
+            ),
+            completion_confidence=f"mock_disconnect_after_band_{disconnect_after_band_index}",
+            requires_user_check=partial_output,
+            source=source,
+            copies=copies,
+            bands_sent=len(sent_bands),
+            total_bands=len(plan_package.bands),
+            rows_sent=printable_rows_sent,
+            total_rows=plan_package.plan.transfer_height_dots,
+            bytes_sent=printable_bytes_sent,
+            total_bytes=plan_package.plan.total_raster_bytes,
+            tail_blank_rows_dots=plan_package.plan.tail_blank_rows_dots,
+            safe_actions=(
+                ["inspect_output", "clear_printer", "reprint_from_start"]
+                if partial_output
+                else ["retry_from_start"]
+            ),
         )
 
     def _load_jobs(self) -> None:
@@ -212,6 +267,15 @@ def _deserialize_job(payload: dict[str, Any]) -> PrintJob:
         tail_blank_rows_dots=_int(payload, "tail_blank_rows_dots"),
         safe_actions=_string_list(payload, "safe_actions"),
     )
+
+
+def _sent_bands_for_disconnect(
+    bands: list[RasterBand],
+    disconnect_after_band_index: int,
+) -> list[RasterBand]:
+    if disconnect_after_band_index < 0:
+        return []
+    return bands[: min(disconnect_after_band_index + 1, len(bands))]
 
 
 def _serialize_segment(segment: RasterBand) -> dict[str, object]:

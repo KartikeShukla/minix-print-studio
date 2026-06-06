@@ -22,6 +22,8 @@ pnpm release-package-check
 - Unit tests for schema validation, profile matching, config generation, protocol commands, raster packing, safety metrics, and print planning.
 - Golden tests for canonical rendering and packed raster outputs.
 - Mock BLE tests for scan, connect, flow control, disconnects, missing final OK, and partial-output states.
+- Mock print-queue tests cover segment-boundary transport disconnects so printable
+  partial output is never reported as a safe retry or verified completion.
 - Hardware tests are explicit and separate from CI. Stage A exports a read-only
   `hardware-test-<timestamp>.zip` artifact and must not unlock printing.
 - Host-readiness tests cover the CLI diagnostic that distinguishes local
