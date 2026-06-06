@@ -18,6 +18,10 @@ explicit certification stages pass.
 - A stable-support gate record may enable long-print continuous printing and
   stable support claims, but it still keeps agent direct printing disabled by
   default.
+- An agent-direct policy-review record may document stricter agent defaults,
+  approval requirements, conservative limits, raw BLE write blocks, and unsafe
+  resume blocks, but it still keeps direct printing disabled until a later
+  explicit user opt-in workflow exists.
 - A daemon result of `completed_unverified` means the BLE transfer finished from
   the daemon's perspective; it does not certify that the paper output is correct.
 - Agent direct printing is disabled by default, and MCP print tools return

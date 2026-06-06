@@ -7,6 +7,7 @@ import type {
   AgentIntegrationTargetId,
 } from "@/lib/agent-integrations";
 import type {
+  AgentDirectPolicyReviewInspectionResult,
   HardwareArtifactInspectionResult,
   HardwareHostReadiness,
   StableSupportGateInspectionResult,
@@ -124,6 +125,7 @@ declare global {
       inspectHardwareArtifact?: () => Promise<HardwareArtifactInspectionResult | null>;
       inspectTrustedPrinterRecord?: () => Promise<TrustedPrinterRecordInspectionResult | null>;
       inspectStableSupportGate?: () => Promise<StableSupportGateInspectionResult | null>;
+      inspectAgentDirectPolicyReview?: () => Promise<AgentDirectPolicyReviewInspectionResult | null>;
     };
   }
 }

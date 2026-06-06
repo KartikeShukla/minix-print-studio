@@ -16,7 +16,7 @@ not yet a stable public installer.
   locally. Long-print reliability print execution and artifact recording are
   implemented, and local Stage D physical evidence was recorded on 2026-06-06.
   Stable support claims require the local stable-support gate record, and agent
-  direct printing still requires a later policy review.
+  direct printing still requires a later explicit user opt-in workflow.
 - User-initiated physical BLE transfer is implemented as an experimental path,
   and operator paper-output confirmation can now be recorded on the job. Stage
   B/C artifact-recording, local trusted-printer record, and long-print

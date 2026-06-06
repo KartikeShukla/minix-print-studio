@@ -74,6 +74,7 @@ describe("MiniX Print Studio shell", () => {
     expect(screen.getByText("Daemon")).toBeInTheDocument();
     expect(screen.getByText("Printer verification")).toBeInTheDocument();
     expect(screen.getByText("Stable support gate")).toBeInTheDocument();
+    expect(screen.getByText("Agent-direct policy gate")).toBeInTheDocument();
     expect(screen.getByText("Agent integrations")).toBeInTheDocument();
 
     fireEvent.click(
@@ -1503,6 +1504,109 @@ describe("MiniX Print Studio shell", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText("Agent direct default: approval required"),
+    ).toBeInTheDocument();
+  });
+
+  it("inspects a local agent-direct policy review while keeping direct printing disabled", async () => {
+    const inspect = vi.fn().mockResolvedValue({
+      recordPath: "/tmp/agent-direct-policy-review.json",
+      summary: {
+        status: "agent_direct_policy_reviewed",
+        sourceGate: {
+          stage: "stable_support_gate",
+          status: "stable_support_claims_enabled",
+          localRecordValidated: true,
+        },
+        agentRules: {
+          directPrintEnabled: false,
+          directPrintDefault: "disabled",
+          approvalRequiredByDefault: true,
+          longDirectPrintRequiresApproval: true,
+          overLimitBehavior: "preview_and_ask",
+          noAutomaticRetryAfterPrintableBytes: true,
+          rawBleWritesAllowed: false,
+          unsafeResumeAllowed: false,
+          requiresTrustedPrinter: true,
+          requiresStableSupportGate: true,
+        },
+        limits: {
+          maxHeightDots: 1000,
+          warnTotalBlackCoverage: 0.3,
+          blockTotalBlackCoverage: 0.45,
+          blockBandCoverage: 0.7,
+          maxCopies: 1,
+          jobsPerMinute: 3,
+        },
+        safety: {
+          stableSupportClaimEnabled: true,
+          longPrintPrintingEnabled: true,
+          agentDirectPrintingEnabled: false,
+          agentDirectPrintingDefault: "approval_required",
+        },
+        nextRequiredStage: "explicit_user_opt_in_for_agent_direct_printing",
+      },
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+        agentDirectPolicyReviewInspector={{ inspect }}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Inspect agent-direct policy review",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(inspect).toHaveBeenCalledOnce();
+    });
+    expect(
+      await screen.findByText("Agent-direct policy reviewed"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Validated locally")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stable-support source validated"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Direct print default: disabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Approval required by default"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Long direct print requires approval"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Over limit: preview and ask")).toBeInTheDocument();
+    expect(
+      screen.getByText("No automatic retry after print bytes"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Raw BLE writes blocked")).toBeInTheDocument();
+    expect(screen.getByText("Unsafe resume blocked")).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent height limit: 1000 dots"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Agent copies: 1")).toBeInTheDocument();
+    expect(screen.getByText("Agent rate limit: 3/min")).toBeInTheDocument();
+    expect(
+      screen.getByText("Agent direct printing remains disabled"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Next: explicit user opt-in required"),
     ).toBeInTheDocument();
   });
 
