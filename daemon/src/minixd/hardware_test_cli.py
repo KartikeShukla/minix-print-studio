@@ -363,6 +363,17 @@ def run(
             inspect_stable_support_gate(Path(args.record_path))
             stdout.write("stable-support-gate-inspected\n")
             return 0
+        if args.command == "inspect-agent-direct-policy-review":
+            inspect_agent_direct_policy_review(Path(args.record_path))
+            stdout.write("agent-direct-policy-review-inspected\n")
+            return 0
+        if args.command == "record-agent-direct-policy-review":
+            record_agent_direct_policy_review(
+                stable_support_gate_path=Path(args.stable_support_gate),
+                output_dir=Path(args.output_dir),
+            )
+            stdout.write("agent-direct-policy-review-recorded\n")
+            return 0
         if args.command == "record-protocol-sanity":
             record_protocol_sanity_artifact(
                 stage_a_artifact_path=Path(args.stage_a_artifact),
@@ -520,6 +531,31 @@ def _build_parser() -> argparse.ArgumentParser:
     stable_support_inspect_parser.add_argument(
         "record_path",
         help="Path to a stable-support gate JSON record.",
+    )
+    agent_rules_inspect_parser = subparsers.add_parser(
+        "inspect-agent-direct-policy-review",
+        help="Inspect an agent-direct policy-review JSON record without contacting the daemon.",
+    )
+    agent_rules_inspect_parser.add_argument(
+        "record_path",
+        help="Path to an agent-direct policy-review JSON record.",
+    )
+    agent_rules_parser = subparsers.add_parser(
+        "record-agent-direct-policy-review",
+        help=(
+            "Record an agent-direct printing policy-review gate from a "
+            "stable-support gate without enabling direct printing."
+        ),
+    )
+    agent_rules_parser.add_argument(
+        "--stable-support-gate",
+        required=True,
+        help="Path to the stable-support gate JSON record.",
+    )
+    agent_rules_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the agent-direct policy-review JSON record.",
     )
     record_tiny_parser = subparsers.add_parser(
         "record-tiny-visual-card",
@@ -1763,6 +1799,223 @@ def _summarize_support_gate_evidence_stage(
     }
 
 
+def record_agent_direct_policy_review(
+    *,
+    stable_support_gate_path: Path,
+    output_dir: Path,
+) -> Path:
+    stable_support_summary = inspect_stable_support_gate(stable_support_gate_path)
+    safety = _required_json_object(
+        stable_support_summary,
+        "safety",
+        "stable-support-gate",
+    )
+    if (
+        _required_json_string(
+            stable_support_summary,
+            "status",
+            "stable-support-gate",
+        )
+        != "stable_support_claims_enabled"
+    ):
+        raise HardwareTestCliError("stable-support gate has wrong status")
+    for field in ("stableSupportClaimEnabled", "longPrintPrintingEnabled"):
+        if not _required_json_bool(safety, field, "stable-support-gate.safety"):
+            raise HardwareTestCliError("stable-support gate does not enable stable support")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    record_path = output_dir / "agent-direct-policy-review.json"
+    record = {
+        "schemaVersion": 1,
+        "status": "agent_direct_policy_reviewed",
+        "sourceGate": {
+            "stage": "stable_support_gate",
+            "status": "stable_support_claims_enabled",
+            "localRecordValidated": True,
+        },
+        "agentRules": {
+            "directPrintEnabled": False,
+            "directPrintDefault": "disabled",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": {
+            "maxHeightDots": 1000,
+            "warnTotalBlackCoverage": 0.30,
+            "blockTotalBlackCoverage": 0.45,
+            "blockBandCoverage": 0.70,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": False,
+            "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": "explicit_user_opt_in_for_agent_direct_printing",
+    }
+    record_path.write_text(f"{json.dumps(record, indent=2)}\n", encoding="utf-8")
+    return record_path
+
+
+def inspect_agent_direct_policy_review(record_path: Path) -> dict[str, object]:
+    try:
+        decoded = json.loads(record_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("agent-direct policy review not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HardwareTestCliError("agent-direct policy review is invalid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError("agent-direct policy review is not a JSON object")
+    if (
+        "deviceId" in decoded
+        or "rawDeviceId" in decoded
+        or "device" in decoded
+        or "profileId" in decoded
+        or "deviceFingerprint" in decoded
+        or "fingerprint" in decoded
+    ):
+        raise HardwareTestCliError("agent-direct policy review exposes raw device id")
+
+    source_gate = _required_json_object(
+        decoded,
+        "sourceGate",
+        "agent-direct-policy-review",
+    )
+    agent_rules = _required_json_object(
+        decoded,
+        "agentRules",
+        "agent-direct-policy-review",
+    )
+    limits = _required_json_object(decoded, "limits", "agent-direct-policy-review")
+    safety = _required_json_object(decoded, "safety", "agent-direct-policy-review")
+    if (
+        _required_json_string(decoded, "status", "agent-direct-policy-review")
+        != "agent_direct_policy_reviewed"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong status")
+    if (
+        _required_json_string(source_gate, "stage", "agent-direct-policy-review.sourceGate")
+        != "stable_support_gate"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong source gate")
+    if (
+        _required_json_string(source_gate, "status", "agent-direct-policy-review.sourceGate")
+        != "stable_support_claims_enabled"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong source status")
+    if not _required_json_bool(
+        source_gate,
+        "localRecordValidated",
+        "agent-direct-policy-review.sourceGate",
+    ):
+        raise HardwareTestCliError("agent-direct policy review source is not validated")
+
+    for field in (
+        "approvalRequiredByDefault",
+        "longDirectPrintRequiresApproval",
+        "noAutomaticRetryAfterPrintableBytes",
+        "requiresTrustedPrinter",
+        "requiresStableSupportGate",
+    ):
+        if not _required_json_bool(agent_rules, field, "agent-direct-policy-review.agentRules"):
+            raise HardwareTestCliError("agent-direct policy review weakens approval policy")
+    for field in ("directPrintEnabled", "rawBleWritesAllowed", "unsafeResumeAllowed"):
+        if _required_json_bool(agent_rules, field, "agent-direct-policy-review.agentRules"):
+            raise HardwareTestCliError("agent-direct policy review enables unsafe direct printing")
+    if (
+        _required_json_string(
+            agent_rules,
+            "directPrintDefault",
+            "agent-direct-policy-review.agentRules",
+        )
+        != "disabled"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong direct default")
+    if (
+        _required_json_string(
+            agent_rules,
+            "overLimitBehavior",
+            "agent-direct-policy-review.agentRules",
+        )
+        != "preview_and_ask"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong over-limit behavior")
+
+    expected_limits = {
+        "maxHeightDots": 1000,
+        "warnTotalBlackCoverage": 0.30,
+        "blockTotalBlackCoverage": 0.45,
+        "blockBandCoverage": 0.70,
+        "maxCopies": 1,
+        "jobsPerMinute": 3,
+    }
+    for field, expected in expected_limits.items():
+        if _required_json_number(limits, field, "agent-direct-policy-review.limits") != expected:
+            raise HardwareTestCliError("agent-direct policy review has wrong safety limits")
+
+    for field in ("stableSupportClaimEnabled", "longPrintPrintingEnabled"):
+        if not _required_json_bool(safety, field, "agent-direct-policy-review.safety"):
+            raise HardwareTestCliError("agent-direct policy review lacks stable support")
+    if _required_json_bool(
+        safety,
+        "agentDirectPrintingEnabled",
+        "agent-direct-policy-review.safety",
+    ):
+        raise HardwareTestCliError("agent-direct policy review enables direct printing")
+    if (
+        _required_json_string(
+            safety,
+            "agentDirectPrintingDefault",
+            "agent-direct-policy-review.safety",
+        )
+        != "approval_required"
+    ):
+        raise HardwareTestCliError("agent-direct policy review has wrong approval default")
+    next_required_stage = _required_json_string(
+        decoded,
+        "nextRequiredStage",
+        "agent-direct-policy-review",
+    )
+    if next_required_stage != "explicit_user_opt_in_for_agent_direct_printing":
+        raise HardwareTestCliError("agent-direct policy review has wrong next stage")
+
+    return {
+        "status": "agent_direct_policy_reviewed",
+        "sourceGate": {
+            "stage": "stable_support_gate",
+            "status": "stable_support_claims_enabled",
+            "localRecordValidated": True,
+        },
+        "agentRules": {
+            "directPrintEnabled": False,
+            "directPrintDefault": "disabled",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": expected_limits,
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": False,
+            "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": next_required_stage,
+    }
+
+
 def _summarize_trusted_record_evidence_stage(
     hardware_evidence: Mapping[str, object],
     field: str,
@@ -2430,6 +2683,17 @@ def _required_json_int(
     field_value = value.get(field)
     if not isinstance(field_value, int):
         raise HardwareTestCliError(f"artifact missing required integer: {filename}.{field}")
+    return field_value
+
+
+def _required_json_number(
+    value: Mapping[str, object],
+    field: str,
+    filename: str,
+) -> int | float:
+    field_value = value.get(field)
+    if not isinstance(field_value, int | float) or isinstance(field_value, bool):
+        raise HardwareTestCliError(f"artifact missing required number: {filename}.{field}")
     return field_value
 
 

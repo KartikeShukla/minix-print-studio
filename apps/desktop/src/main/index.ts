@@ -27,6 +27,7 @@ import { ensureMcpShim } from "./mcpShim";
 import { exportClaudeDesktopMcpb } from "./mcpbExport";
 import {
   checkHostBluetoothReadiness,
+  inspectAgentDirectPolicyReview,
   inspectHardwareArtifact,
   inspectStableSupportGate,
   inspectTrustedPrinterRecord,
@@ -232,6 +233,24 @@ ipcMain.handle("stable-support-gates:inspect", async () => {
     return null;
   }
   return inspectStableSupportGate({
+    recordPath,
+    repoRoot: getRepoRoot(),
+  });
+});
+ipcMain.handle("agent-direct-policy-reviews:inspect", async () => {
+  const options: OpenDialogOptions = {
+    title: "Inspect agent-direct policy review",
+    properties: ["openFile"],
+    filters: [{ name: "Agent-direct policy JSON", extensions: ["json"] }],
+  };
+  const selection = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  const recordPath = selection.filePaths[0];
+  if (selection.canceled || !recordPath) {
+    return null;
+  }
+  return inspectAgentDirectPolicyReview({
     recordPath,
     repoRoot: getRepoRoot(),
   });

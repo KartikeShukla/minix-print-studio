@@ -216,6 +216,47 @@ export type StableSupportGateInspectionResult = {
   summary: StableSupportGateSummary;
 };
 
+export type AgentDirectPolicyReviewSummary = {
+  status: string;
+  sourceGate: {
+    stage: string;
+    status: string;
+    localRecordValidated: boolean;
+  };
+  agentRules: {
+    directPrintEnabled: boolean;
+    directPrintDefault: string;
+    approvalRequiredByDefault: boolean;
+    longDirectPrintRequiresApproval: boolean;
+    overLimitBehavior: string;
+    noAutomaticRetryAfterPrintableBytes: boolean;
+    rawBleWritesAllowed: boolean;
+    unsafeResumeAllowed: boolean;
+    requiresTrustedPrinter: boolean;
+    requiresStableSupportGate: boolean;
+  };
+  limits: {
+    maxHeightDots: number;
+    warnTotalBlackCoverage: number;
+    blockTotalBlackCoverage: number;
+    blockBandCoverage: number;
+    maxCopies: number;
+    jobsPerMinute: number;
+  };
+  safety: {
+    stableSupportClaimEnabled: boolean;
+    longPrintPrintingEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    agentDirectPrintingDefault: string;
+  };
+  nextRequiredStage: string;
+};
+
+export type AgentDirectPolicyReviewInspectionResult = {
+  recordPath: string;
+  summary: AgentDirectPolicyReviewSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -352,6 +393,38 @@ export async function inspectStableSupportGate({
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error("stable-support gate is invalid JSON", { cause: error });
+    }
+    throw error;
+  }
+}
+
+export async function inspectAgentDirectPolicyReview({
+  recordPath,
+  repoRoot,
+  runner = runCommand,
+}: {
+  recordPath: string;
+  repoRoot: string;
+  runner?: CommandRunner;
+}): Promise<AgentDirectPolicyReviewInspectionResult> {
+  try {
+    await runHardwareCli({
+      artifactPath: recordPath,
+      repoRoot,
+      commandName: "inspect-agent-direct-policy-review",
+      runner,
+    });
+    const decoded = JSON.parse(await readFile(recordPath, "utf-8")) as unknown;
+
+    return {
+      recordPath,
+      summary: summarizeAgentDirectPolicyReview(decoded),
+    };
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error("agent-direct policy review is invalid JSON", {
+        cause: error,
+      });
     }
     throw error;
   }
@@ -680,6 +753,208 @@ function summarizeStableSupportGateEvidenceStage(
   };
 }
 
+function summarizeAgentDirectPolicyReview(
+  decoded: unknown,
+): AgentDirectPolicyReviewSummary {
+  const record = jsonObject(decoded, "agent-direct policy review");
+  if (
+    "deviceId" in record ||
+    "rawDeviceId" in record ||
+    "device" in record ||
+    "profileId" in record ||
+    "deviceFingerprint" in record ||
+    "fingerprint" in record
+  ) {
+    throw new Error("agent-direct policy review exposes raw device id");
+  }
+  const sourceGate = requiredJsonObject(
+    record,
+    "sourceGate",
+    "agent-direct policy review",
+  );
+  const agentRules = requiredJsonObject(
+    record,
+    "agentRules",
+    "agent-direct policy review",
+  );
+  const limits = requiredJsonObject(
+    record,
+    "limits",
+    "agent-direct policy review",
+  );
+  const safety = requiredJsonObject(
+    record,
+    "safety",
+    "agent-direct policy review",
+  );
+  if (
+    requiredJsonString(record, "status", "agent-direct policy review") !==
+    "agent_direct_policy_reviewed"
+  ) {
+    throw new Error("agent-direct policy review has wrong status");
+  }
+  if (
+    requiredJsonString(
+      sourceGate,
+      "stage",
+      "agent-direct policy review.sourceGate",
+    ) !== "stable_support_gate"
+  ) {
+    throw new Error("agent-direct policy review has wrong source gate");
+  }
+  if (
+    requiredJsonString(
+      sourceGate,
+      "status",
+      "agent-direct policy review.sourceGate",
+    ) !== "stable_support_claims_enabled"
+  ) {
+    throw new Error("agent-direct policy review has wrong source status");
+  }
+  if (
+    !requiredJsonBoolean(
+      sourceGate,
+      "localRecordValidated",
+      "agent-direct policy review.sourceGate",
+    )
+  ) {
+    throw new Error("agent-direct policy review source is not validated");
+  }
+
+  for (const field of [
+    "approvalRequiredByDefault",
+    "longDirectPrintRequiresApproval",
+    "noAutomaticRetryAfterPrintableBytes",
+    "requiresTrustedPrinter",
+    "requiresStableSupportGate",
+  ]) {
+    if (
+      !requiredJsonBoolean(
+        agentRules,
+        field,
+        "agent-direct policy review.agentRules",
+      )
+    ) {
+      throw new Error("agent-direct policy review weakens approval policy");
+    }
+  }
+  for (const field of [
+    "directPrintEnabled",
+    "rawBleWritesAllowed",
+    "unsafeResumeAllowed",
+  ]) {
+    if (
+      requiredJsonBoolean(
+        agentRules,
+        field,
+        "agent-direct policy review.agentRules",
+      )
+    ) {
+      throw new Error(
+        "agent-direct policy review enables unsafe direct printing",
+      );
+    }
+  }
+  const directPrintDefault = requiredJsonString(
+    agentRules,
+    "directPrintDefault",
+    "agent-direct policy review.agentRules",
+  );
+  if (directPrintDefault !== "disabled") {
+    throw new Error("agent-direct policy review has wrong direct default");
+  }
+  const overLimitBehavior = requiredJsonString(
+    agentRules,
+    "overLimitBehavior",
+    "agent-direct policy review.agentRules",
+  );
+  if (overLimitBehavior !== "preview_and_ask") {
+    throw new Error("agent-direct policy review has wrong over-limit behavior");
+  }
+
+  const expectedLimits = {
+    maxHeightDots: 1000,
+    warnTotalBlackCoverage: 0.3,
+    blockTotalBlackCoverage: 0.45,
+    blockBandCoverage: 0.7,
+    maxCopies: 1,
+    jobsPerMinute: 3,
+  };
+  for (const [field, expected] of Object.entries(expectedLimits)) {
+    if (
+      requiredJsonNumber(limits, field, "agent-direct policy review.limits") !==
+      expected
+    ) {
+      throw new Error("agent-direct policy review has wrong safety limits");
+    }
+  }
+
+  for (const field of [
+    "stableSupportClaimEnabled",
+    "longPrintPrintingEnabled",
+  ]) {
+    if (
+      !requiredJsonBoolean(safety, field, "agent-direct policy review.safety")
+    ) {
+      throw new Error("agent-direct policy review lacks stable support");
+    }
+  }
+  if (
+    requiredJsonBoolean(
+      safety,
+      "agentDirectPrintingEnabled",
+      "agent-direct policy review.safety",
+    )
+  ) {
+    throw new Error("agent-direct policy review enables direct printing");
+  }
+  const agentDirectPrintingDefault = requiredJsonString(
+    safety,
+    "agentDirectPrintingDefault",
+    "agent-direct policy review.safety",
+  );
+  if (agentDirectPrintingDefault !== "approval_required") {
+    throw new Error("agent-direct policy review has wrong approval default");
+  }
+  const nextRequiredStage = requiredJsonString(
+    record,
+    "nextRequiredStage",
+    "agent-direct policy review",
+  );
+  if (nextRequiredStage !== "explicit_user_opt_in_for_agent_direct_printing") {
+    throw new Error("agent-direct policy review has wrong next stage");
+  }
+
+  return {
+    status: "agent_direct_policy_reviewed",
+    sourceGate: {
+      stage: "stable_support_gate",
+      status: "stable_support_claims_enabled",
+      localRecordValidated: true,
+    },
+    agentRules: {
+      directPrintEnabled: false,
+      directPrintDefault,
+      approvalRequiredByDefault: true,
+      longDirectPrintRequiresApproval: true,
+      overLimitBehavior,
+      noAutomaticRetryAfterPrintableBytes: true,
+      rawBleWritesAllowed: false,
+      unsafeResumeAllowed: false,
+      requiresTrustedPrinter: true,
+      requiresStableSupportGate: true,
+    },
+    limits: expectedLimits,
+    safety: {
+      stableSupportClaimEnabled: true,
+      longPrintPrintingEnabled: true,
+      agentDirectPrintingEnabled: false,
+      agentDirectPrintingDefault,
+    },
+    nextRequiredStage,
+  };
+}
+
 function summarizeTrustedEvidenceStage(
   hardwareEvidence: Record<string, unknown>,
   field: string,
@@ -756,6 +1031,18 @@ function requiredJsonBoolean(
   return value;
 }
 
+function requiredJsonNumber(
+  parent: Record<string, unknown>,
+  field: string,
+  label: string,
+) {
+  const value = parent[field];
+  if (typeof value !== "number") {
+    throw new Error(`${label}.${field} is missing`);
+  }
+  return value;
+}
+
 function requiredJsonStringArray(
   parent: Record<string, unknown>,
   field: string,
@@ -795,6 +1082,7 @@ async function runHardwareCliJson<T>({
     | "inspect-artifact"
     | "inspect-trusted-printer-record"
     | "inspect-stable-support-gate"
+    | "inspect-agent-direct-policy-review"
     | "protocol-sanity-preflight"
     | "tiny-visual-card-preflight"
     | "evidence-summary";
@@ -828,6 +1116,7 @@ async function runHardwareCli({
     | "inspect-artifact"
     | "inspect-trusted-printer-record"
     | "inspect-stable-support-gate"
+    | "inspect-agent-direct-policy-review"
     | "protocol-sanity-preflight"
     | "tiny-visual-card-preflight"
     | "evidence-summary";

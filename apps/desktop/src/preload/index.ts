@@ -27,4 +27,6 @@ contextBridge.exposeInMainWorld("minix", {
     ipcRenderer.invoke("trusted-printer-records:inspect"),
   inspectStableSupportGate: () =>
     ipcRenderer.invoke("stable-support-gates:inspect"),
+  inspectAgentDirectPolicyReview: () =>
+    ipcRenderer.invoke("agent-direct-policy-reviews:inspect"),
 });

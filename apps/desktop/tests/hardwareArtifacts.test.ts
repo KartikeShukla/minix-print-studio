@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   checkHostBluetoothReadiness,
+  inspectAgentDirectPolicyReview,
   inspectHardwareArtifact,
   inspectStableSupportGate,
   inspectTrustedPrinterRecord,
@@ -524,6 +525,117 @@ describe("hardware artifact inspection bridge", () => {
             "-m",
             "minixd.hardware_test_cli",
             "inspect-stable-support-gate",
+            recordPath,
+          ],
+          cwd: "/repo/minix",
+        },
+      ]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs the shared hardware-test CLI agent-direct policy-review inspection", async () => {
+    const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
+    const tempDir = await mkdtemp(
+      path.join(os.tmpdir(), "minix-agent-policy-test-"),
+    );
+    const recordPath = path.join(tempDir, "agent-direct-policy-review.json");
+
+    try {
+      await writeFile(
+        recordPath,
+        JSON.stringify({
+          status: "agent_direct_policy_reviewed",
+          sourceGate: {
+            stage: "stable_support_gate",
+            status: "stable_support_claims_enabled",
+            localRecordValidated: true,
+          },
+          agentRules: {
+            directPrintEnabled: false,
+            directPrintDefault: "disabled",
+            approvalRequiredByDefault: true,
+            longDirectPrintRequiresApproval: true,
+            overLimitBehavior: "preview_and_ask",
+            noAutomaticRetryAfterPrintableBytes: true,
+            rawBleWritesAllowed: false,
+            unsafeResumeAllowed: false,
+            requiresTrustedPrinter: true,
+            requiresStableSupportGate: true,
+          },
+          limits: {
+            maxHeightDots: 1000,
+            warnTotalBlackCoverage: 0.3,
+            blockTotalBlackCoverage: 0.45,
+            blockBandCoverage: 0.7,
+            maxCopies: 1,
+            jobsPerMinute: 3,
+          },
+          safety: {
+            stableSupportClaimEnabled: true,
+            longPrintPrintingEnabled: true,
+            agentDirectPrintingEnabled: false,
+            agentDirectPrintingDefault: "approval_required",
+          },
+          nextRequiredStage: "explicit_user_opt_in_for_agent_direct_printing",
+        }),
+      );
+
+      const result = await inspectAgentDirectPolicyReview({
+        recordPath,
+        repoRoot: "/repo/minix",
+        runner: async (command, args, options) => {
+          calls.push({ command, args, cwd: options.cwd });
+          return {
+            stdout: "agent-direct-policy-review-inspected\n",
+            stderr: "",
+            exitCode: 0,
+          };
+        },
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          recordPath,
+          summary: expect.objectContaining({
+            status: "agent_direct_policy_reviewed",
+            sourceGate: expect.objectContaining({
+              stage: "stable_support_gate",
+              localRecordValidated: true,
+            }),
+            agentRules: expect.objectContaining({
+              directPrintEnabled: false,
+              directPrintDefault: "disabled",
+              approvalRequiredByDefault: true,
+              longDirectPrintRequiresApproval: true,
+              overLimitBehavior: "preview_and_ask",
+              rawBleWritesAllowed: false,
+              unsafeResumeAllowed: false,
+            }),
+            limits: expect.objectContaining({
+              maxHeightDots: 1000,
+              maxCopies: 1,
+              jobsPerMinute: 3,
+            }),
+            safety: expect.objectContaining({
+              stableSupportClaimEnabled: true,
+              longPrintPrintingEnabled: true,
+              agentDirectPrintingEnabled: false,
+              agentDirectPrintingDefault: "approval_required",
+            }),
+          }),
+        }),
+      );
+      expect(JSON.stringify(result)).not.toContain("mock-minix-0194");
+      expect(JSON.stringify(result)).not.toContain("aaaaaaaa");
+      expect(calls).toEqual([
+        {
+          command: "/repo/minix/.venv/bin/python",
+          args: [
+            "-m",
+            "minixd.hardware_test_cli",
+            "inspect-agent-direct-policy-review",
             recordPath,
           ],
           cwd: "/repo/minix",

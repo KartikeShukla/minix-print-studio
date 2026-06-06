@@ -314,6 +314,36 @@ agent direct printing. In the desktop app, use `Inspect stable-support gate` in
 the Printer panel to validate the selected JSON through the same CLI path and
 show the reviewed Stage D state in the setup flow.
 
+Record the agent-direct policy-review gate from the stable-support gate:
+
+```bash
+scripts/hardware-test.sh record-agent-direct-policy-review \
+  --stable-support-gate <stable-support-gate-device-fingerprint.json> \
+  --output-dir <local-output-dir>
+```
+
+This writes `agent-direct-policy-review.json`. The command runs offline,
+validates the stable-support gate first, records the stricter agent defaults
+from the safety policy, keeps printer identity out of this follow-up record,
+keeps stdout status-only, and still sets `agentDirectPrintingEnabled: false`.
+The policy review records direct printing as disabled by default, approval
+required by default, long direct prints requiring approval, over-limit behavior
+as preview-and-ask, no automatic retry after printable bytes, and no raw BLE
+writes or unsafe resume.
+
+Inspect the policy review before relying on it:
+
+```bash
+scripts/hardware-test.sh inspect-agent-direct-policy-review <agent-direct-policy-review.json>
+```
+
+The CLI inspection rejects records that expose raw device ids, omit
+stable-support source validation, weaken approval requirements, change the
+conservative agent limits, allow raw BLE writes or unsafe resume, or enable
+agent direct printing. In the desktop app, use `Inspect agent-direct policy
+review` in the Printer panel to show the gate while keeping explicit user opt-in
+as the next required stage.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A

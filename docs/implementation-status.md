@@ -228,6 +228,18 @@ package:win-installer`, the Release Package workflow, and the release
   validates the selected JSON through the same CLI path, and shows the reviewed
   Stage D evidence, long-print trust, stable-support claim, and agent-direct
   disabled state.
+- `minix-hardware-test record-agent-direct-policy-review` records an offline
+  local JSON gate from the reviewed stable-support gate, captures the stricter
+  agent defaults and limits, keeps stdout status-only, and keeps agent direct
+  printing disabled pending explicit user opt-in.
+- `minix-hardware-test inspect-agent-direct-policy-review` validates a local
+  agent-direct policy-review JSON record offline, rejects raw device IDs,
+  weakened approval policy, raw BLE writes, unsafe resume, changed conservative
+  limits, or any direct-print unlock, and does not contact the daemon.
+- Electron exposes agent-direct policy-review inspection from the Printer setup
+  flow, validates the selected JSON through the same CLI path, and shows the
+  approval-required default, preview-and-ask over-limit behavior, agent limits,
+  raw-write/resume blocks, and explicit user opt-in as the next stage.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -335,6 +347,10 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for stable-support gate inspection through the
   hardware-test CLI, Electron bridge, renderer setup checklist, and renderer
   Printer panel while keeping agent direct printing disabled.
+- TDD red/green checks for agent-direct policy-review recording and inspection
+  through the hardware-test CLI, Electron bridge, renderer setup checklist, and
+  renderer Printer panel while keeping direct printing disabled pending explicit
+  user opt-in.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -407,6 +423,11 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
   `stable-support-gate-fa0f77ee9e7e43ea.json` outside the repository, enabling
   stable support claims plus long-print trust while keeping agent direct printing
   disabled.
+- The offline agent-direct policy-review command was exercised against the local
+  stable-support gate and produced
+  `agent-direct-policy-review.json` outside the repository, recording
+  conservative agent limits and approval defaults without persisting printer
+  identity while keeping agent direct printing disabled.
 - Playwright MCP smoke against `http://127.0.0.1:5175/`: Agent Integrations browser fallback still renders after connection-test UI changes; daemon health fetch errors are expected in non-Electron browser mode.
 - `pnpm build` completes without the previous renderer Vite chunk-size warning;
   standalone renderer JS chunks are split into `index`, `react-vendor`,
@@ -414,5 +435,5 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Define the agent direct printing policy-review gate without enabling agent
-   direct printing by default.
+1. Design the explicit user opt-in workflow for agent direct printing without
+   changing the approval-required default.

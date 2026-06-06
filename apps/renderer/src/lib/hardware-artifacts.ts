@@ -197,6 +197,47 @@ export type StableSupportGateInspectionResult = {
   summary: StableSupportGateSummary;
 };
 
+export type AgentDirectPolicyReviewSummary = {
+  status: string;
+  sourceGate: {
+    stage: string;
+    status: string;
+    localRecordValidated: boolean;
+  };
+  agentRules: {
+    directPrintEnabled: boolean;
+    directPrintDefault: string;
+    approvalRequiredByDefault: boolean;
+    longDirectPrintRequiresApproval: boolean;
+    overLimitBehavior: string;
+    noAutomaticRetryAfterPrintableBytes: boolean;
+    rawBleWritesAllowed: boolean;
+    unsafeResumeAllowed: boolean;
+    requiresTrustedPrinter: boolean;
+    requiresStableSupportGate: boolean;
+  };
+  limits: {
+    maxHeightDots: number;
+    warnTotalBlackCoverage: number;
+    blockTotalBlackCoverage: number;
+    blockBandCoverage: number;
+    maxCopies: number;
+    jobsPerMinute: number;
+  };
+  safety: {
+    stableSupportClaimEnabled: boolean;
+    longPrintPrintingEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    agentDirectPrintingDefault: string;
+  };
+  nextRequiredStage: string;
+};
+
+export type AgentDirectPolicyReviewInspectionResult = {
+  recordPath: string;
+  summary: AgentDirectPolicyReviewSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -221,6 +262,10 @@ export type TrustedPrinterRecordInspector = {
 
 export type StableSupportGateInspector = {
   inspect: () => Promise<StableSupportGateInspectionResult | null>;
+};
+
+export type AgentDirectPolicyReviewInspector = {
+  inspect: () => Promise<AgentDirectPolicyReviewInspectionResult | null>;
 };
 
 export type HardwareReadinessProvider = {
@@ -258,6 +303,18 @@ export const desktopStableSupportGateInspector: StableSupportGateInspector = {
     return inspectStableSupportGate();
   },
 };
+
+export const desktopAgentDirectPolicyReviewInspector: AgentDirectPolicyReviewInspector =
+  {
+    async inspect() {
+      const inspectAgentDirectPolicyReview =
+        window.minix?.inspectAgentDirectPolicyReview;
+      if (!inspectAgentDirectPolicyReview) {
+        throw new Error("Agent-direct policy review inspection is unavailable");
+      }
+      return inspectAgentDirectPolicyReview();
+    },
+  };
 
 export const desktopHardwareReadinessProvider: HardwareReadinessProvider = {
   async check() {
