@@ -227,8 +227,27 @@ claims, and agent direct printing disabled until long-print reliability passes.
 ## Stage D Long-Print Reliability Artifact
 
 After Stage A/B/C artifacts have been reviewed, the printer has a trusted-printer
-record, and a long-print job has operator paper-output confirmation recorded on
-the daemon job, record the Stage D artifact:
+record, and the printer is powered on nearby, print the deterministic long-print
+marker fixture through the daemon:
+
+```bash
+scripts/hardware-test.sh print-long-print-reliability \
+  --stage-a-artifact <stage-a.zip> \
+  --protocol-sanity-artifact <hardware-test-protocol-sanity.zip> \
+  --tiny-visual-card-artifact <hardware-test-tiny-visual-card-job-id.zip> \
+  --trusted-printer-record <trusted-printer-device-fingerprint.json>
+```
+
+This command validates the Stage A/B/C/trusted-record chain, generates an
+8000-dot low-coverage marker strip with START, 25%, 50%, 75%, and END markers,
+creates a daemon preview, and submits the physical print job. Stdout is
+status-only to avoid leaking local identifiers or daemon approval tokens. Use the
+desktop print status or `/v1/jobs` to read the confirmed daemon job id for the
+recording command. The CLI uses a 10-minute timeout for the physical print
+request and still requires operator paper-output confirmation.
+
+After the output is reviewed and the daemon job has operator paper-output
+confirmation recorded, record the Stage D artifact:
 
 ```bash
 scripts/hardware-test.sh record-long-print-reliability \

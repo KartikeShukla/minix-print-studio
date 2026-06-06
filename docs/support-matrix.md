@@ -15,7 +15,7 @@ physical validation before a stable public release.
 
 | Profile | Support Level | Printing Status | Required Evidence |
 | --- | --- | --- | --- |
-| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer, operator-confirmation recording, Stage B/C artifact recording, local trusted-printer record generation, and long-print reliability artifact recording implemented; stable support remains certification-gated | Stage A/B/C physical evidence exists locally; a reviewed physical long-print reliability artifact remains required before stable support claims, long-print trust, or agent direct printing. |
+| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer, operator-confirmation recording, Stage B/C artifact recording, local trusted-printer record generation, and long-print reliability print/artifact commands implemented; stable support remains certification-gated | Stage A/B/C/D physical evidence exists locally; stable support claims, long-print trust, and agent direct printing require an explicit support-gating update. |
 
 ## Agent Integrations
 
@@ -39,7 +39,7 @@ physical validation before a stable public release.
 | Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
 | Stage C physical tiny visual test card | Artifact recording implemented; local reviewed artifact recorded on 2026-06-06 from a confirmed daemon job | `minix-hardware-test record-tiny-visual-card` |
 | Trusted printer record | Implemented for manual continuous printing only; keeps long-print, stable support, and agent direct printing disabled | `minix-hardware-test record-trusted-printer` |
-| Long-print reliability | Artifact recording implemented; physical long-print evidence pending | `minix-hardware-test record-long-print-reliability` |
+| Long-print reliability | Print execution, operator confirmation, and artifact recording completed locally on 2026-06-06; support gate pending | `minix-hardware-test print-long-print-reliability`, then `minix-hardware-test record-long-print-reliability` |
 
 Do not treat BLE detection, Stage A, or an unverified transfer alone as stable
 printer certification.

@@ -24,10 +24,11 @@ evidence, community governance docs, Stage A physical read-only verification, an
 an experimental user-initiated BLE transport path with operator confirmation
 recording. Stage B/C hardware-test artifact recording is implemented for reviewed
 physical runs, and reviewed artifacts can produce a local trusted-printer record
-for manual continuous printing. Long-print reliability artifact recording is
-implemented, but physical long-print evidence is still pending. Stable support,
-long-print trust, and agent direct printing remain gated until reviewed
-long-print reliability evidence exists.
+for manual continuous printing. Long-print reliability print execution and
+artifact recording are implemented, and local physical Stage D evidence was
+recorded on 2026-06-06. Stable support, long-print trust, and agent direct
+printing remain gated until the support profile consumes the reviewed Stage D
+evidence.
 
 ## Safety Model
 
@@ -49,14 +50,17 @@ contract.
 ## Supported Printers
 
 The first profile target is `seznik-minix-s1-lyin48d-gy`. The profile data is tracked
-in the repository, but stable support still requires physical evidence:
+in the repository, and local physical evidence now covers:
 
 - Stage A read-only identity and BLE-shape verification.
 - Stage B physical protocol sanity artifact after the offline preflight passes.
 - Stage C tiny visual test card artifact from a confirmed Stage B artifact and
   operator-verified daemon job.
-- Long-print reliability artifact from a confirmed long-print job before stable
-  support claims.
+- Long-print reliability print execution, operator confirmation, and artifact
+  recording.
+
+Stable support claims still require an explicit support-gating update that
+consumes the reviewed evidence.
 
 Do not treat BLE discovery, a matching name, a matching service UUID, or an
 unverified transfer result as stable printer certification. See
