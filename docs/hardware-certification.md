@@ -146,6 +146,23 @@ Before a physical protocol sanity run, review the offline preflight output:
 The preflight output is not a certification result. It is the deterministic
 command plan for the next physical test.
 
+After a reviewed physical Stage B run, record the operator result as a hardware
+artifact:
+
+```bash
+scripts/hardware-test.sh record-protocol-sanity \
+  --stage-a-artifact <stage-a.zip> \
+  --confirmed-at <utc-timestamp> \
+  --operator-note "<what happened on paper and device LEDs>" \
+  --no-paper-moved \
+  --no-error \
+  --output-dir <local-output-dir>
+```
+
+This writes `hardware-test-protocol-sanity.zip`. The artifact records the command
+plan, operator confirmation, and safety report, but does not include raster bytes
+and does not unlock trusted printing.
+
 ## Stage C Preflight
 
 After Stage A inspection, review the tiny visual card preflight before adding any
@@ -171,6 +188,23 @@ transport finished from the daemon's perspective; a human must inspect the paper
 output and record the confirmation before treating the stage as passed. The app
 and daemon can record this confirmation on the print job, but Stage C still needs
 a reviewed hardware-test artifact before the profile becomes trusted.
+
+After Stage B has a confirmed artifact and the tiny-card print job has operator
+paper-output confirmation recorded on the daemon job, record the Stage C artifact:
+
+```bash
+scripts/hardware-test.sh record-tiny-visual-card \
+  --stage-a-artifact <stage-a.zip> \
+  --protocol-sanity-artifact <hardware-test-protocol-sanity.zip> \
+  --job-id <confirmed-job-id> \
+  --output-dir <local-output-dir>
+```
+
+This writes `hardware-test-tiny-visual-card-<job-id>.zip`. The command verifies
+the confirmed Stage B artifact, verifies the daemon job is
+`confirmed_complete`, stores a SHA-256 digest of the Stage B artifact, and keeps
+`printingLocked` true. It still does not complete certification; long-print
+reliability remains required before stable support claims.
 
 ## Shareable Evidence Summary
 

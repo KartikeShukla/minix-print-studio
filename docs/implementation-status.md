@@ -285,6 +285,10 @@ Public development is on `main`; implementation slices use short-lived
 - TDD red/green checks for operator paper-output confirmation at the daemon queue,
   daemon API, diagnostics export, renderer daemon client, and renderer print
   status action.
+- TDD red/green checks for Stage B protocol-sanity hardware artifact recording,
+  Stage C tiny-card hardware artifact recording from a confirmed daemon job,
+  confirmed Stage B artifact validation, digest chaining, and locked-printing
+  safety reports.
 - TDD red/green checks for open-source readiness validation and private path rejection.
 - TDD red/green checks for required community README sections in open-source readiness validation.
 - TDD red/green checks for required public package metadata in open-source readiness validation.
@@ -340,8 +344,10 @@ Public development is on `main`; implementation slices use short-lived
 
 ## Next Implementation Slices
 
-1. Implement durable Stage B/C hardware-test artifact recording for physical
-   protocol sanity and tiny visual card runs instead of relying on an ad hoc
-   local transfer response, reusing the operator-confirmation job record.
-2. Run a reviewed physical tiny-card confirmation through that artifact path.
-3. After Stage B and visual-card evidence exists, implement trusted-printer confirmation and keep long-print reliability as a separate certification gate.
+1. Run reviewed physical Stage B protocol sanity and Stage C tiny-card
+   confirmation through the new hardware-test artifact commands.
+2. After reviewed Stage B and visual-card evidence exists, implement
+   trusted-printer confirmation while keeping long-print reliability as a
+   separate certification gate.
+3. Add the long-print reliability hardware artifact path before stable support
+   claims.

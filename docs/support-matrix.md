@@ -15,7 +15,7 @@ physical validation before a stable public release.
 
 | Profile | Support Level | Printing Status | Required Evidence |
 | --- | --- | --- | --- |
-| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer and operator-confirmation recording implemented; trusted printing remains certification-gated | Stage A physical artifact exists; Stage B protocol sanity, reviewed operator-confirmed tiny visual card artifact, and long-print reliability before stable support claims. |
+| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer, operator-confirmation recording, and Stage B/C artifact recording implemented; trusted printing remains certification-gated | Stage A physical artifact exists; reviewed Stage B protocol sanity artifact, reviewed Stage C tiny visual card artifact, and long-print reliability before stable support claims. |
 
 ## Agent Integrations
 
@@ -35,9 +35,9 @@ physical validation before a stable public release.
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
 | Stage A shareable evidence summary | Implemented offline and shown in Electron artifact inspection | `minix-hardware-test evidence-summary` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |
-| Stage B physical protocol sanity | Pending hardware run | Future hardware-test artifact |
+| Stage B physical protocol sanity | Artifact recording implemented; reviewed physical artifact still required | `minix-hardware-test record-protocol-sanity` |
 | Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
-| Stage C physical tiny visual test card | Initial transfer completed as `completed_unverified`; app/daemon can record operator confirmation, but reviewed artifact is still required | Future hardware-test artifact |
+| Stage C physical tiny visual test card | Artifact recording implemented and requires a confirmed Stage B artifact plus a verified daemon job; reviewed physical artifact still required | `minix-hardware-test record-tiny-visual-card` |
 | Long-print reliability | Pending | Future hardware-test artifact |
 
 Do not treat BLE detection, Stage A, or an unverified transfer alone as stable
