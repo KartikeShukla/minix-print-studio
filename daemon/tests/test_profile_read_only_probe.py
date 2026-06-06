@@ -51,6 +51,28 @@ class FakeReadOnlyClient:
             self.raw_notifications.append(b"V1.9.11".hex())
 
 
+class DelayedStatusThenTextClient:
+    def __init__(self, raw_notifications: list[str]) -> None:
+        self.raw_notifications = raw_notifications
+
+    async def write_gatt_char(
+        self,
+        characteristic: str,
+        data: bytes,
+        *,
+        response: bool | None = None,
+    ) -> None:
+        if data == bytes.fromhex("aa 01"):
+            self.raw_notifications.append(bytes.fromhex("0105").hex())
+            asyncio.create_task(self._append_later(b"S1_LYiN48D_GY".hex()))
+        if data == bytes.fromhex("aa 02"):
+            self.raw_notifications.append(b"V1.9.11".hex())
+
+    async def _append_later(self, payload: str) -> None:
+        await asyncio.sleep(0.01)
+        self.raw_notifications.append(payload)
+
+
 def test_profile_read_only_probe_queries_model_and_firmware_without_print_commands() -> None:
     raw_notifications: list[str] = []
     client = FakeReadOnlyClient(raw_notifications)
@@ -88,6 +110,30 @@ def test_profile_read_only_probe_queries_model_and_firmware_without_print_comman
         b"\x02S1_LYiN48D_GY\x00".hex(),
         b"V1.9.11".hex(),
     ]
+
+
+def test_profile_read_only_probe_waits_past_status_notifications_for_expected_text() -> None:
+    raw_notifications: list[str] = []
+    client = DelayedStatusThenTextClient(raw_notifications)
+    session = ReadOnlyBleSession(
+        device_id="dev_minix",
+        client=client,
+        services=[FF00],
+        write_characteristics=[FF02],
+        notify_characteristics=[FF01],
+        raw_notifications=raw_notifications,
+    )
+
+    result = asyncio.run(
+        ProfileReadOnlyProbe(
+            profiles=[PROFILE],
+            response_timeout_s=0.05,
+            poll_interval_s=0.001,
+        )(session)
+    )
+
+    assert result.model_response == "S1_LYiN48D_GY"
+    assert result.firmware == "V1.9.11"
 
 
 def test_profile_read_only_probe_skips_unknown_write_characteristic() -> None:

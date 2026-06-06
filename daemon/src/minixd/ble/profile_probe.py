@@ -74,18 +74,50 @@ class ProfileReadOnlyProbe:
                 payload_bytes=len(command),
             )
         )
-        notifications = await self._wait_for_notifications(session.raw_notifications, start_index)
-        return _extract_expected_text(notifications, expected_values)
+        return await self._wait_for_expected_text(
+            session.raw_notifications,
+            start_index,
+            expected_values,
+        )
 
-    async def _wait_for_notifications(
+    async def _wait_for_expected_text(
         self,
         raw_notifications: list[str],
         start_index: int,
-    ) -> list[str]:
+        expected_values: Sequence[str],
+    ) -> str | None:
         deadline = time.monotonic() + self.response_timeout_s
-        while len(raw_notifications) == start_index and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            notifications = raw_notifications[start_index:]
+            expected = _extract_expected_text(
+                notifications,
+                expected_values,
+                allow_fallback=False,
+            )
+            if expected is not None:
+                return expected
             await asyncio.sleep(self.poll_interval_s)
-        return raw_notifications[start_index:]
+        return _extract_expected_text(
+            raw_notifications[start_index:],
+            expected_values,
+            allow_fallback=True,
+        )
+
+
+def _extract_expected_text(
+    raw_notifications: Sequence[str],
+    expected_values: Sequence[str],
+    *,
+    allow_fallback: bool,
+) -> str | None:
+    decoded_payloads = [_decode_ascii_notification(raw) for raw in raw_notifications]
+    for expected in expected_values:
+        for payload in decoded_payloads:
+            if payload is not None and expected in payload:
+                return expected
+    if allow_fallback:
+        return next((payload for payload in decoded_payloads if payload), None)
+    return None
 
 
 def _matching_profile(
@@ -158,18 +190,6 @@ def _profile_observed_firmware(profile: dict[str, Any]) -> list[str]:
     if isinstance(value, list):
         return [firmware for firmware in value if isinstance(firmware, str)]
     return []
-
-
-def _extract_expected_text(
-    raw_notifications: Sequence[str],
-    expected_values: Sequence[str],
-) -> str | None:
-    decoded_payloads = [_decode_ascii_notification(raw) for raw in raw_notifications]
-    for expected in expected_values:
-        for payload in decoded_payloads:
-            if payload is not None and expected in payload:
-                return expected
-    return next((payload for payload in decoded_payloads if payload), None)
 
 
 def _decode_ascii_notification(raw: str) -> str | None:

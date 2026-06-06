@@ -60,6 +60,7 @@ describe("daemon API client", () => {
       jobId: "job_api",
       previewId: "prev_api",
       planId: "plan_job_api",
+      deviceId: "dev_minix",
       state: "completed_unverified",
       phase: "waiting_for_final_status",
       completionLevel: "unverified",
@@ -122,7 +123,8 @@ describe("daemon API client", () => {
         paperMode: "continuous",
         density: "medium",
         copies: 1,
-        source: "ui"
+        source: "ui",
+        deviceId: "dev_minix"
       })
     ).resolves.toEqual(printResponse);
 
@@ -166,7 +168,8 @@ describe("daemon API client", () => {
         paperMode: "continuous",
         density: "medium",
         copies: 1,
-        source: "ui"
+        source: "ui",
+        deviceId: "dev_minix"
       })
     });
   });

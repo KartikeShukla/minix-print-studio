@@ -25,6 +25,7 @@ from minixd.ble.discovery import (
 )
 from minixd.ble.profile_probe import ProfileReadOnlyProbe
 from minixd.printing.queue import PrintQueue
+from minixd.printing.transport import BleakPrintTransport, PrintTransport
 from minixd.projects.store import ProjectStore
 from minixd.render.preview_store import PreviewStore
 
@@ -67,16 +68,18 @@ def create_app(
     profiles_data = load_profiles()
     preview_store = PreviewStore()
     project_store = ProjectStore((data_dir / "projects") if data_dir is not None else None)
+    ble_adapter = _create_ble_adapter(profiles=profiles_data, mock=mock)
     print_queue = PrintQueue(
         profiles=profiles_data,
         preview_store=preview_store,
         mock=mock,
         job_store_path=(data_dir / "jobs.json") if data_dir is not None else None,
         mock_disconnect_after_band_index=mock_print_disconnect_after_band_index,
+        transport=_create_print_transport(profiles=profiles_data, mock=mock),
     )
     discovery_service = PrinterDiscoveryService(
         profiles=profiles_data,
-        adapter=_create_ble_adapter(profiles=profiles_data, mock=mock),
+        adapter=ble_adapter,
     )
     app.include_router(create_render_router(preview_store=preview_store, profiles=profiles_data))
     app.include_router(create_projects_router(project_store=project_store))
@@ -159,6 +162,16 @@ def _create_ble_adapter(*, profiles: list[dict[str, Any]], mock: bool) -> BleAda
             )
         },
     )
+
+
+def _create_print_transport(
+    *,
+    profiles: list[dict[str, Any]],
+    mock: bool,
+) -> PrintTransport | None:
+    if mock:
+        return None
+    return BleakPrintTransport(service_uuids=_profile_service_uuids(profiles))
 
 
 def _profile_service_uuids(profiles: list[dict[str, Any]]) -> list[str]:

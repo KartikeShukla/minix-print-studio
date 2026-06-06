@@ -7,7 +7,12 @@ import {
   type AgentIntegrationTargetId
 } from "./agentIntegrations";
 import { buildBetaFeedbackDraft } from "./betaFeedback";
-import { createDaemonLaunchConfig, createDaemonRuntime, startDaemon } from "./daemonSupervisor";
+import {
+  createDaemonLaunchConfig,
+  createDaemonRuntime,
+  resolveDaemonMockMode,
+  startDaemon
+} from "./daemonSupervisor";
 import {
   installAgentIntegrationConfig,
   uninstallAgentIntegrationConfig
@@ -22,7 +27,7 @@ import { exportSupportBundle } from "./supportBundle";
 import { getUpdateChannelState, setUpdateChannel } from "./updateChannel";
 
 let mainWindow: BrowserWindow | null = null;
-const runtime = createDaemonRuntime({ mock: true });
+const runtime = createDaemonRuntime({ mock: resolveDaemonMockMode() });
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({

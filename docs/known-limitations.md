@@ -6,11 +6,17 @@ not yet a stable public installer.
 
 ## Hardware
 
-- Physical Stage A validation has not been completed in this environment because
-  Bluetooth access was unavailable.
-- Stage B physical protocol sanity, tiny visual card, and long-print reliability
-  runs are pending.
-- Printing remains locked until certification stages pass on physical hardware.
+- Physical Stage A validation completed on 2026-06-06 for
+  `Seznik MiniX_0194_LE`: model `S1_LYiN48D_GY`, firmware `V1.9.11`, and a
+  read-only artifact inspected as safe.
+- macOS advertisements for this unit may omit service UUIDs, so discovery must
+  fall back from FF00-filtered scanning to name-prefix matching before read-only
+  verification.
+- Stage B physical protocol sanity, user confirmation of the tiny visual card,
+  and long-print reliability runs are still pending.
+- User-initiated physical BLE transfer is implemented as an experimental path,
+  but completion is still `completed_unverified` until the operator inspects the
+  paper output.
 - Only the Seznik MiniX profile is present.
 
 ## Packaging
@@ -27,7 +33,8 @@ not yet a stable public installer.
 
 ## Product Surface
 
-- The mock print flow is implemented, but real printer transport remains certification-gated.
+- The mock print flow and experimental physical BLE transport are implemented,
+  but trusted printer support remains certification-gated.
 - Hardware diagnostics artifacts must be reviewed and redacted before public sharing;
   use the Stage A evidence summary for maintainer review before sharing a full ZIP.
 - Agent integrations require the desktop app and daemon runtime handoff to be active.

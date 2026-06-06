@@ -124,6 +124,45 @@ def test_bleak_scan_maps_advertisement_data_to_daemon_advertisements() -> None:
     assert advertisements[0].rssi == -47
 
 
+def test_bleak_scan_falls_back_to_unfiltered_discovery_when_service_filter_is_empty() -> None:
+    calls: list[list[str]] = []
+
+    async def discover(
+        timeout: float,
+        *,
+        return_adv: bool,
+        service_uuids: list[str],
+    ) -> dict[str, tuple[FakeDevice, FakeAdvertisementData]]:
+        calls.append(service_uuids)
+        if service_uuids:
+            return {}
+        return {
+            "dev_minix": (
+                FakeDevice(address="dev_minix", name="Seznik MiniX_0194_LE"),
+                FakeAdvertisementData(
+                    local_name="Seznik MiniX_0194_LE",
+                    service_uuids=[],
+                    rssi=-55,
+                ),
+            )
+        }
+
+    adapter = BleakBleAdapter(
+        scanner_discover=discover,
+        client_factory=_unused_client_factory,
+        scan_timeout_s=0.1,
+        service_uuids=[FF00],
+    )
+
+    advertisements = asyncio.run(adapter.scan())
+
+    assert calls == [[FF00], []]
+    assert advertisements[0].device_id == "dev_minix"
+    assert advertisements[0].name == "Seznik MiniX_0194_LE"
+    assert advertisements[0].service_uuids == []
+    assert advertisements[0].rssi == -55
+
+
 def test_bleak_scan_reports_bluetooth_unavailable() -> None:
     async def discover(
         timeout: float,

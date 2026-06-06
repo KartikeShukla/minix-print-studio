@@ -27,6 +27,10 @@ export type DaemonLaunchConfig = {
   env: NodeJS.ProcessEnv;
 };
 
+export type DaemonMockEnv = {
+  MINIX_DAEMON_MOCK?: string;
+};
+
 export function createDaemonRuntime(options: Partial<DaemonRuntime> = {}): DaemonRuntime {
   const port = options.port ?? 39281;
   const token = options.token ?? `token_${randomUUID()}`;
@@ -38,6 +42,12 @@ export function createDaemonRuntime(options: Partial<DaemonRuntime> = {}): Daemo
     port,
     mock
   };
+}
+
+export function resolveDaemonMockMode(
+  env: DaemonMockEnv = process.env
+): boolean {
+  return env.MINIX_DAEMON_MOCK?.toLowerCase() === "true";
 }
 
 export function createDaemonLaunchConfig(options: DaemonLaunchOptions): DaemonLaunchConfig {

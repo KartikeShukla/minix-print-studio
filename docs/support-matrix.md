@@ -15,7 +15,7 @@ physical validation before a stable public release.
 
 | Profile | Support Level | Printing Status | Required Evidence |
 | --- | --- | --- | --- |
-| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Printing remains certification-gated | Stage A physical artifact, Stage B protocol sanity, tiny visual card, and long-print reliability before stable support claims. |
+| `seznik-minix-s1-lyin48d-gy` | `official` profile data | Experimental physical transfer implemented; trusted printing remains certification-gated | Stage A physical artifact exists; Stage B protocol sanity, operator-confirmed tiny visual card, and long-print reliability before stable support claims. |
 
 ## Agent Integrations
 
@@ -31,13 +31,14 @@ physical validation before a stable public release.
 | Stage | Status | Artifact |
 | --- | --- | --- |
 | Host Bluetooth readiness | Implemented for macOS CLI and Electron diagnostics, with guarded Stage A CLI options | `minix-hardware-test host-readiness` / `scan --require-host-ready` / Printer panel |
-| Stage A: read-only verification | Implemented in daemon, renderer, and CLI | `hardware-test-<timestamp>.zip` |
+| Stage A: read-only verification | Implemented in daemon, renderer, and CLI; physically verified on 2026-06-06 for `Seznik MiniX_0194_LE` | `hardware-test-<timestamp>.zip` |
 | Stage A artifact inspection | Implemented offline | `minix-hardware-test inspect-artifact` |
 | Stage A shareable evidence summary | Implemented offline and shown in Electron artifact inspection | `minix-hardware-test evidence-summary` |
 | Stage B preflight | Implemented offline | `minix-hardware-test protocol-sanity-preflight` |
 | Stage B physical protocol sanity | Pending hardware run | Future hardware-test artifact |
 | Stage C tiny visual card preflight | Implemented offline | `minix-hardware-test tiny-visual-card-preflight` |
-| Stage C physical tiny visual test card | Pending hardware run | Future hardware-test artifact |
+| Stage C physical tiny visual test card | Initial transfer completed as `completed_unverified`; operator confirmation still required | Future hardware-test artifact |
 | Long-print reliability | Pending | Future hardware-test artifact |
 
-Do not treat BLE detection or Stage A alone as permission to print.
+Do not treat BLE detection, Stage A, or an unverified transfer alone as stable
+printer certification.

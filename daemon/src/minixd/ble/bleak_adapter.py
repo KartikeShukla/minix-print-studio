@@ -100,6 +100,12 @@ class BleakBleAdapter:
                 return_adv=True,
                 service_uuids=list(self._service_uuids),
             )
+            if not discovered and self._service_uuids:
+                discovered = await self._scanner_discover(
+                    self._scan_timeout_s,
+                    return_adv=True,
+                    service_uuids=[],
+                )
         except BleakBluetoothNotAvailableError as exc:
             raise PrinterBluetoothUnavailableError(
                 f"Bluetooth unavailable: {_exception_message(exc)}"

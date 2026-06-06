@@ -37,6 +37,30 @@ def test_scan_classifies_known_ff00_name_as_detected_unverified_not_printable() 
     assert candidates[0].reason == "Service UUID and name match; model query required."
 
 
+def test_scan_classifies_known_name_without_advertised_service_as_detected_unverified() -> None:
+    service = PrinterDiscoveryService(
+        profiles=load_profiles(),
+        adapter=MockBleAdapter(
+            advertisements=[
+                BleAdvertisement(
+                    device_id="dev_minix",
+                    name="Seznik MiniX_0194_LE",
+                    service_uuids=[],
+                    rssi=-55,
+                )
+            ],
+        ),
+    )
+
+    candidates = asyncio.run(service.scan())
+
+    assert candidates[0].support_level == "detected_unverified"
+    assert candidates[0].candidate_profile_ids == ["seznik-minix-s1-lyin48d-gy"]
+    assert candidates[0].printable is False
+    assert candidates[0].next_required_stage == "read_only_verification"
+    assert candidates[0].reason == "Name matches; model query required."
+
+
 def test_scan_does_not_claim_generic_ff00_printers_are_supported() -> None:
     service = PrinterDiscoveryService(
         profiles=load_profiles(),

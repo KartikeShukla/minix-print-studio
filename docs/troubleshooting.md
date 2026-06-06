@@ -22,6 +22,12 @@ Check:
 - Whether another app owns the printer connection.
 - Whether the daemon is running in mock mode.
 
+If macOS can see `Seznik MiniX_0194_LE` in an unfiltered BLE scan but the daemon
+scan returns no printer, the advertisement may be omitting service UUIDs. The
+daemon should fall back from the FF00 service filter to an unfiltered scan and
+classify known MiniX name-prefix matches as `detected_unverified`; read-only
+verification is still required before any print target is accepted.
+
 ## Printer Detected But Not Printable
 
 This is expected before certification. Detection only means a service or name matched.
