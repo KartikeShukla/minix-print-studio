@@ -15,9 +15,9 @@ not yet a stable public installer.
 - Stage B physical protocol sanity and Stage C tiny-card artifact evidence exists
   locally. Long-print reliability print execution and artifact recording are
   implemented, and local Stage D physical evidence was recorded on 2026-06-06.
-  Stable support claims require the local stable-support gate record, and agent
-  direct printing still requires runtime approval enforcement after the explicit
-  opt-in record.
+  Stable support claims require the local stable-support gate record. MCP agent
+  direct-print requests can enforce a reviewed opt-in gate, but the desktop MCP
+  runtime handoff does not yet persist or select that gate for agents.
 - User-initiated physical BLE transfer is implemented as an experimental path,
   and operator paper-output confirmation can now be recorded on the job. Stage
   B/C artifact-recording, local trusted-printer record, and long-print

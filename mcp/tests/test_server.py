@@ -138,6 +138,31 @@ async def test_mcp_server_calls_render_preview_tool(
 
 
 @pytest.mark.anyio
+async def test_mcp_server_calls_print_note_with_agent_direct_opt_in(
+    client_session: ClientSession,
+) -> None:
+    result = await client_session.call_tool(
+        "print_note",
+        {
+            "text": "Restock labels",
+            "title": "Agent note",
+            "agent_direct_user_opt_in": _agent_direct_user_opt_in_record(),
+        },
+    )
+
+    assert result.structuredContent is not None
+    assert result.structuredContent["status"] == "approval_required"
+    assert result.structuredContent["policyDecision"]["directPrintAllowed"] is True
+    assert (
+        result.structuredContent["policyDecision"]["runtimeApprovalRequired"] is True
+    )
+    assert (
+        result.structuredContent["policyDecision"]["unattendedPrintingAllowed"] is False
+    )
+    assert "approvalToken" not in str(result.structuredContent)
+
+
+@pytest.mark.anyio
 async def test_mcp_server_calls_get_job_status_tool(
     client_session: ClientSession,
 ) -> None:
@@ -159,3 +184,48 @@ async def test_mcp_server_calls_list_supported_profiles_tool(
     assert result.structuredContent["status"] == "ok"
     assert result.structuredContent["profiles"][0]["id"] == "seznik-minix-s1-lyin48d-gy"
     assert "serviceUuid" not in str(result.structuredContent)
+
+
+def _agent_direct_user_opt_in_record() -> JsonObject:
+    return {
+        "status": "agent_direct_user_opt_in_recorded",
+        "sourcePolicyReview": {
+            "stage": "agent_direct_policy_review",
+            "status": "agent_direct_policy_reviewed",
+            "localRecordValidated": True,
+        },
+        "optIn": {
+            "explicitUserOptIn": True,
+            "recordedVia": "local_cli_confirmation",
+            "directPrintDefault": "approval_required",
+            "unattendedPrintingAllowed": False,
+        },
+        "agentRules": {
+            "directPrintEnabled": True,
+            "directPrintDefault": "approval_required",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": {
+            "maxHeightDots": 1000,
+            "warnTotalBlackCoverage": 0.3,
+            "blockTotalBlackCoverage": 0.45,
+            "blockBandCoverage": 0.7,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": True,
+            "agentDirectPrintingDefault": "approval_required",
+            "unattendedAgentPrintingEnabled": False,
+        },
+        "nextRequiredStage": "runtime_approval_enforcement",
+    }

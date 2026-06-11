@@ -71,6 +71,7 @@ def print_note_tool(
     *,
     text: str,
     title: str = "Agent note",
+    agent_direct_user_opt_in: JsonObject | None = None,
 ) -> JsonObject:
     try:
         preview = client.create_document_preview(
@@ -82,7 +83,11 @@ def print_note_tool(
 
     return _approval_required_response(
         preview,
-        policy_decision=_agent_policy_decision(tool_name="print_note"),
+        policy_decision=_agent_policy_decision(
+            tool_name="print_note",
+            preview=preview,
+            agent_direct_user_opt_in=agent_direct_user_opt_in,
+        ),
     )
 
 
@@ -190,15 +195,109 @@ def _approval_required_response(
     return response
 
 
-def _agent_policy_decision(*, tool_name: str) -> JsonObject:
-    return {
+def _agent_policy_decision(
+    *,
+    tool_name: str,
+    preview: JsonObject | None = None,
+    agent_direct_user_opt_in: JsonObject | None = None,
+) -> JsonObject:
+    if agent_direct_user_opt_in is None:
+        return {
+            "tool": tool_name,
+            "directPrintAllowed": False,
+            "reasons": ["agent_direct_print_disabled", "printer_not_trusted"],
+            "rateLimit": {
+                "jobsPerMinute": _int_value(DEFAULT_AGENT_POLICY, "rateLimitJobsPerMinute")
+            },
+        }
+
+    opt_in_policy = _reviewed_agent_direct_opt_in_policy(agent_direct_user_opt_in)
+    limits = cast(JsonObject, opt_in_policy["limits"])
+    reasons: list[JsonValue] = []
+    if preview is None:
+        reasons.append("preview_required")
+    elif _int_value(preview, "heightDots") > _int_value(limits, "maxHeightDots"):
+        reasons.append("agent_height_limit_exceeded")
+
+    safety = _optional_object_value(preview or {}, "safety")
+    if safety is not None and not _bool_value(safety, "allowed"):
+        reasons.append("preview_safety_blocked")
+
+    if not reasons:
+        reasons = ["explicit_user_opt_in", "approval_required_by_default"]
+
+    policy_decision: JsonObject = {
         "tool": tool_name,
-        "directPrintAllowed": False,
-        "reasons": ["agent_direct_print_disabled", "printer_not_trusted"],
-        "rateLimit": {
-            "jobsPerMinute": _int_value(DEFAULT_AGENT_POLICY, "rateLimitJobsPerMinute")
+        "directPrintAllowed": reasons == [
+            "explicit_user_opt_in",
+            "approval_required_by_default",
+        ],
+        "runtimeApprovalRequired": True,
+        "unattendedPrintingAllowed": False,
+        "sourceGate": "agent_direct_user_opt_in",
+        "reasons": reasons,
+        "limits": {
+            "maxHeightDots": _int_value(limits, "maxHeightDots"),
+            "maxCopies": _int_value(limits, "maxCopies"),
+            "jobsPerMinute": _int_value(limits, "jobsPerMinute"),
         },
     }
+    return policy_decision
+
+
+def _reviewed_agent_direct_opt_in_policy(record: JsonObject) -> JsonObject:
+    if _string_value(record, "status") != "agent_direct_user_opt_in_recorded":
+        raise ValueError("agent direct user opt-in has wrong status")
+    source_policy_review = _object_value(record, "sourcePolicyReview")
+    opt_in = _object_value(record, "optIn")
+    agent_rules = _object_value(record, "agentRules")
+    limits = _object_value(record, "limits")
+    safety = _object_value(record, "safety")
+    if _string_value(source_policy_review, "stage") != "agent_direct_policy_review":
+        raise ValueError("agent direct user opt-in has wrong source stage")
+    if _string_value(source_policy_review, "status") != "agent_direct_policy_reviewed":
+        raise ValueError("agent direct user opt-in has wrong source status")
+    if not _bool_value(source_policy_review, "localRecordValidated"):
+        raise ValueError("agent direct user opt-in source is not validated")
+    if not _bool_value(opt_in, "explicitUserOptIn"):
+        raise ValueError("agent direct user opt-in lacks explicit opt-in")
+    if _string_value(opt_in, "directPrintDefault") != "approval_required":
+        raise ValueError("agent direct user opt-in weakens approval default")
+    if _bool_value(opt_in, "unattendedPrintingAllowed"):
+        raise ValueError("agent direct user opt-in allows unattended printing")
+    for field in (
+        "directPrintEnabled",
+        "approvalRequiredByDefault",
+        "longDirectPrintRequiresApproval",
+        "noAutomaticRetryAfterPrintableBytes",
+        "requiresTrustedPrinter",
+        "requiresStableSupportGate",
+    ):
+        if not _bool_value(agent_rules, field):
+            raise ValueError("agent direct user opt-in weakens approval policy")
+    for field in ("rawBleWritesAllowed", "unsafeResumeAllowed"):
+        if _bool_value(agent_rules, field):
+            raise ValueError("agent direct user opt-in enables unsafe direct printing")
+    if _string_value(agent_rules, "directPrintDefault") != "approval_required":
+        raise ValueError("agent direct user opt-in has wrong direct default")
+    if _string_value(agent_rules, "overLimitBehavior") != "preview_and_ask":
+        raise ValueError("agent direct user opt-in has wrong over-limit behavior")
+    for field in ("maxHeightDots", "maxCopies", "jobsPerMinute"):
+        _int_value(limits, field)
+    for field in (
+        "stableSupportClaimEnabled",
+        "longPrintPrintingEnabled",
+        "agentDirectPrintingEnabled",
+    ):
+        if not _bool_value(safety, field):
+            raise ValueError("agent direct user opt-in lacks required safety")
+    if _string_value(safety, "agentDirectPrintingDefault") != "approval_required":
+        raise ValueError("agent direct user opt-in has wrong approval default")
+    if _bool_value(safety, "unattendedAgentPrintingEnabled"):
+        raise ValueError("agent direct user opt-in enables unattended printing")
+    if _string_value(record, "nextRequiredStage") != "runtime_approval_enforcement":
+        raise ValueError("agent direct user opt-in has wrong next stage")
+    return {"limits": limits}
 
 
 def _build_note_document(*, text: str, title: str) -> JsonObject:
@@ -254,6 +353,20 @@ def _int_value(source: JsonObject, key: str) -> int:
     if not isinstance(value, int):
         raise ValueError(f"{key} must be an integer")
     return value
+
+
+def _bool_value(source: JsonObject, key: str) -> bool:
+    value = source.get(key)
+    if not isinstance(value, bool):
+        raise ValueError(f"{key} must be a boolean")
+    return value
+
+
+def _object_value(source: JsonObject, key: str) -> JsonObject:
+    value = source.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object")
+    return cast(JsonObject, value)
 
 
 def _copy_optional_string(target: JsonObject, source: JsonObject, key: str) -> None:

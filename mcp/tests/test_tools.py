@@ -9,8 +9,16 @@ from minix_mcp.tools import (
 
 
 class StubDaemonClient:
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail: bool = False,
+        preview_height_dots: int = 240,
+        preview_safety_allowed: bool = True,
+    ) -> None:
         self.fail = fail
+        self.preview_height_dots = preview_height_dots
+        self.preview_safety_allowed = preview_safety_allowed
         self.preview_calls: list[tuple[JsonObject, JsonObject]] = []
 
     def get_health(self) -> JsonObject:
@@ -39,9 +47,9 @@ class StubDaemonClient:
             "renderSettingsHash": "sha256:settings",
             "profileId": "seznik-minix-s1-lyin48d-gy",
             "widthDots": 384,
-            "heightDots": 240,
+            "heightDots": self.preview_height_dots,
             "safety": {
-                "allowed": True,
+                "allowed": self.preview_safety_allowed,
                 "warnings": [],
                 "metrics": {"totalBlackCoverage": 0.08, "maxBandCoverage64": 0.12},
             },
@@ -204,6 +212,89 @@ def test_print_note_explains_agent_direct_policy_without_leaking_token() -> None
     assert "approvalToken" not in str(response)
 
 
+def test_print_note_accepts_reviewed_opt_in_gate_for_approval_required_flow() -> None:
+    client = StubDaemonClient()
+
+    response = print_note_tool(
+        client,
+        text="Restock labels",
+        title="Agent note",
+        agent_direct_user_opt_in=_agent_direct_user_opt_in_record(),
+    )
+
+    assert response["status"] == "approval_required"
+    assert response["policyDecision"] == {
+        "tool": "print_note",
+        "directPrintAllowed": True,
+        "runtimeApprovalRequired": True,
+        "unattendedPrintingAllowed": False,
+        "sourceGate": "agent_direct_user_opt_in",
+        "reasons": ["explicit_user_opt_in", "approval_required_by_default"],
+        "limits": {
+            "maxHeightDots": 1000,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+    }
+    assert response["message"] == (
+        "Preview created. User approval is required before printing."
+    )
+    assert "approvalToken" not in str(response)
+    assert "rawBleWritesAllowed" not in str(response)
+
+
+def test_print_note_rejects_opt_in_gate_when_preview_exceeds_agent_height_limit() -> None:
+    client = StubDaemonClient(preview_height_dots=1001)
+
+    response = print_note_tool(
+        client,
+        text="Restock labels",
+        title="Agent note",
+        agent_direct_user_opt_in=_agent_direct_user_opt_in_record(),
+    )
+
+    assert response["status"] == "approval_required"
+    assert response["policyDecision"] == {
+        "tool": "print_note",
+        "directPrintAllowed": False,
+        "runtimeApprovalRequired": True,
+        "unattendedPrintingAllowed": False,
+        "sourceGate": "agent_direct_user_opt_in",
+        "reasons": ["agent_height_limit_exceeded"],
+        "limits": {
+            "maxHeightDots": 1000,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+    }
+
+
+def test_print_note_rejects_opt_in_gate_when_preview_safety_blocks_printing() -> None:
+    client = StubDaemonClient(preview_safety_allowed=False)
+
+    response = print_note_tool(
+        client,
+        text="Restock labels",
+        title="Agent note",
+        agent_direct_user_opt_in=_agent_direct_user_opt_in_record(),
+    )
+
+    assert response["status"] == "approval_required"
+    assert response["policyDecision"] == {
+        "tool": "print_note",
+        "directPrintAllowed": False,
+        "runtimeApprovalRequired": True,
+        "unattendedPrintingAllowed": False,
+        "sourceGate": "agent_direct_user_opt_in",
+        "reasons": ["preview_safety_blocked"],
+        "limits": {
+            "maxHeightDots": 1000,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+    }
+
+
 def test_get_job_status_returns_structured_daemon_job_without_raw_segments() -> None:
     response = get_job_status_tool(StubDaemonClient(), job_id="job_123")
 
@@ -270,3 +361,48 @@ def test_tools_return_app_not_running_when_daemon_is_unavailable() -> None:
     assert print_note_tool(client, text="hello")["status"] == "app_not_running"
     assert get_job_status_tool(client, job_id="job_123")["status"] == "app_not_running"
     assert list_supported_profiles_tool(client)["status"] == "app_not_running"
+
+
+def _agent_direct_user_opt_in_record() -> JsonObject:
+    return {
+        "status": "agent_direct_user_opt_in_recorded",
+        "sourcePolicyReview": {
+            "stage": "agent_direct_policy_review",
+            "status": "agent_direct_policy_reviewed",
+            "localRecordValidated": True,
+        },
+        "optIn": {
+            "explicitUserOptIn": True,
+            "recordedVia": "local_cli_confirmation",
+            "directPrintDefault": "approval_required",
+            "unattendedPrintingAllowed": False,
+        },
+        "agentRules": {
+            "directPrintEnabled": True,
+            "directPrintDefault": "approval_required",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": {
+            "maxHeightDots": 1000,
+            "warnTotalBlackCoverage": 0.3,
+            "blockTotalBlackCoverage": 0.45,
+            "blockBandCoverage": 0.7,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": True,
+            "agentDirectPrintingDefault": "approval_required",
+            "unattendedAgentPrintingEnabled": False,
+        },
+        "nextRequiredStage": "runtime_approval_enforcement",
+    }

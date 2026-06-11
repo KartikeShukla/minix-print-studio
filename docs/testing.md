@@ -80,6 +80,10 @@ pnpm release-package-check
   conservative agent limits, approval-required direct default, unattended-print
   block, raw BLE write and unsafe-resume blocks, Electron bridge command wiring,
   renderer setup checklist item, and renderer Printer panel display.
+- MCP runtime approval tests cover `print_note` with the default blocked policy,
+  a reviewed `agent_direct_user_opt_in` gate, height-limit rejection,
+  safety-blocked rejection, FastMCP server argument forwarding, approval-token
+  redaction, and unattended-print blocking.
 - Long-print reliability print-execution tests cover trusted-record chain
   validation, deterministic marker fixture submission through daemon preview and
   print APIs, status-only stdout, omission of raster payloads from stdout, and
