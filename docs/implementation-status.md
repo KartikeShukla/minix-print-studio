@@ -112,6 +112,10 @@ package:win-installer`, the Release Package workflow, and the release
 - Shared TypeScript API schemas for printer scan candidates and read-only verification responses.
 - Renderer daemon client methods for authenticated printer scan and read-only verification.
 - Renderer Scan Printers flow that displays detected candidates, runs identity verification, and shows `Printing still locked` after read-only verification.
+- Renderer persists the last read-only verified printer selection locally,
+  restores it on relaunch with a visible remembered-printer status, and uses its
+  explicit `deviceId` for the next approved physical print while keeping
+  printing trust locked.
 - Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
 - BLE scan now falls back to unfiltered discovery when the profile service filter
   returns no devices, so macOS can detect `Seznik MiniX_0194_LE` advertisements

@@ -14,6 +14,12 @@ import {
   saveSetupChecklistDismissed,
   SETUP_CHECKLIST_STORAGE_KEY
 } from "../src/lib/setup-checklist";
+import {
+  clearStoredVerifiedPrinter,
+  loadStoredVerifiedPrinter,
+  saveStoredVerifiedPrinter,
+  VERIFIED_PRINTER_STORAGE_KEY
+} from "../src/lib/printer-selection";
 
 describe("document storage", () => {
   it("round-trips a valid document through localStorage", () => {
@@ -71,5 +77,53 @@ describe("document storage", () => {
 
     localStorage.setItem(SETUP_CHECKLIST_STORAGE_KEY, "{");
     expect(loadSetupChecklistDismissed()).toBe(false);
+  });
+
+  it("round-trips the remembered verified printer selection", () => {
+    localStorage.clear();
+
+    saveStoredVerifiedPrinter({
+      deviceId: "mock-minix-0194",
+      name: "Seznik MiniX_0194_LE",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      verifiedAt: "2026-06-11T10:00:00.000Z"
+    });
+
+    expect(JSON.parse(localStorage.getItem(VERIFIED_PRINTER_STORAGE_KEY) ?? "{}")).toEqual({
+      deviceId: "mock-minix-0194",
+      name: "Seznik MiniX_0194_LE",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      verifiedAt: "2026-06-11T10:00:00.000Z"
+    });
+    expect(loadStoredVerifiedPrinter()).toEqual({
+      deviceId: "mock-minix-0194",
+      name: "Seznik MiniX_0194_LE",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      modelResponse: "S1_LYiN48D_GY",
+      firmware: "V1.9.11",
+      verifiedAt: "2026-06-11T10:00:00.000Z"
+    });
+  });
+
+  it("ignores invalid verified printer selections and can clear them", () => {
+    localStorage.setItem(VERIFIED_PRINTER_STORAGE_KEY, JSON.stringify({ deviceId: "" }));
+
+    expect(loadStoredVerifiedPrinter()).toBeNull();
+
+    saveStoredVerifiedPrinter({
+      deviceId: "mock-minix-0194",
+      name: null,
+      profileId: null,
+      modelResponse: null,
+      firmware: null,
+      verifiedAt: "2026-06-11T10:00:00.000Z"
+    });
+    clearStoredVerifiedPrinter();
+
+    expect(localStorage.getItem(VERIFIED_PRINTER_STORAGE_KEY)).toBeNull();
   });
 });

@@ -44,6 +44,9 @@ pnpm release-package-check
   Bluetooth readiness blocks Stage A.
 - Desktop and renderer tests cover exposing that host-readiness result in the
   Printer panel before Stage A scan attempts, including recommended actions.
+- Renderer printer-selection tests cover local persistence of the last read-only
+  verified printer and restoration into the approved-print request `deviceId`
+  without granting trusted-print status.
 - Offline certification-preflight tests cover Stage B protocol command metadata
   and Stage C tiny-card metadata without sending BLE writes or including printable
   raster bytes.

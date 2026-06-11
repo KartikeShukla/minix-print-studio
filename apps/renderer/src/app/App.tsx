@@ -113,6 +113,11 @@ import {
   saveSetupChecklistDismissed,
 } from "@/lib/setup-checklist";
 import {
+  loadStoredVerifiedPrinter,
+  saveStoredVerifiedPrinter,
+  type StoredVerifiedPrinter,
+} from "@/lib/printer-selection";
+import {
   desktopAgentDirectPolicyReviewInspector,
   desktopAgentDirectUserOptInInspector,
   desktopHardwareArtifactInspector,
@@ -339,6 +344,7 @@ type PrinterWorkflow =
       status: "verified";
       candidates: PrinterCandidate[];
       verification: ReadOnlyVerification;
+      remembered?: boolean;
     }
   | { status: "error"; message: string };
 
@@ -513,9 +519,9 @@ export function App({
   >(null);
   const [agentIntegrationMutation, setAgentIntegrationMutation] =
     useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
-  const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>({
-    status: "idle",
-  });
+  const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>(() =>
+    printerWorkflowFromStoredVerifiedPrinter(loadStoredVerifiedPrinter()),
+  );
   const [setupChecklistDismissed, setSetupChecklistDismissed] = useState(() =>
     loadSetupChecklistDismissed(),
   );
@@ -1230,6 +1236,15 @@ export function App({
       setPrinterWorkflow({ status: "verifying", candidates, deviceId });
       try {
         const verification = await client.readOnlyVerify(deviceId);
+        const candidate = candidates.find((item) => item.deviceId === deviceId);
+        saveStoredVerifiedPrinter({
+          deviceId: verification.deviceId,
+          name: candidate?.name ?? null,
+          profileId: verification.profileId,
+          modelResponse: verification.modelResponse,
+          firmware: verification.firmware,
+          verifiedAt: new Date().toISOString(),
+        });
         setPrinterWorkflow({ status: "verified", candidates, verification });
       } catch (error: unknown) {
         setPrinterWorkflow({
@@ -4826,6 +4841,9 @@ function PrinterDiscoveryStatus({
         <div className="text-muted-foreground">Verifying printer identity</div>
       ) : verification ? (
         <div className="space-y-2 border-t border-border pt-3">
+          {workflow.status === "verified" && workflow.remembered ? (
+            <Badge variant="muted">Remembered verified printer</Badge>
+          ) : null}
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Model</span>
             <span>{verification.modelResponse ?? "Unknown"}</span>
@@ -5204,6 +5222,50 @@ function appendImageElementWithAsset(
   return {
     ...nextDocument,
     assets: [...remainingAssets, projectAsset],
+  };
+}
+
+function printerWorkflowFromStoredVerifiedPrinter(
+  stored: StoredVerifiedPrinter | null,
+): PrinterWorkflow {
+  if (!stored) {
+    return { status: "idle" };
+  }
+
+  const profileIds = stored.profileId ? [stored.profileId] : [];
+  return {
+    status: "verified",
+    remembered: true,
+    candidates: [
+      {
+        deviceId: stored.deviceId,
+        name: stored.name,
+        serviceUuids: [],
+        rssi: null,
+        supportLevel: "detected_unverified",
+        candidateProfileIds: profileIds,
+        printable: false,
+        nextRequiredStage: "read_only_verification",
+        reason: "Remembered from the last read-only verification.",
+      },
+    ],
+    verification: {
+      status: "read_only_verified",
+      deviceId: stored.deviceId,
+      profileId: stored.profileId,
+      profileSupportLevel: stored.profileId ? "official" : null,
+      modelResponse: stored.modelResponse,
+      firmware: stored.firmware,
+      printable: false,
+      nextRequiredStage: "protocol_sanity_test",
+      reason:
+        "Restored from the last read-only verification. Re-scan if the printer changed.",
+      services: [],
+      writeCharacteristics: [],
+      notifyCharacteristics: [],
+      rawNotifications: [],
+      timingEvents: [],
+    },
   };
 }
 
