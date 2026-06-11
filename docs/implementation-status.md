@@ -120,6 +120,9 @@ package:win-installer`, the Release Package workflow, and the release
   restores it on relaunch with a visible remembered-printer status, and uses its
   explicit `deviceId` for the next approved physical print while keeping
   printing trust locked.
+- Renderer Printer setup can forget a remembered read-only verified printer,
+  clearing the saved BLE identity and preventing stale `deviceId` reuse on the
+  next approved physical print.
 - Bleak-backed BLE adapter for non-mock daemon mode using service-filtered advertisement discovery.
 - BLE scan now falls back to unfiltered discovery when the profile service filter
   returns no devices, so macOS can detect `Seznik MiniX_0194_LE` advertisements
@@ -435,6 +438,8 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for desktop `minixprint://approval/<previewId>` parsing,
   pending approval queue ordering/removal, renderer auto-review of queued
   approval deep links, and queue clearing after user approval.
+- TDD red/green checks for clearing a remembered verified printer selection
+  before the next print so stale BLE identities are not reused.
 - TDD red/green checks for first-run Setup checklist visibility, local dismissal persistence, and storage corruption fallback.
 - TDD red/green checks for standalone renderer and packaged desktop renderer
   Vite chunk splitting across React, editor/canvas, and UI dependencies.
