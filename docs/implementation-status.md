@@ -153,8 +153,11 @@ package:win-installer`, the Release Package workflow, and the release
 - Renderer image import embeds local PNG/JPEG/WebP files into the document, displays imported images on the canvas, exposes fit/threshold/invert inspector controls, and persists them with undoable document edits.
 - Renderer text layers support double-click inline editing through an HTML canvas overlay that commits one undoable document edit on blur or Enter, and cancels with Escape.
 - Renderer canvas footer controls zoom the artboard and Konva stage from 50% to 200% without mutating persisted print document data; inline text editing overlays scale with the zoomed canvas.
+- Renderer canvas workspace also supports Ctrl/Cmd + mouse wheel zoom from 50% to 200% without mutating persisted print document data.
 - Renderer canvas footer controls pan the stage viewport in 48-dot steps and reset to origin without mutating persisted print document data.
 - Renderer selected layers show React Konva transformer handles for resize/rotate edits, persist transformed geometry through the document history path, and keep Undo available after a transform.
+- Renderer inspector can delete the selected unlocked layer through the persisted document history path, and Undo restores the removed layer.
+- Renderer editor keyboard shortcuts support Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y redo, Escape deselect, Delete/Backspace delete, and Arrow-key nudging with Shift for larger steps while ignoring form-field input.
 - Design model can insert deterministic long-print test markers with `START LP-TEST`, 25%, 50%, 75%, and `END LP-TEST checksum: 7F3A` sentinels while preserving existing document content.
 - Renderer toolbar exposes `Insert long-print test markers`, persists the 8000-dot marker fixture through the normal document history path, and keeps Undo available after insertion.
 - Renderer completed print jobs persist to a localStorage-backed Recent Jobs list with job id, status, completion level, and band progress.

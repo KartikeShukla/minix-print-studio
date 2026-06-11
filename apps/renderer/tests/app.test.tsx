@@ -1775,6 +1775,49 @@ describe("MiniX Print Studio shell", () => {
     );
   });
 
+  it("zooms the canvas with Ctrl or Cmd wheel without changing the print document", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    await screen.findAllByText("Double-click to edit");
+    const initialStored = localStorage.getItem(
+      "minix.printStudio.currentDocument.v1",
+    );
+    expect(screen.getByText("Zoom 100%")).toBeInTheDocument();
+
+    const workspace = screen.getByRole("region", { name: "Canvas workspace" });
+
+    fireEvent.wheel(workspace, { deltaY: -100, ctrlKey: true });
+    expect(screen.getByText("Zoom 125%")).toBeInTheDocument();
+
+    fireEvent.wheel(workspace, { deltaY: 100, metaKey: true });
+    fireEvent.wheel(workspace, { deltaY: 100, metaKey: true });
+    expect(screen.getByText("Zoom 75%")).toBeInTheDocument();
+
+    fireEvent.wheel(workspace, { deltaY: -100 });
+    expect(screen.getByText("Zoom 75%")).toBeInTheDocument();
+
+    expect(localStorage.getItem("minix.printStudio.currentDocument.v1")).toBe(
+      initialStored,
+    );
+  });
+
   it("pans the canvas viewport from footer controls without changing the print document", async () => {
     const { container } = render(
       <App
@@ -2139,6 +2182,154 @@ describe("MiniX Print Studio shell", () => {
     expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
     expect(undo).toBeEnabled();
     expect(redo).toBeDisabled();
+  });
+
+  it("deletes the selected layer from the inspector and supports undo", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete layer" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Rectangle 1")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("No layer selected")).toBeInTheDocument();
+    const stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+    );
+    expect(stored.elements).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+  });
+
+  it("supports editor keyboard shortcuts for delete, undo, redo, and nudge", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(window, { key: "ArrowDown", shiftKey: true });
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+      );
+      expect(stored.elements).toEqual([
+        expect.objectContaining({ name: "Rectangle 1", x: 33, y: 154 }),
+      ]);
+    });
+
+    fireEvent.keyDown(window, { key: "Delete" });
+    await waitFor(() => {
+      expect(screen.queryByText("Rectangle 1")).not.toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true, shiftKey: true });
+    await waitFor(() => {
+      expect(screen.queryByText("Rectangle 1")).not.toBeInTheDocument();
+    });
+  });
+
+  it("ignores editor keyboard shortcuts while typing in form fields", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rectangle" }));
+    expect(await screen.findByText("Rectangle 1")).toBeInTheDocument();
+
+    const nameInput = screen.getByRole("textbox", { name: "Name" });
+    nameInput.focus();
+    fireEvent.keyDown(nameInput, { key: "Backspace" });
+    fireEvent.keyDown(nameInput, { key: "ArrowRight" });
+
+    expect(screen.getAllByText("Rectangle 1")).not.toHaveLength(0);
+    const stored = JSON.parse(
+      localStorage.getItem("minix.printStudio.currentDocument.v1") ?? "{}",
+    );
+    expect(stored.elements).toEqual([
+      expect.objectContaining({ name: "Rectangle 1", x: 32, y: 144 }),
+    ]);
+  });
+
+  it("explains why Print is disabled before an approved preview exists", async () => {
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    const printButton = screen.getByRole("button", { name: "Print" });
+    expect(printButton).toBeDisabled();
+    expect(printButton).toHaveAttribute(
+      "title",
+      "Run Preview first - printing requires an approved daemon preview",
+    );
   });
 
   it("inserts long-print test markers from the canvas tool and keeps undo history", async () => {

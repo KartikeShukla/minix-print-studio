@@ -94,6 +94,10 @@ pnpm release-package-check
 - Desktop support bundle tests cover redacted log/crash ZIP export and the renderer
   support action without requiring hardware.
 - Renderer setup tests cover the first-run checklist and local dismissal persistence.
+- Renderer editor ergonomics tests cover Ctrl/Cmd wheel zoom, inspector delete
+  with undo restore, global delete/nudge/undo/redo shortcuts, form-field
+  shortcut suppression, and disabled-print affordance text before preview
+  approval.
 - UI E2E tests cover onboarding, mock print flow, preview, safety warnings, and integration setup.
 
 ## Physical Validation Notes
