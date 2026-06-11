@@ -126,9 +126,11 @@ pnpm release-package-check
 Physical validation is not part of CI. On 2026-06-06, an unsandboxed non-mock
 daemon on `127.0.0.1:39282` completed:
 
-- `scripts/hardware-test.sh --timeout 25 scan --require-host-ready`
-- `scripts/hardware-test.sh --timeout 45 export-read-only --device-id <device-id>
---require-host-ready --output-dir <local-output-dir>`
+- `scripts/hardware-test.sh --base-url http://127.0.0.1:39282 --timeout 25
+  scan --require-host-ready`
+- `scripts/hardware-test.sh --base-url http://127.0.0.1:39282 --timeout 45
+  export-read-only --device-id <device-id> --require-host-ready --output-dir
+  <local-output-dir>`
 - Offline `inspect-artifact`, `protocol-sanity-preflight`,
   `tiny-visual-card-preflight`, and `evidence-summary`
 - One experimental tiny-card `/v1/jobs/print` transfer that reported
@@ -150,6 +152,14 @@ daemon on `127.0.0.1:39282` completed:
   Stage A/B/C/trusted-record/Stage D evidence chain and produced
   `stable-support-gate-fa0f77ee9e7e43ea.json` outside the repository with stable
   support and long-print trust enabled, and agent direct printing disabled.
+- On 2026-06-12, a paper-free guarded Stage A scan against an unsandboxed
+  non-mock daemon on `127.0.0.1:39282` succeeded with
+  `scripts/hardware-test.sh --base-url http://127.0.0.1:39282 --timeout 25 scan
+  --require-host-ready`, detecting `Seznik MiniX_0194_LE` as
+  `detected_unverified`. No print commands or raster bytes were sent. Use
+  `--base-url` rather than `MINIX_DAEMON_BASE_URL` for this local hardware path
+  because the environment override can cause the macOS readiness subprocess to
+  report `controllerInfo == nil` before daemon contact.
 
 ## Release Evidence Gate
 
