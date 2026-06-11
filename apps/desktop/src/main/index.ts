@@ -34,7 +34,10 @@ import {
   inspectTrustedPrinterRecord,
 } from "./hardwareArtifacts";
 import { getRepoRoot } from "./paths";
-import { writeDaemonRuntimeHandoff } from "./runtimeHandoff";
+import {
+  selectAgentDirectUserOptInGate,
+  writeDaemonRuntimeHandoff,
+} from "./runtimeHandoff";
 import { buildSecureWebPreferences } from "./security";
 import { exportSupportBundle } from "./supportBundle";
 import { getUpdateChannelState, setUpdateChannel } from "./updateChannel";
@@ -269,10 +272,15 @@ ipcMain.handle("agent-direct-user-opt-ins:inspect", async () => {
   if (selection.canceled || !recordPath) {
     return null;
   }
-  return inspectAgentDirectUserOptIn({
+  const inspection = await inspectAgentDirectUserOptIn({
     recordPath,
     repoRoot: getRepoRoot(),
   });
+  selectAgentDirectUserOptInGate({
+    userDataPath: app.getPath("userData"),
+    recordPath,
+  });
+  return inspection;
 });
 
 function getAgentIntegrationTarget(

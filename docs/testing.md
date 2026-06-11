@@ -87,6 +87,11 @@ pnpm release-package-check
   a reviewed `agent_direct_user_opt_in` gate, height-limit rejection,
   safety-blocked rejection, FastMCP server argument forwarding, approval-token
   redaction, and unattended-print blocking.
+- Desktop MCP opt-in handoff tests cover selecting a reviewed
+  agent-direct user opt-in record into the runtime directory, referencing it from
+  `runtime.json` without inlining the gate, preserving the selection across
+  handoff rewrites, resolving it in the Python MCP runtime, rejecting inline gate
+  JSON, and auto-applying it to FastMCP `print_note` calls.
 - Long-print reliability print-execution tests cover trusted-record chain
   validation, deterministic marker fixture submission through daemon preview and
   print APIs, status-only stdout, omission of raster payloads from stdout, and
