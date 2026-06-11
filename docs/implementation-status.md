@@ -450,9 +450,11 @@ package:win-installer`, the Release Package workflow, and the release
 - `scripts/hardware-test.sh scan --help` and `scripts/hardware-test.sh
 export-read-only --help` show `--require-host-ready` as a guarded Stage A
   option.
-- `scripts/hardware-test.sh scan --require-host-ready` refuses daemon contact
-  on this host while `system_profiler SPBluetoothDataType` reports no visible
-  Bluetooth controller.
+- `scripts/hardware-test.sh --base-url http://127.0.0.1:39282 --timeout 25
+  scan --require-host-ready` completed a paper-free guarded Stage A scan against
+  an unsandboxed non-mock daemon on 2026-06-12 and detected
+  `Seznik MiniX_0194_LE` as `detected_unverified`, with no print commands or
+  raster bytes sent.
 - `scripts/hardware-test.sh --help` shows `evidence-summary` as an available offline command.
 - Non-mock Stage A scan/export on 2026-06-06 against a separate daemon on
   `127.0.0.1:39282` detected `Seznik MiniX_0194_LE` by name after unfiltered

@@ -121,13 +121,18 @@ Only continue if the readiness output reports that Stage A can scan from the cur
 host context:
 
 ```bash
-scripts/hardware-test.sh scan --require-host-ready
-scripts/hardware-test.sh export-read-only --device-id <device-id> --require-host-ready --output-dir ./hardware-artifacts
+scripts/hardware-test.sh --base-url http://127.0.0.1:39282 scan --require-host-ready
+scripts/hardware-test.sh --base-url http://127.0.0.1:39282 export-read-only --device-id <device-id> --require-host-ready --output-dir ./hardware-artifacts
 scripts/hardware-test.sh inspect-artifact ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh protocol-sanity-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh tiny-visual-card-preflight ./hardware-artifacts/hardware-test-<timestamp>.zip
 scripts/hardware-test.sh evidence-summary ./hardware-artifacts/hardware-test-<timestamp>.zip
 ```
+
+Prefer `--base-url` for non-default daemon ports during guarded Stage A runs.
+In some macOS shell contexts, setting `MINIX_DAEMON_BASE_URL` can change the
+subprocess environment enough for the local Bluetooth readiness probe to report
+`controllerInfo == nil` even when `host-readiness` is otherwise ready.
 
 Stage A artifacts are validation records, not certification. Prefer the redacted
 evidence summary for maintainer review before sharing full ZIP artifacts. The physical
