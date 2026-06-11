@@ -119,6 +119,7 @@ import {
   saveSetupChecklistDismissed,
 } from "@/lib/setup-checklist";
 import {
+  clearStoredVerifiedPrinter,
   loadStoredVerifiedPrinter,
   saveStoredVerifiedPrinter,
   type StoredVerifiedPrinter,
@@ -1317,6 +1318,11 @@ export function App({
     [client],
   );
 
+  const clearRememberedPrinter = useCallback(() => {
+    clearStoredVerifiedPrinter();
+    setPrinterWorkflow({ status: "idle" });
+  }, []);
+
   const checkHostBluetoothReadiness = useCallback(async () => {
     setHardwareReadinessWorkflow({ status: "running" });
     try {
@@ -2365,6 +2371,7 @@ export function App({
               onInspectStableSupportGate={inspectStableSupportGate}
               onInspectAgentDirectPolicyReview={inspectAgentDirectPolicyReview}
               onInspectAgentDirectUserOptIn={inspectAgentDirectUserOptIn}
+              onClearRememberedPrinter={clearRememberedPrinter}
             />
 
             <section className="border-b border-border p-4">
@@ -4519,6 +4526,7 @@ function PrinterPanel({
   onInspectStableSupportGate,
   onInspectAgentDirectPolicyReview,
   onInspectAgentDirectUserOptIn,
+  onClearRememberedPrinter,
 }: {
   workflow: PrinterWorkflow;
   hardwareReadinessWorkflow: HardwareReadinessWorkflow;
@@ -4536,6 +4544,7 @@ function PrinterPanel({
   onInspectStableSupportGate: () => void;
   onInspectAgentDirectPolicyReview: () => void;
   onInspectAgentDirectUserOptIn: () => void;
+  onClearRememberedPrinter: () => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
@@ -4585,6 +4594,7 @@ function PrinterPanel({
             onExportHardwareArtifact(verification.deviceId);
           }
         }}
+        onClearRememberedPrinter={onClearRememberedPrinter}
       />
       <HardwarePreflightStatus
         workflow={hardwarePreflightWorkflow}
@@ -5185,6 +5195,7 @@ function PrinterDiscoveryStatus({
   hardwareArtifactWorkflow,
   onVerify,
   onExportHardwareArtifact,
+  onClearRememberedPrinter,
 }: {
   workflow: PrinterWorkflow;
   candidate: PrinterCandidate | undefined;
@@ -5192,6 +5203,7 @@ function PrinterDiscoveryStatus({
   hardwareArtifactWorkflow: HardwareArtifactWorkflow;
   onVerify: () => void;
   onExportHardwareArtifact: () => void;
+  onClearRememberedPrinter: () => void;
 }) {
   if (workflow.status === "scanning") {
     return <div className="mt-4 text-sm text-muted-foreground">Scanning</div>;
@@ -5234,7 +5246,18 @@ function PrinterDiscoveryStatus({
       ) : verification ? (
         <div className="space-y-2 border-t border-border pt-3">
           {workflow.status === "verified" && workflow.remembered ? (
-            <Badge variant="muted">Remembered verified printer</Badge>
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="muted">Remembered verified printer</Badge>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onClearRememberedPrinter}
+              >
+                <X className="size-4" aria-hidden="true" />
+                Forget remembered printer
+              </Button>
+            </div>
           ) : null}
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Model</span>
