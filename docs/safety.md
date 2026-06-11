@@ -32,6 +32,9 @@ explicit certification stages pass.
   supplied by the caller or selected through the desktop handoff. It must still
   return preview/approval metadata only, reject unsafe or over-limit previews,
   and never dispatch printer bytes without a user-approved preview token.
+- Desktop approval of an MCP-created preview may submit a stored preview by
+  preview ID after user review. The approval token stays inside the daemon
+  preview store; renderer and MCP responses must not expose it.
 - A daemon result of `completed_unverified` means the BLE transfer finished from
   the daemon's perspective; it does not certify that the paper output is correct.
 - Agent direct printing is disabled by default, and MCP print tools return
@@ -43,6 +46,8 @@ explicit certification stages pass.
 The daemon creates preview-bound approval artifacts. Print planning requires a matching
 preview id, document hash, render settings hash, raster hash, and approval token.
 Diagnostics exports must not expose approval tokens or raw raster bytes.
+Desktop approval for MCP previews uses the daemon-held preview binding rather
+than handing the approval token to the renderer or agent.
 
 ## Thermal Coverage Policy
 

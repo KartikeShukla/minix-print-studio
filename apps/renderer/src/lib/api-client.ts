@@ -31,6 +31,7 @@ import {
   printPlanResponseSchema,
   printerScanResponseSchema,
   readOnlyVerificationSchema,
+  storedPreviewMetadataResponseSchema,
   type DiagnosticsExportRequest,
   type DiagnosticsExportResponse,
   type DocumentPreviewResponse,
@@ -45,9 +46,11 @@ import {
   type PrintPlanRequest,
   type PrintPlanResponse,
   type PrintPreviewRequest,
+  type PrintStoredPreviewRequest,
   type PrinterScanResponse,
   type ReadOnlyVerification,
   type RenderSettings,
+  type StoredPreviewMetadataResponse,
 } from "@minix/shared-api";
 
 export type DaemonRuntime = {
@@ -61,11 +64,17 @@ export type DaemonClient = {
     document: PrintDocument,
     renderSettings: RenderSettings,
   ) => Promise<DocumentPreviewResponse>;
+  getStoredPreview: (
+    previewId: string,
+  ) => Promise<StoredPreviewMetadataResponse>;
   planApprovedPreview: (
     request: PrintPlanRequest,
   ) => Promise<PrintPlanResponse>;
   printApprovedPreview: (
     request: PrintPreviewRequest,
+  ) => Promise<PrintJobResponse>;
+  printStoredPreview: (
+    request: PrintStoredPreviewRequest,
   ) => Promise<PrintJobResponse>;
   confirmJobOutput: (
     jobId: string,
@@ -153,6 +162,14 @@ export function createDaemonClient(): DaemonClient {
         "Daemon document preview",
       );
     },
+    async getStoredPreview(previewId) {
+      return requestDaemon(
+        `/v1/render/previews/${encodeURIComponent(previewId)}`,
+        {},
+        storedPreviewMetadataResponseSchema.parse,
+        "Daemon stored preview",
+      );
+    },
     async planApprovedPreview(request) {
       return requestDaemon(
         "/v1/jobs/plan",
@@ -173,6 +190,17 @@ export function createDaemonClient(): DaemonClient {
         },
         printJobResponseSchema.parse,
         "Daemon print job",
+      );
+    },
+    async printStoredPreview(request) {
+      return requestDaemon(
+        "/v1/jobs/print-stored-preview",
+        {
+          method: "POST",
+          body: request,
+        },
+        printJobResponseSchema.parse,
+        "Daemon stored preview print job",
       );
     },
     async confirmJobOutput(jobId, request) {

@@ -189,6 +189,10 @@ package:win-installer`, the Release Package workflow, and the release
 - Claude Desktop Agent Integration can export a token-free `.mcpb` bundle
   containing a manifest, local shim bridge, install README, and the advertised
   safe MCP tool list.
+- Daemon approved-print flow can submit a stored preview by preview ID without
+  exposing the preview approval token to the caller, and the renderer Agent
+  Preview Approval panel can review redacted preview metadata, deny locally, or
+  approve the existing preview-bound job.
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
 - Mock print jobs can simulate a segment-boundary transport disconnect and report
   `failed_partial_output` with exact bands, rows, bytes, user-check requirement,
@@ -414,6 +418,9 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for shared project API contracts and authenticated renderer project client methods.
 - TDD red/green checks for the renderer Projects panel load/save/open/update/delete and daemon-backed image asset import workflows against the daemon project client.
 - TDD red/green checks for renderer daemon-project session persistence, startup restore before local document cache fallback, and active-project session cleanup on delete.
+- TDD red/green checks for daemon stored-preview print approval, renderer
+  redacted preview lookup, and the desktop Agent Preview Approval review,
+  deny, and approve path without approval-token exposure.
 - TDD red/green checks for first-run Setup checklist visibility, local dismissal persistence, and storage corruption fallback.
 - TDD red/green checks for standalone renderer and packaged desktop renderer
   Vite chunk splitting across React, editor/canvas, and UI dependencies.
@@ -477,6 +484,6 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Add a desktop approval surface for MCP-originated print previews so a user can
-   review an agent-created preview, approve or deny it, and submit the existing
-   preview-bound print job without exposing approval tokens to the agent.
+1. Add desktop deep-link handling for `minixprint://approval/<previewId>` and an
+   in-app pending-preview queue so MCP approval requests can open directly in
+   the review surface instead of requiring manual preview ID entry.

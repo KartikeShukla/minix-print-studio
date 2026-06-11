@@ -92,6 +92,10 @@ pnpm release-package-check
   `runtime.json` without inlining the gate, preserving the selection across
   handoff rewrites, resolving it in the Python MCP runtime, rejecting inline gate
   JSON, and auto-applying it to FastMCP `print_note` calls.
+- MCP desktop approval-surface tests cover stored-preview print submission by
+  preview ID without approval-token exposure, redacted preview lookup from the
+  renderer daemon client, and the Agent Preview Approval review, deny, and
+  approve path.
 - Long-print reliability print-execution tests cover trusted-record chain
   validation, deterministic marker fixture submission through daemon preview and
   print APIs, status-only stdout, omission of raster payloads from stdout, and
