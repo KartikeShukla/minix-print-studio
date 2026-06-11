@@ -90,6 +90,11 @@ import type {
   StoredPreviewMetadataResponse,
 } from "@minix/shared-api";
 import {
+  desktopAgentPreviewApprovalProvider,
+  type AgentPreviewApprovalProvider,
+  type PendingAgentPreviewApproval,
+} from "@/lib/agent-preview-approvals";
+import {
   desktopAgentIntegrationInstaller,
   loadAgentIntegrationPreview,
   type AgentIntegrationConnectionTestResult,
@@ -186,6 +191,7 @@ type AppDaemonClient = Pick<
 
 export type AppProps = {
   daemonClient?: AppDaemonClient;
+  agentPreviewApprovalProvider?: AgentPreviewApprovalProvider;
   agentIntegrationProvider?: AgentIntegrationProvider;
   agentIntegrationInstaller?: AgentIntegrationInstaller;
   hardwareArtifactInspector?: HardwareArtifactInspector;
@@ -238,7 +244,11 @@ type AgentPreviewApprovalWorkflow =
   | { status: "reviewing"; previewId: string }
   | { status: "ready"; preview: StoredPreviewMetadataResponse }
   | { status: "printing"; preview: StoredPreviewMetadataResponse }
-  | { status: "printed"; preview: StoredPreviewMetadataResponse; job: PrintJobResponse }
+  | {
+      status: "printed";
+      preview: StoredPreviewMetadataResponse;
+      job: PrintJobResponse;
+    }
   | { status: "denied"; previewId: string }
   | { status: "error"; message: string };
 
@@ -403,6 +413,7 @@ type CanvasElement =
 
 export function App({
   daemonClient,
+  agentPreviewApprovalProvider,
   agentIntegrationProvider,
   agentIntegrationInstaller,
   hardwareArtifactInspector,
@@ -421,6 +432,10 @@ export function App({
   const integrationProvider = useMemo(
     () => agentIntegrationProvider ?? loadAgentIntegrationPreview,
     [agentIntegrationProvider],
+  );
+  const previewApprovalProvider = useMemo(
+    () => agentPreviewApprovalProvider ?? desktopAgentPreviewApprovalProvider,
+    [agentPreviewApprovalProvider],
   );
   const integrationInstaller = useMemo(
     () => agentIntegrationInstaller ?? desktopAgentIntegrationInstaller,
@@ -532,6 +547,8 @@ export function App({
   const [agentIntegrationMutation, setAgentIntegrationMutation] =
     useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
   const [agentPreviewInput, setAgentPreviewInput] = useState("");
+  const [pendingAgentPreviewApprovals, setPendingAgentPreviewApprovals] =
+    useState<PendingAgentPreviewApproval[]>([]);
   const [agentPreviewApprovalWorkflow, setAgentPreviewApprovalWorkflow] =
     useState<AgentPreviewApprovalWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>(() =>
@@ -547,6 +564,7 @@ export function App({
     DEFAULT_CANVAS_ZOOM_INDEX,
   );
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  const lastAutoReviewedAgentPreviewRef = useRef<string | null>(null);
   const { document, past, future, selectedElementId } = editorState;
 
   useEffect(() => {
@@ -573,6 +591,31 @@ export function App({
       cancelled = true;
     };
   }, [client]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribe = previewApprovalProvider.subscribe?.((approvals) => {
+      setPendingAgentPreviewApprovals(approvals);
+    });
+
+    previewApprovalProvider
+      .list()
+      .then((approvals) => {
+        if (!cancelled) {
+          setPendingAgentPreviewApprovals(approvals);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPendingAgentPreviewApprovals([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [previewApprovalProvider]);
 
   useEffect(() => {
     saveStoredDocument(document);
@@ -1933,35 +1976,90 @@ export function App({
     [integrationInstaller],
   );
 
-  const reviewAgentPreview = useCallback(async () => {
-    if (!client.getStoredPreview) {
-      setAgentPreviewApprovalWorkflow({
-        status: "error",
-        message: "Agent preview review unavailable",
-      });
-      return;
-    }
-    const previewId = parseAgentPreviewId(agentPreviewInput);
-    if (!previewId) {
-      setAgentPreviewApprovalWorkflow({
-        status: "error",
-        message: "Agent preview ID is required",
-      });
-      return;
-    }
+  const reviewAgentPreviewInput = useCallback(
+    async (input: string) => {
+      if (!client.getStoredPreview) {
+        setAgentPreviewApprovalWorkflow({
+          status: "error",
+          message: "Agent preview review unavailable",
+        });
+        return;
+      }
+      const previewId = parseAgentPreviewId(input);
+      if (!previewId) {
+        setAgentPreviewApprovalWorkflow({
+          status: "error",
+          message: "Agent preview ID is required",
+        });
+        return;
+      }
 
-    setAgentPreviewApprovalWorkflow({ status: "reviewing", previewId });
-    try {
-      const preview = await client.getStoredPreview(previewId);
-      setAgentPreviewApprovalWorkflow({ status: "ready", preview });
-    } catch (error: unknown) {
-      setAgentPreviewApprovalWorkflow({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Agent preview review failed",
-      });
+      setAgentPreviewApprovalWorkflow({ status: "reviewing", previewId });
+      try {
+        const preview = await client.getStoredPreview(previewId);
+        setAgentPreviewApprovalWorkflow({ status: "ready", preview });
+      } catch (error: unknown) {
+        setAgentPreviewApprovalWorkflow({
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Agent preview review failed",
+        });
+      }
+    },
+    [client],
+  );
+
+  const reviewAgentPreview = useCallback(async () => {
+    await reviewAgentPreviewInput(agentPreviewInput);
+  }, [agentPreviewInput, reviewAgentPreviewInput]);
+
+  const discardPendingAgentPreviewApproval = useCallback(
+    async (previewId: string) => {
+      setPendingAgentPreviewApprovals((currentApprovals) =>
+        currentApprovals.filter((approval) => approval.previewId !== previewId),
+      );
+      try {
+        await previewApprovalProvider.remove(previewId);
+      } catch {
+        // The local decision still stands if the desktop queue is unavailable.
+      }
+    },
+    [previewApprovalProvider],
+  );
+
+  const selectPendingAgentPreviewApproval = useCallback(
+    (approval: PendingAgentPreviewApproval) => {
+      lastAutoReviewedAgentPreviewRef.current = approval.approvalUrl;
+      setAgentPreviewInput(approval.approvalUrl);
+      void reviewAgentPreviewInput(approval.approvalUrl);
+    },
+    [reviewAgentPreviewInput],
+  );
+
+  useEffect(() => {
+    const nextApproval = pendingAgentPreviewApprovals[0];
+    if (!nextApproval) {
+      return;
     }
-  }, [agentPreviewInput, client]);
+    if (lastAutoReviewedAgentPreviewRef.current === nextApproval.approvalUrl) {
+      return;
+    }
+    if (
+      agentPreviewApprovalWorkflow.status === "reviewing" ||
+      agentPreviewApprovalWorkflow.status === "printing"
+    ) {
+      return;
+    }
+    lastAutoReviewedAgentPreviewRef.current = nextApproval.approvalUrl;
+    setAgentPreviewInput(nextApproval.approvalUrl);
+    void reviewAgentPreviewInput(nextApproval.approvalUrl);
+  }, [
+    agentPreviewApprovalWorkflow.status,
+    pendingAgentPreviewApprovals,
+    reviewAgentPreviewInput,
+  ]);
 
   const denyAgentPreview = useCallback(() => {
     const previewId =
@@ -1971,7 +2069,12 @@ export function App({
         ? agentPreviewApprovalWorkflow.preview.previewId
         : parseAgentPreviewId(agentPreviewInput) || "unknown";
     setAgentPreviewApprovalWorkflow({ status: "denied", previewId });
-  }, [agentPreviewApprovalWorkflow, agentPreviewInput]);
+    void discardPendingAgentPreviewApproval(previewId);
+  }, [
+    agentPreviewApprovalWorkflow,
+    agentPreviewInput,
+    discardPendingAgentPreviewApproval,
+  ]);
 
   const approveAgentPreview = useCallback(async () => {
     if (
@@ -2001,6 +2104,7 @@ export function App({
         saveStoredJobHistory(nextHistory);
         return nextHistory;
       });
+      await discardPendingAgentPreviewApproval(preview.previewId);
       setAgentPreviewApprovalWorkflow({ status: "printed", preview, job });
     } catch (error: unknown) {
       setAgentPreviewApprovalWorkflow({
@@ -2009,7 +2113,13 @@ export function App({
           error instanceof Error ? error.message : "Agent preview print failed",
       });
     }
-  }, [agentPreviewApprovalWorkflow, client, document, printerWorkflow]);
+  }, [
+    agentPreviewApprovalWorkflow,
+    client,
+    discardPendingAgentPreviewApproval,
+    document,
+    printerWorkflow,
+  ]);
 
   const statusLabel = health
     ? health.mock
@@ -2364,10 +2474,12 @@ export function App({
 
             <AgentPreviewApprovalPanel
               previewIdInput={agentPreviewInput}
+              pendingApprovals={pendingAgentPreviewApprovals}
               workflow={agentPreviewApprovalWorkflow}
               canReview={Boolean(client.getStoredPreview)}
               canApprove={Boolean(client.printStoredPreview)}
               onInputChange={setAgentPreviewInput}
+              onSelectPendingApproval={selectPendingAgentPreviewApproval}
               onReview={reviewAgentPreview}
               onDeny={denyAgentPreview}
               onApprove={approveAgentPreview}
@@ -3125,19 +3237,23 @@ function AgentIntegrationsPanel({
 
 function AgentPreviewApprovalPanel({
   previewIdInput,
+  pendingApprovals,
   workflow,
   canReview,
   canApprove,
   onInputChange,
+  onSelectPendingApproval,
   onReview,
   onDeny,
   onApprove,
 }: {
   previewIdInput: string;
+  pendingApprovals: PendingAgentPreviewApproval[];
   workflow: AgentPreviewApprovalWorkflow;
   canReview: boolean;
   canApprove: boolean;
   onInputChange: (value: string) => void;
+  onSelectPendingApproval: (approval: PendingAgentPreviewApproval) => void;
   onReview: () => void;
   onDeny: () => void;
   onApprove: () => void;
@@ -3159,6 +3275,32 @@ function AgentPreviewApprovalPanel({
       </div>
 
       <div className="space-y-3 text-sm">
+        {pendingApprovals.length > 0 ? (
+          <div className="space-y-2 rounded-md border border-border bg-background p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-muted-foreground">
+                Pending agent previews
+              </span>
+              <Badge variant="muted">{pendingApprovals.length}</Badge>
+            </div>
+            <div className="space-y-1">
+              {pendingApprovals.map((approval) => (
+                <button
+                  key={approval.previewId}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
+                  aria-label={`Review pending preview ${approval.previewId}`}
+                  onClick={() => onSelectPendingApproval(approval)}
+                >
+                  <span className="truncate">{approval.previewId}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatShortTime(approval.receivedAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">
             Agent preview ID
@@ -5592,6 +5734,17 @@ function formatCoverage(
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "0%";
 }
 
+function formatShortTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "pending";
+  }
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function parseAgentPreviewId(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -5599,7 +5752,12 @@ function parseAgentPreviewId(input: string): string | null {
   }
   const urlPrefix = "minixprint://approval/";
   if (trimmed.startsWith(urlPrefix)) {
-    const id = trimmed.slice(urlPrefix.length).trim();
+    let id: string;
+    try {
+      id = decodeURIComponent(trimmed.slice(urlPrefix.length)).trim();
+    } catch {
+      return null;
+    }
     return id || null;
   }
   return trimmed;

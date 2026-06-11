@@ -193,6 +193,10 @@ package:win-installer`, the Release Package workflow, and the release
   exposing the preview approval token to the caller, and the renderer Agent
   Preview Approval panel can review redacted preview metadata, deny locally, or
   approve the existing preview-bound job.
+- Electron registers and handles `minixprint://approval/<previewId>` desktop
+  deep links, keeps a token-free in-app pending approval queue, and lets the
+  renderer auto-open queued MCP approval requests in the Agent Preview Approval
+  review surface without manual preview ID entry.
 - Daemon print jobs and redacted segment metadata can persist to a disk-backed JSON store and survive daemon app restarts.
 - Mock print jobs can simulate a segment-boundary transport disconnect and report
   `failed_partial_output` with exact bands, rows, bytes, user-check requirement,
@@ -421,6 +425,9 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for daemon stored-preview print approval, renderer
   redacted preview lookup, and the desktop Agent Preview Approval review,
   deny, and approve path without approval-token exposure.
+- TDD red/green checks for desktop `minixprint://approval/<previewId>` parsing,
+  pending approval queue ordering/removal, renderer auto-review of queued
+  approval deep links, and queue clearing after user approval.
 - TDD red/green checks for first-run Setup checklist visibility, local dismissal persistence, and storage corruption fallback.
 - TDD red/green checks for standalone renderer and packaged desktop renderer
   Vite chunk splitting across React, editor/canvas, and UI dependencies.
@@ -484,6 +491,6 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Add desktop deep-link handling for `minixprint://approval/<previewId>` and an
-   in-app pending-preview queue so MCP approval requests can open directly in
-   the review surface instead of requiring manual preview ID entry.
+1. Add a packaged-app smoke for custom protocol registration and second-instance
+   approval URL handoff once unsigned package validation has a stable GUI smoke
+   lane.

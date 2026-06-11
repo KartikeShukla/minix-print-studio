@@ -1047,7 +1047,107 @@ describe("MiniX Print Studio shell", () => {
       });
     });
     expect(await screen.findByText("Job Status")).toBeInTheDocument();
-    expect(screen.getAllByText("completed_unverified").length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("completed_unverified").length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("opens a queued desktop approval deep link directly in the preview review surface", async () => {
+    const getStoredPreview = vi.fn().mockResolvedValue({
+      previewId: "prev_queued/encoded",
+      documentHash: "sha256:document",
+      renderSettingsHash: "sha256:settings",
+      rasterHash: "sha256:raster",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      widthDots: 384,
+      heightDots: 280,
+      safety: {
+        allowed: true,
+        warnings: [],
+        metrics: { totalBlackCoverage: 0.05 },
+      },
+      createdAt: "2026-06-11T10:00:00.000Z",
+      expiresAt: "2026-06-11T10:10:00.000Z",
+    });
+    const printStoredPreview = vi.fn().mockResolvedValue({
+      jobId: "job_queued",
+      previewId: "prev_queued/encoded",
+      planId: "plan_job_queued",
+      deviceId: null,
+      state: "completed_unverified",
+      phase: "waiting_for_final_status",
+      completionLevel: "unverified",
+      completionConfidence: "mock_data_sent_final_ack_missing",
+      requiresUserCheck: true,
+      source: "desktop_agent_approval",
+      copies: 1,
+      bandsSent: 1,
+      totalBands: 1,
+      rowsSent: 440,
+      totalRows: 440,
+      bytesSent: 21120,
+      totalBytes: 21120,
+      tailBlankRowsDots: 160,
+      safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"],
+    });
+    const remove = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          getStoredPreview,
+          printStoredPreview,
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+        agentPreviewApprovalProvider={{
+          list: async () => [
+            {
+              previewId: "prev_queued/encoded",
+              approvalUrl: "minixprint://approval/prev_queued%2Fencoded",
+              receivedAt: "2026-06-11T10:00:00.000Z",
+            },
+          ],
+          remove,
+        }}
+      />,
+    );
+
+    expect(
+      await screen.findByText("Pending agent previews"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Agent preview ready")).toBeInTheDocument();
+    expect(screen.getByLabelText("Agent preview ID")).toHaveValue(
+      "minixprint://approval/prev_queued%2Fencoded",
+    );
+    expect(getStoredPreview).toHaveBeenCalledWith("prev_queued/encoded");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Approve agent preview" }),
+    );
+
+    await waitFor(() => {
+      expect(printStoredPreview).toHaveBeenCalledWith({
+        previewId: "prev_queued/encoded",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        copies: 1,
+        source: "desktop_agent_approval",
+      });
+    });
+    await waitFor(() => {
+      expect(remove).toHaveBeenCalledWith("prev_queued/encoded");
+    });
   });
 
   it("scans and read-only verifies a printer without enabling trusted print", async () => {
@@ -1256,7 +1356,9 @@ describe("MiniX Print Studio shell", () => {
       />,
     );
 
-    expect(await screen.findByText("Remembered verified printer")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Remembered verified printer"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Seznik MiniX_0194_LE")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));

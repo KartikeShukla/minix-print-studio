@@ -145,8 +145,9 @@ local daemon without embedding bearer tokens.
 
 The MCP server can preview documents and notes through daemon approval flows. It does
 not bypass preview approval, unlock trusted printing, or expose raw BLE access.
-The desktop app can review an MCP-created preview by ID or approval URL and submit
-the stored preview without exposing the daemon approval token to the agent.
+The desktop app can open `minixprint://approval/<previewId>` links into a
+pending approval queue, review the MCP-created preview, and submit the stored
+preview without exposing the daemon approval token to the agent.
 
 See [docs/mcp-integrations.md](docs/mcp-integrations.md).
 

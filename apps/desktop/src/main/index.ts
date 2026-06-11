@@ -7,6 +7,7 @@ import {
   type OpenDialogOptions,
 } from "electron";
 import log from "electron-log";
+import { AgentPreviewApprovalQueue } from "./agentPreviewApprovals";
 import {
   buildAgentIntegrationPreview,
   testAgentIntegrationConnection,
@@ -44,6 +45,8 @@ import { getUpdateChannelState, setUpdateChannel } from "./updateChannel";
 
 let mainWindow: BrowserWindow | null = null;
 const runtime = createDaemonRuntime({ mock: resolveDaemonMockMode() });
+const agentPreviewApprovalQueue = new AgentPreviewApprovalQueue();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -62,6 +65,33 @@ function createWindow(): void {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
     void mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+  }
+}
+
+function publishAgentPreviewApprovals(): void {
+  mainWindow?.webContents.send(
+    "agent-preview-approvals:changed",
+    agentPreviewApprovalQueue.list(),
+  );
+}
+
+function enqueueAgentPreviewApprovalUrl(url: string): void {
+  const approval = agentPreviewApprovalQueue.enqueueUrl(url);
+  if (!approval) {
+    return;
+  }
+  publishAgentPreviewApprovals();
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  }
+}
+
+function enqueueAgentPreviewApprovalArgs(argv: string[]): void {
+  for (const arg of argv) {
+    enqueueAgentPreviewApprovalUrl(arg);
   }
 }
 
@@ -104,6 +134,16 @@ ipcMain.handle("daemon:runtime", () => ({
 }));
 ipcMain.handle("agent-integrations:preview", () =>
   buildAgentIntegrationPreview({ userDataPath: app.getPath("userData") }),
+);
+ipcMain.handle("agent-preview-approvals:list", () =>
+  agentPreviewApprovalQueue.list(),
+);
+ipcMain.handle(
+  "agent-preview-approvals:remove",
+  (_event, previewId: string) => {
+    agentPreviewApprovalQueue.remove(previewId);
+    publishAgentPreviewApprovals();
+  },
 );
 ipcMain.handle(
   "agent-integrations:install",
@@ -296,8 +336,23 @@ function getAgentIntegrationTarget(
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) {
+    app.quit();
+    return;
+  }
+  app.setAsDefaultProtocolClient("minixprint");
+  enqueueAgentPreviewApprovalArgs(process.argv);
   startSidecar();
   createWindow();
+});
+
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  enqueueAgentPreviewApprovalUrl(url);
+});
+
+app.on("second-instance", (_event, argv) => {
+  enqueueAgentPreviewApprovalArgs(argv);
 });
 
 app.on("window-all-closed", () => {
