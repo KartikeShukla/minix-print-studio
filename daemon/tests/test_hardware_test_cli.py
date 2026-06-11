@@ -1398,6 +1398,122 @@ def test_hardware_test_cli_inspects_agent_direct_policy_review_without_unlock(
     assert device_fingerprint not in raw_stdout
 
 
+def test_hardware_test_cli_records_agent_direct_user_opt_in_with_approval_default(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    device_fingerprint = chain["device_fingerprint"]
+    assert isinstance(device_fingerprint, str)
+    policy_review_path = _create_agent_direct_policy_review(tmp_path, chain)
+    output_dir = tmp_path / "agent-opt-in"
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "record-agent-direct-user-opt-in",
+            "--agent-direct-policy-review",
+            str(policy_review_path),
+            "--confirm-explicit-user-opt-in",
+            "--output-dir",
+            str(output_dir),
+        ],
+        stdout=stdout,
+    )
+
+    record_path = output_dir / "agent-direct-user-opt-in.json"
+    raw_stdout = stdout.getvalue()
+    assert exit_code == 0
+    assert raw_stdout.strip() == "agent-direct-user-opt-in-recorded"
+    assert "mock-minix-0194" not in raw_stdout
+    assert device_fingerprint not in raw_stdout
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record == {
+        "schemaVersion": 1,
+        "status": "agent_direct_user_opt_in_recorded",
+        "sourcePolicyReview": {
+            "stage": "agent_direct_policy_review",
+            "status": "agent_direct_policy_reviewed",
+            "localRecordValidated": True,
+        },
+        "optIn": {
+            "explicitUserOptIn": True,
+            "recordedVia": "local_cli_confirmation",
+            "directPrintDefault": "approval_required",
+            "unattendedPrintingAllowed": False,
+        },
+        "agentRules": {
+            "directPrintEnabled": True,
+            "directPrintDefault": "approval_required",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": {
+            "maxHeightDots": 1000,
+            "warnTotalBlackCoverage": 0.30,
+            "blockTotalBlackCoverage": 0.45,
+            "blockBandCoverage": 0.70,
+            "maxCopies": 1,
+            "jobsPerMinute": 3,
+        },
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": True,
+            "agentDirectPrintingDefault": "approval_required",
+            "unattendedAgentPrintingEnabled": False,
+        },
+        "nextRequiredStage": "runtime_approval_enforcement",
+    }
+    encoded_record = json.dumps(record, sort_keys=True)
+    assert "mock-minix-0194" not in encoded_record
+    assert device_fingerprint not in encoded_record
+    assert "seznik-minix-s1-lyin48d-gy" not in encoded_record
+    assert "END LP-TEST checksum" not in encoded_record
+
+
+def test_hardware_test_cli_inspects_agent_direct_user_opt_in(
+    tmp_path: Path,
+) -> None:
+    chain = _create_trusted_printer_chain(tmp_path)
+    device_fingerprint = chain["device_fingerprint"]
+    assert isinstance(device_fingerprint, str)
+    policy_review_path = _create_agent_direct_policy_review(tmp_path, chain)
+    output_dir = tmp_path / "agent-opt-in"
+    record_exit_code = run(
+        [
+            "record-agent-direct-user-opt-in",
+            "--agent-direct-policy-review",
+            str(policy_review_path),
+            "--confirm-explicit-user-opt-in",
+            "--output-dir",
+            str(output_dir),
+        ],
+        stdout=io.StringIO(),
+    )
+    stdout = io.StringIO()
+
+    exit_code = run(
+        [
+            "inspect-agent-direct-user-opt-in",
+            str(output_dir / "agent-direct-user-opt-in.json"),
+        ],
+        stdout=stdout,
+    )
+
+    raw_stdout = stdout.getvalue()
+    assert record_exit_code == 0
+    assert exit_code == 0
+    assert raw_stdout.strip() == "agent-direct-user-opt-in-inspected"
+    assert "mock-minix-0194" not in raw_stdout
+    assert device_fingerprint not in raw_stdout
+
+
 def test_hardware_test_cli_rejects_support_gate_from_agent_direct_stage_d_unlock(
     tmp_path: Path,
 ) -> None:
@@ -1847,6 +1963,59 @@ def _create_trusted_printer_chain(tmp_path: Path) -> dict[str, object]:
         "trusted_printer": trusted_record_path,
         "device_fingerprint": device_fingerprint,
     }
+
+
+def _create_agent_direct_policy_review(
+    tmp_path: Path,
+    chain: Mapping[str, object],
+) -> Path:
+    device_fingerprint = chain["device_fingerprint"]
+    stage_a_artifact_path = chain["stage_a"]
+    protocol_artifact_path = chain["protocol_sanity"]
+    tiny_artifact_path = chain["tiny_visual_card"]
+    trusted_record_path = chain["trusted_printer"]
+    assert isinstance(device_fingerprint, str)
+    assert isinstance(stage_a_artifact_path, Path)
+    assert isinstance(protocol_artifact_path, Path)
+    assert isinstance(tiny_artifact_path, Path)
+    assert isinstance(trusted_record_path, Path)
+    support_gate_output_dir = tmp_path / "support-gate"
+    long_print_artifact_path = _create_long_print_reliability_artifact(tmp_path, chain)
+    support_record_exit_code = run(
+        [
+            "record-stable-support-gate",
+            "--stage-a-artifact",
+            str(stage_a_artifact_path),
+            "--protocol-sanity-artifact",
+            str(protocol_artifact_path),
+            "--tiny-visual-card-artifact",
+            str(tiny_artifact_path),
+            "--trusted-printer-record",
+            str(trusted_record_path),
+            "--long-print-reliability-artifact",
+            str(long_print_artifact_path),
+            "--output-dir",
+            str(support_gate_output_dir),
+        ],
+        stdout=io.StringIO(),
+    )
+    stable_support_gate_path = support_gate_output_dir / (
+        f"stable-support-gate-{device_fingerprint.removeprefix('sha256:')}.json"
+    )
+    policy_output_dir = tmp_path / "agent-policy"
+    policy_record_exit_code = run(
+        [
+            "record-agent-direct-policy-review",
+            "--stable-support-gate",
+            str(stable_support_gate_path),
+            "--output-dir",
+            str(policy_output_dir),
+        ],
+        stdout=io.StringIO(),
+    )
+    assert support_record_exit_code == 0
+    assert policy_record_exit_code == 0
+    return policy_output_dir / "agent-direct-policy-review.json"
 
 
 def _create_long_print_reliability_artifact(

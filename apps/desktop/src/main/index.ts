@@ -28,6 +28,7 @@ import { exportClaudeDesktopMcpb } from "./mcpbExport";
 import {
   checkHostBluetoothReadiness,
   inspectAgentDirectPolicyReview,
+  inspectAgentDirectUserOptIn,
   inspectHardwareArtifact,
   inspectStableSupportGate,
   inspectTrustedPrinterRecord,
@@ -251,6 +252,24 @@ ipcMain.handle("agent-direct-policy-reviews:inspect", async () => {
     return null;
   }
   return inspectAgentDirectPolicyReview({
+    recordPath,
+    repoRoot: getRepoRoot(),
+  });
+});
+ipcMain.handle("agent-direct-user-opt-ins:inspect", async () => {
+  const options: OpenDialogOptions = {
+    title: "Inspect agent-direct user opt-in",
+    properties: ["openFile"],
+    filters: [{ name: "Agent-direct opt-in JSON", extensions: ["json"] }],
+  };
+  const selection = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  const recordPath = selection.filePaths[0];
+  if (selection.canceled || !recordPath) {
+    return null;
+  }
+  return inspectAgentDirectUserOptIn({
     recordPath,
     repoRoot: getRepoRoot(),
   });

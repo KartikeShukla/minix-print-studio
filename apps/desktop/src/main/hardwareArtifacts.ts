@@ -257,6 +257,47 @@ export type AgentDirectPolicyReviewInspectionResult = {
   summary: AgentDirectPolicyReviewSummary;
 };
 
+export type AgentDirectUserOptInSummary = {
+  status: string;
+  sourcePolicyReview: {
+    stage: string;
+    status: string;
+    localRecordValidated: boolean;
+  };
+  optIn: {
+    explicitUserOptIn: boolean;
+    recordedVia: string;
+    directPrintDefault: string;
+    unattendedPrintingAllowed: boolean;
+  };
+  agentRules: {
+    directPrintEnabled: boolean;
+    directPrintDefault: string;
+    approvalRequiredByDefault: boolean;
+    longDirectPrintRequiresApproval: boolean;
+    overLimitBehavior: string;
+    noAutomaticRetryAfterPrintableBytes: boolean;
+    rawBleWritesAllowed: boolean;
+    unsafeResumeAllowed: boolean;
+    requiresTrustedPrinter: boolean;
+    requiresStableSupportGate: boolean;
+  };
+  limits: AgentDirectPolicyReviewSummary["limits"];
+  safety: {
+    stableSupportClaimEnabled: boolean;
+    longPrintPrintingEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    agentDirectPrintingDefault: string;
+    unattendedAgentPrintingEnabled: boolean;
+  };
+  nextRequiredStage: string;
+};
+
+export type AgentDirectUserOptInInspectionResult = {
+  recordPath: string;
+  summary: AgentDirectUserOptInSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -423,6 +464,38 @@ export async function inspectAgentDirectPolicyReview({
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error("agent-direct policy review is invalid JSON", {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
+export async function inspectAgentDirectUserOptIn({
+  recordPath,
+  repoRoot,
+  runner = runCommand,
+}: {
+  recordPath: string;
+  repoRoot: string;
+  runner?: CommandRunner;
+}): Promise<AgentDirectUserOptInInspectionResult> {
+  try {
+    await runHardwareCli({
+      artifactPath: recordPath,
+      repoRoot,
+      commandName: "inspect-agent-direct-user-opt-in",
+      runner,
+    });
+    const decoded = JSON.parse(await readFile(recordPath, "utf-8")) as unknown;
+
+    return {
+      recordPath,
+      summary: summarizeAgentDirectUserOptIn(decoded),
+    };
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error("agent-direct user opt-in is invalid JSON", {
         cause: error,
       });
     }
@@ -955,6 +1028,248 @@ function summarizeAgentDirectPolicyReview(
   };
 }
 
+function summarizeAgentDirectUserOptIn(
+  decoded: unknown,
+): AgentDirectUserOptInSummary {
+  const record = jsonObject(decoded, "agent-direct user opt-in");
+  if (
+    "deviceId" in record ||
+    "rawDeviceId" in record ||
+    "device" in record ||
+    "profileId" in record ||
+    "deviceFingerprint" in record ||
+    "fingerprint" in record
+  ) {
+    throw new Error("agent-direct user opt-in exposes raw device id");
+  }
+  const sourcePolicyReview = requiredJsonObject(
+    record,
+    "sourcePolicyReview",
+    "agent-direct user opt-in",
+  );
+  const optIn = requiredJsonObject(
+    record,
+    "optIn",
+    "agent-direct user opt-in",
+  );
+  const agentRules = requiredJsonObject(
+    record,
+    "agentRules",
+    "agent-direct user opt-in",
+  );
+  const limits = requiredJsonObject(
+    record,
+    "limits",
+    "agent-direct user opt-in",
+  );
+  const safety = requiredJsonObject(
+    record,
+    "safety",
+    "agent-direct user opt-in",
+  );
+  if (
+    requiredJsonString(record, "status", "agent-direct user opt-in") !==
+    "agent_direct_user_opt_in_recorded"
+  ) {
+    throw new Error("agent-direct user opt-in has wrong status");
+  }
+  if (
+    requiredJsonString(
+      sourcePolicyReview,
+      "stage",
+      "agent-direct user opt-in.sourcePolicyReview",
+    ) !== "agent_direct_policy_review"
+  ) {
+    throw new Error("agent-direct user opt-in has wrong source stage");
+  }
+  if (
+    requiredJsonString(
+      sourcePolicyReview,
+      "status",
+      "agent-direct user opt-in.sourcePolicyReview",
+    ) !== "agent_direct_policy_reviewed"
+  ) {
+    throw new Error("agent-direct user opt-in has wrong source status");
+  }
+  if (
+    !requiredJsonBoolean(
+      sourcePolicyReview,
+      "localRecordValidated",
+      "agent-direct user opt-in.sourcePolicyReview",
+    )
+  ) {
+    throw new Error("agent-direct user opt-in source is not validated");
+  }
+  if (
+    !requiredJsonBoolean(
+      optIn,
+      "explicitUserOptIn",
+      "agent-direct user opt-in.optIn",
+    )
+  ) {
+    throw new Error("agent-direct user opt-in lacks explicit opt-in");
+  }
+  const recordedVia = requiredJsonString(
+    optIn,
+    "recordedVia",
+    "agent-direct user opt-in.optIn",
+  );
+  if (recordedVia !== "local_cli_confirmation") {
+    throw new Error("agent-direct user opt-in has wrong recorder");
+  }
+  const optInDefault = requiredJsonString(
+    optIn,
+    "directPrintDefault",
+    "agent-direct user opt-in.optIn",
+  );
+  if (optInDefault !== "approval_required") {
+    throw new Error("agent-direct user opt-in weakens approval default");
+  }
+  if (
+    requiredJsonBoolean(
+      optIn,
+      "unattendedPrintingAllowed",
+      "agent-direct user opt-in.optIn",
+    )
+  ) {
+    throw new Error("agent-direct user opt-in allows unattended printing");
+  }
+
+  for (const field of [
+    "directPrintEnabled",
+    "approvalRequiredByDefault",
+    "longDirectPrintRequiresApproval",
+    "noAutomaticRetryAfterPrintableBytes",
+    "requiresTrustedPrinter",
+    "requiresStableSupportGate",
+  ]) {
+    if (
+      !requiredJsonBoolean(
+        agentRules,
+        field,
+        "agent-direct user opt-in.agentRules",
+      )
+    ) {
+      throw new Error("agent-direct user opt-in weakens approval policy");
+    }
+  }
+  for (const field of ["rawBleWritesAllowed", "unsafeResumeAllowed"]) {
+    if (
+      requiredJsonBoolean(
+        agentRules,
+        field,
+        "agent-direct user opt-in.agentRules",
+      )
+    ) {
+      throw new Error("agent-direct user opt-in enables unsafe direct printing");
+    }
+  }
+  const directPrintDefault = requiredJsonString(
+    agentRules,
+    "directPrintDefault",
+    "agent-direct user opt-in.agentRules",
+  );
+  if (directPrintDefault !== "approval_required") {
+    throw new Error("agent-direct user opt-in has wrong direct default");
+  }
+  const overLimitBehavior = requiredJsonString(
+    agentRules,
+    "overLimitBehavior",
+    "agent-direct user opt-in.agentRules",
+  );
+  if (overLimitBehavior !== "preview_and_ask") {
+    throw new Error("agent-direct user opt-in has wrong over-limit behavior");
+  }
+
+  const expectedLimits = {
+    maxHeightDots: 1000,
+    warnTotalBlackCoverage: 0.3,
+    blockTotalBlackCoverage: 0.45,
+    blockBandCoverage: 0.7,
+    maxCopies: 1,
+    jobsPerMinute: 3,
+  };
+  for (const [field, expected] of Object.entries(expectedLimits)) {
+    if (
+      requiredJsonNumber(limits, field, "agent-direct user opt-in.limits") !==
+      expected
+    ) {
+      throw new Error("agent-direct user opt-in has wrong safety limits");
+    }
+  }
+
+  for (const field of [
+    "stableSupportClaimEnabled",
+    "longPrintPrintingEnabled",
+    "agentDirectPrintingEnabled",
+  ]) {
+    if (!requiredJsonBoolean(safety, field, "agent-direct user opt-in.safety")) {
+      throw new Error("agent-direct user opt-in lacks required safety");
+    }
+  }
+  const agentDirectPrintingDefault = requiredJsonString(
+    safety,
+    "agentDirectPrintingDefault",
+    "agent-direct user opt-in.safety",
+  );
+  if (agentDirectPrintingDefault !== "approval_required") {
+    throw new Error("agent-direct user opt-in has wrong approval default");
+  }
+  if (
+    requiredJsonBoolean(
+      safety,
+      "unattendedAgentPrintingEnabled",
+      "agent-direct user opt-in.safety",
+    )
+  ) {
+    throw new Error("agent-direct user opt-in enables unattended printing");
+  }
+  const nextRequiredStage = requiredJsonString(
+    record,
+    "nextRequiredStage",
+    "agent-direct user opt-in",
+  );
+  if (nextRequiredStage !== "runtime_approval_enforcement") {
+    throw new Error("agent-direct user opt-in has wrong next stage");
+  }
+
+  return {
+    status: "agent_direct_user_opt_in_recorded",
+    sourcePolicyReview: {
+      stage: "agent_direct_policy_review",
+      status: "agent_direct_policy_reviewed",
+      localRecordValidated: true,
+    },
+    optIn: {
+      explicitUserOptIn: true,
+      recordedVia,
+      directPrintDefault: optInDefault,
+      unattendedPrintingAllowed: false,
+    },
+    agentRules: {
+      directPrintEnabled: true,
+      directPrintDefault,
+      approvalRequiredByDefault: true,
+      longDirectPrintRequiresApproval: true,
+      overLimitBehavior,
+      noAutomaticRetryAfterPrintableBytes: true,
+      rawBleWritesAllowed: false,
+      unsafeResumeAllowed: false,
+      requiresTrustedPrinter: true,
+      requiresStableSupportGate: true,
+    },
+    limits: expectedLimits,
+    safety: {
+      stableSupportClaimEnabled: true,
+      longPrintPrintingEnabled: true,
+      agentDirectPrintingEnabled: true,
+      agentDirectPrintingDefault,
+      unattendedAgentPrintingEnabled: false,
+    },
+    nextRequiredStage,
+  };
+}
+
 function summarizeTrustedEvidenceStage(
   hardwareEvidence: Record<string, unknown>,
   field: string,
@@ -1083,6 +1398,7 @@ async function runHardwareCliJson<T>({
     | "inspect-trusted-printer-record"
     | "inspect-stable-support-gate"
     | "inspect-agent-direct-policy-review"
+    | "inspect-agent-direct-user-opt-in"
     | "protocol-sanity-preflight"
     | "tiny-visual-card-preflight"
     | "evidence-summary";
@@ -1117,6 +1433,7 @@ async function runHardwareCli({
     | "inspect-trusted-printer-record"
     | "inspect-stable-support-gate"
     | "inspect-agent-direct-policy-review"
+    | "inspect-agent-direct-user-opt-in"
     | "protocol-sanity-preflight"
     | "tiny-visual-card-preflight"
     | "evidence-summary";

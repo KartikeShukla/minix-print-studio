@@ -29,4 +29,6 @@ contextBridge.exposeInMainWorld("minix", {
     ipcRenderer.invoke("stable-support-gates:inspect"),
   inspectAgentDirectPolicyReview: () =>
     ipcRenderer.invoke("agent-direct-policy-reviews:inspect"),
+  inspectAgentDirectUserOptIn: () =>
+    ipcRenderer.invoke("agent-direct-user-opt-ins:inspect"),
 });

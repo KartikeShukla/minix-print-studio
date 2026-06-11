@@ -367,12 +367,24 @@ def run(
             inspect_agent_direct_policy_review(Path(args.record_path))
             stdout.write("agent-direct-policy-review-inspected\n")
             return 0
+        if args.command == "inspect-agent-direct-user-opt-in":
+            inspect_agent_direct_user_opt_in(Path(args.record_path))
+            stdout.write("agent-direct-user-opt-in-inspected\n")
+            return 0
         if args.command == "record-agent-direct-policy-review":
             record_agent_direct_policy_review(
                 stable_support_gate_path=Path(args.stable_support_gate),
                 output_dir=Path(args.output_dir),
             )
             stdout.write("agent-direct-policy-review-recorded\n")
+            return 0
+        if args.command == "record-agent-direct-user-opt-in":
+            record_agent_direct_user_opt_in(
+                policy_review_path=Path(args.agent_direct_policy_review),
+                output_dir=Path(args.output_dir),
+                confirmed=args.confirm_explicit_user_opt_in,
+            )
+            stdout.write("agent-direct-user-opt-in-recorded\n")
             return 0
         if args.command == "record-protocol-sanity":
             record_protocol_sanity_artifact(
@@ -556,6 +568,39 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=".",
         help="Directory for the agent-direct policy-review JSON record.",
+    )
+    agent_opt_in_inspect_parser = subparsers.add_parser(
+        "inspect-agent-direct-user-opt-in",
+        help="Inspect an agent-direct user opt-in JSON record without contacting the daemon.",
+    )
+    agent_opt_in_inspect_parser.add_argument(
+        "record_path",
+        help="Path to an agent-direct user opt-in JSON record.",
+    )
+    agent_opt_in_parser = subparsers.add_parser(
+        "record-agent-direct-user-opt-in",
+        help=(
+            "Record explicit user opt-in from an agent-direct policy review "
+            "while preserving approval-required direct printing."
+        ),
+    )
+    agent_opt_in_parser.add_argument(
+        "--agent-direct-policy-review",
+        required=True,
+        help="Path to the agent-direct policy-review JSON record.",
+    )
+    agent_opt_in_parser.add_argument(
+        "--confirm-explicit-user-opt-in",
+        action="store_true",
+        help=(
+            "Required local confirmation that the user opted into "
+            "approval-required agent direct printing."
+        ),
+    )
+    agent_opt_in_parser.add_argument(
+        "--output-dir",
+        default=".",
+        help="Directory for the agent-direct user opt-in JSON record.",
     )
     record_tiny_parser = subparsers.add_parser(
         "record-tiny-visual-card",
@@ -2011,6 +2056,256 @@ def inspect_agent_direct_policy_review(record_path: Path) -> dict[str, object]:
             "longPrintPrintingEnabled": True,
             "agentDirectPrintingEnabled": False,
             "agentDirectPrintingDefault": "approval_required",
+        },
+        "nextRequiredStage": next_required_stage,
+    }
+
+
+def record_agent_direct_user_opt_in(
+    *,
+    policy_review_path: Path,
+    output_dir: Path,
+    confirmed: bool,
+) -> Path:
+    if not confirmed:
+        raise HardwareTestCliError("explicit user opt-in confirmation is required")
+    policy_summary = inspect_agent_direct_policy_review(policy_review_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    record_path = output_dir / "agent-direct-user-opt-in.json"
+    record = {
+        "schemaVersion": 1,
+        "status": "agent_direct_user_opt_in_recorded",
+        "sourcePolicyReview": {
+            "stage": "agent_direct_policy_review",
+            "status": policy_summary["status"],
+            "localRecordValidated": True,
+        },
+        "optIn": {
+            "explicitUserOptIn": True,
+            "recordedVia": "local_cli_confirmation",
+            "directPrintDefault": "approval_required",
+            "unattendedPrintingAllowed": False,
+        },
+        "agentRules": {
+            "directPrintEnabled": True,
+            "directPrintDefault": "approval_required",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": policy_summary["limits"],
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": True,
+            "agentDirectPrintingDefault": "approval_required",
+            "unattendedAgentPrintingEnabled": False,
+        },
+        "nextRequiredStage": "runtime_approval_enforcement",
+    }
+    record_path.write_text(f"{json.dumps(record, indent=2)}\n", encoding="utf-8")
+    return record_path
+
+
+def inspect_agent_direct_user_opt_in(record_path: Path) -> dict[str, object]:
+    try:
+        decoded = json.loads(record_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HardwareTestCliError("agent-direct user opt-in not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HardwareTestCliError("agent-direct user opt-in is invalid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise HardwareTestCliError("agent-direct user opt-in is not a JSON object")
+    if (
+        "deviceId" in decoded
+        or "rawDeviceId" in decoded
+        or "device" in decoded
+        or "profileId" in decoded
+        or "deviceFingerprint" in decoded
+        or "fingerprint" in decoded
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in exposes raw device id")
+
+    source_policy_review = _required_json_object(
+        decoded,
+        "sourcePolicyReview",
+        "agent-direct-user-opt-in",
+    )
+    opt_in = _required_json_object(decoded, "optIn", "agent-direct-user-opt-in")
+    agent_rules = _required_json_object(
+        decoded,
+        "agentRules",
+        "agent-direct-user-opt-in",
+    )
+    limits = _required_json_object(decoded, "limits", "agent-direct-user-opt-in")
+    safety = _required_json_object(decoded, "safety", "agent-direct-user-opt-in")
+    if (
+        _required_json_string(decoded, "status", "agent-direct-user-opt-in")
+        != "agent_direct_user_opt_in_recorded"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong status")
+    if (
+        _required_json_string(
+            source_policy_review,
+            "stage",
+            "agent-direct-user-opt-in.sourcePolicyReview",
+        )
+        != "agent_direct_policy_review"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong source stage")
+    if (
+        _required_json_string(
+            source_policy_review,
+            "status",
+            "agent-direct-user-opt-in.sourcePolicyReview",
+        )
+        != "agent_direct_policy_reviewed"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong source status")
+    if not _required_json_bool(
+        source_policy_review,
+        "localRecordValidated",
+        "agent-direct-user-opt-in.sourcePolicyReview",
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in source is not validated")
+    if not _required_json_bool(
+        opt_in,
+        "explicitUserOptIn",
+        "agent-direct-user-opt-in.optIn",
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in lacks explicit opt-in")
+    if (
+        _required_json_string(opt_in, "recordedVia", "agent-direct-user-opt-in.optIn")
+        != "local_cli_confirmation"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong recorder")
+    if (
+        _required_json_string(
+            opt_in,
+            "directPrintDefault",
+            "agent-direct-user-opt-in.optIn",
+        )
+        != "approval_required"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in weakens approval default")
+    if _required_json_bool(
+        opt_in,
+        "unattendedPrintingAllowed",
+        "agent-direct-user-opt-in.optIn",
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in allows unattended printing")
+
+    for field in (
+        "directPrintEnabled",
+        "approvalRequiredByDefault",
+        "longDirectPrintRequiresApproval",
+        "noAutomaticRetryAfterPrintableBytes",
+        "requiresTrustedPrinter",
+        "requiresStableSupportGate",
+    ):
+        if not _required_json_bool(agent_rules, field, "agent-direct-user-opt-in.agentRules"):
+            raise HardwareTestCliError("agent-direct user opt-in weakens approval policy")
+    for field in ("rawBleWritesAllowed", "unsafeResumeAllowed"):
+        if _required_json_bool(agent_rules, field, "agent-direct-user-opt-in.agentRules"):
+            raise HardwareTestCliError("agent-direct user opt-in enables unsafe direct printing")
+    if (
+        _required_json_string(
+            agent_rules,
+            "directPrintDefault",
+            "agent-direct-user-opt-in.agentRules",
+        )
+        != "approval_required"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong direct default")
+    if (
+        _required_json_string(
+            agent_rules,
+            "overLimitBehavior",
+            "agent-direct-user-opt-in.agentRules",
+        )
+        != "preview_and_ask"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong over-limit behavior")
+
+    expected_limits = {
+        "maxHeightDots": 1000,
+        "warnTotalBlackCoverage": 0.30,
+        "blockTotalBlackCoverage": 0.45,
+        "blockBandCoverage": 0.70,
+        "maxCopies": 1,
+        "jobsPerMinute": 3,
+    }
+    for field, expected in expected_limits.items():
+        if _required_json_number(limits, field, "agent-direct-user-opt-in.limits") != expected:
+            raise HardwareTestCliError("agent-direct user opt-in has wrong safety limits")
+
+    for field in (
+        "stableSupportClaimEnabled",
+        "longPrintPrintingEnabled",
+        "agentDirectPrintingEnabled",
+    ):
+        if not _required_json_bool(safety, field, "agent-direct-user-opt-in.safety"):
+            raise HardwareTestCliError("agent-direct user opt-in lacks required safety")
+    if (
+        _required_json_string(
+            safety,
+            "agentDirectPrintingDefault",
+            "agent-direct-user-opt-in.safety",
+        )
+        != "approval_required"
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in has wrong approval default")
+    if _required_json_bool(
+        safety,
+        "unattendedAgentPrintingEnabled",
+        "agent-direct-user-opt-in.safety",
+    ):
+        raise HardwareTestCliError("agent-direct user opt-in enables unattended printing")
+    next_required_stage = _required_json_string(
+        decoded,
+        "nextRequiredStage",
+        "agent-direct-user-opt-in",
+    )
+    if next_required_stage != "runtime_approval_enforcement":
+        raise HardwareTestCliError("agent-direct user opt-in has wrong next stage")
+
+    return {
+        "status": "agent_direct_user_opt_in_recorded",
+        "sourcePolicyReview": {
+            "stage": "agent_direct_policy_review",
+            "status": "agent_direct_policy_reviewed",
+            "localRecordValidated": True,
+        },
+        "optIn": {
+            "explicitUserOptIn": True,
+            "recordedVia": "local_cli_confirmation",
+            "directPrintDefault": "approval_required",
+            "unattendedPrintingAllowed": False,
+        },
+        "agentRules": {
+            "directPrintEnabled": True,
+            "directPrintDefault": "approval_required",
+            "approvalRequiredByDefault": True,
+            "longDirectPrintRequiresApproval": True,
+            "overLimitBehavior": "preview_and_ask",
+            "noAutomaticRetryAfterPrintableBytes": True,
+            "rawBleWritesAllowed": False,
+            "unsafeResumeAllowed": False,
+            "requiresTrustedPrinter": True,
+            "requiresStableSupportGate": True,
+        },
+        "limits": expected_limits,
+        "safety": {
+            "stableSupportClaimEnabled": True,
+            "longPrintPrintingEnabled": True,
+            "agentDirectPrintingEnabled": True,
+            "agentDirectPrintingDefault": "approval_required",
+            "unattendedAgentPrintingEnabled": False,
         },
         "nextRequiredStage": next_required_stage,
     }

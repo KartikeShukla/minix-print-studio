@@ -344,6 +344,35 @@ agent direct printing. In the desktop app, use `Inspect agent-direct policy
 review` in the Printer panel to show the gate while keeping explicit user opt-in
 as the next required stage.
 
+Record the explicit user opt-in gate from the agent-direct policy review:
+
+```bash
+scripts/hardware-test.sh record-agent-direct-user-opt-in \
+  --agent-direct-policy-review <agent-direct-policy-review.json> \
+  --confirm-explicit-user-opt-in \
+  --output-dir <local-output-dir>
+```
+
+This writes `agent-direct-user-opt-in.json`. The command runs offline, validates
+the policy-review gate first, requires the explicit confirmation flag, keeps
+printer identity out of the follow-up record, and keeps stdout status-only. The
+record changes the agent direct-print default from disabled to
+approval-required, keeps over-limit behavior as preview-and-ask, and continues
+to block unattended agent printing, raw BLE writes, and unsafe resume.
+
+Inspect the opt-in record before relying on it:
+
+```bash
+scripts/hardware-test.sh inspect-agent-direct-user-opt-in <agent-direct-user-opt-in.json>
+```
+
+The CLI inspection rejects records that expose raw device ids, omit local
+policy-review validation, weaken approval-required defaults, change the
+conservative agent limits, allow unattended printing, allow raw BLE writes, or
+allow unsafe resume. In the desktop app, use `Inspect agent-direct user opt-in`
+in the Printer panel to show the opt-in gate while keeping runtime approval
+enforcement as the next required stage.
+
 ## Shareable Evidence Summary
 
 Use the offline evidence summary when asking maintainers to review Stage A
