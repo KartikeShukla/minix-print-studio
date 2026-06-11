@@ -87,6 +87,7 @@ import type {
   PrinterCandidate,
   ReadOnlyVerification,
   RenderSettings,
+  StoredPreviewMetadataResponse,
 } from "@minix/shared-api";
 import {
   desktopAgentIntegrationInstaller,
@@ -178,6 +179,8 @@ type AppDaemonClient = Pick<
       | "deleteProject"
       | "uploadProjectAsset"
       | "confirmJobOutput"
+      | "getStoredPreview"
+      | "printStoredPreview"
     >
   >;
 
@@ -228,6 +231,15 @@ type PrintWorkflow =
   | { status: "running" }
   | { status: "confirming"; job: PrintJobResponse }
   | { status: "completed"; job: PrintJobResponse }
+  | { status: "error"; message: string };
+
+type AgentPreviewApprovalWorkflow =
+  | { status: "idle" }
+  | { status: "reviewing"; previewId: string }
+  | { status: "ready"; preview: StoredPreviewMetadataResponse }
+  | { status: "printing"; preview: StoredPreviewMetadataResponse }
+  | { status: "printed"; preview: StoredPreviewMetadataResponse; job: PrintJobResponse }
+  | { status: "denied"; previewId: string }
   | { status: "error"; message: string };
 
 type DiagnosticsWorkflow =
@@ -519,6 +531,9 @@ export function App({
   >(null);
   const [agentIntegrationMutation, setAgentIntegrationMutation] =
     useState<AgentIntegrationMutationWorkflow>({ status: "idle" });
+  const [agentPreviewInput, setAgentPreviewInput] = useState("");
+  const [agentPreviewApprovalWorkflow, setAgentPreviewApprovalWorkflow] =
+    useState<AgentPreviewApprovalWorkflow>({ status: "idle" });
   const [printerWorkflow, setPrinterWorkflow] = useState<PrinterWorkflow>(() =>
     printerWorkflowFromStoredVerifiedPrinter(loadStoredVerifiedPrinter()),
   );
@@ -1918,6 +1933,84 @@ export function App({
     [integrationInstaller],
   );
 
+  const reviewAgentPreview = useCallback(async () => {
+    if (!client.getStoredPreview) {
+      setAgentPreviewApprovalWorkflow({
+        status: "error",
+        message: "Agent preview review unavailable",
+      });
+      return;
+    }
+    const previewId = parseAgentPreviewId(agentPreviewInput);
+    if (!previewId) {
+      setAgentPreviewApprovalWorkflow({
+        status: "error",
+        message: "Agent preview ID is required",
+      });
+      return;
+    }
+
+    setAgentPreviewApprovalWorkflow({ status: "reviewing", previewId });
+    try {
+      const preview = await client.getStoredPreview(previewId);
+      setAgentPreviewApprovalWorkflow({ status: "ready", preview });
+    } catch (error: unknown) {
+      setAgentPreviewApprovalWorkflow({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Agent preview review failed",
+      });
+    }
+  }, [agentPreviewInput, client]);
+
+  const denyAgentPreview = useCallback(() => {
+    const previewId =
+      agentPreviewApprovalWorkflow.status === "ready" ||
+      agentPreviewApprovalWorkflow.status === "printing" ||
+      agentPreviewApprovalWorkflow.status === "printed"
+        ? agentPreviewApprovalWorkflow.preview.previewId
+        : parseAgentPreviewId(agentPreviewInput) || "unknown";
+    setAgentPreviewApprovalWorkflow({ status: "denied", previewId });
+  }, [agentPreviewApprovalWorkflow, agentPreviewInput]);
+
+  const approveAgentPreview = useCallback(async () => {
+    if (
+      agentPreviewApprovalWorkflow.status !== "ready" ||
+      !client.printStoredPreview
+    ) {
+      return;
+    }
+    const verifiedDeviceId =
+      printerWorkflow.status === "verified"
+        ? printerWorkflow.verification.deviceId
+        : undefined;
+    const preview = agentPreviewApprovalWorkflow.preview;
+    setAgentPreviewApprovalWorkflow({ status: "printing", preview });
+    try {
+      const job = await client.printStoredPreview({
+        previewId: preview.previewId,
+        profileId: preview.profileId,
+        paperMode: document.target.paperMode,
+        density: document.target.density,
+        copies: 1,
+        source: "desktop_agent_approval",
+        ...(verifiedDeviceId ? { deviceId: verifiedDeviceId } : {}),
+      });
+      setJobHistory((currentHistory) => {
+        const nextHistory = prependStoredPrintJob(currentHistory, job);
+        saveStoredJobHistory(nextHistory);
+        return nextHistory;
+      });
+      setAgentPreviewApprovalWorkflow({ status: "printed", preview, job });
+    } catch (error: unknown) {
+      setAgentPreviewApprovalWorkflow({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Agent preview print failed",
+      });
+    }
+  }, [agentPreviewApprovalWorkflow, client, document, printerWorkflow]);
+
   const statusLabel = health
     ? health.mock
       ? "Mock daemon online"
@@ -2267,6 +2360,17 @@ export function App({
               onUninstall={uninstallAgentIntegrationTarget}
               onTest={testAgentIntegrationTarget}
               onExport={exportAgentIntegrationTarget}
+            />
+
+            <AgentPreviewApprovalPanel
+              previewIdInput={agentPreviewInput}
+              workflow={agentPreviewApprovalWorkflow}
+              canReview={Boolean(client.getStoredPreview)}
+              canApprove={Boolean(client.printStoredPreview)}
+              onInputChange={setAgentPreviewInput}
+              onReview={reviewAgentPreview}
+              onDeny={denyAgentPreview}
+              onApprove={approveAgentPreview}
             />
 
             <SupportBundlePanel
@@ -3015,6 +3119,152 @@ function AgentIntegrationsPanel({
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function AgentPreviewApprovalPanel({
+  previewIdInput,
+  workflow,
+  canReview,
+  canApprove,
+  onInputChange,
+  onReview,
+  onDeny,
+  onApprove,
+}: {
+  previewIdInput: string;
+  workflow: AgentPreviewApprovalWorkflow;
+  canReview: boolean;
+  canApprove: boolean;
+  onInputChange: (value: string) => void;
+  onReview: () => void;
+  onDeny: () => void;
+  onApprove: () => void;
+}) {
+  const preview =
+    workflow.status === "ready" ||
+    workflow.status === "printing" ||
+    workflow.status === "printed"
+      ? workflow.preview
+      : null;
+  const isReviewing = workflow.status === "reviewing";
+  const isPrinting = workflow.status === "printing";
+
+  return (
+    <section className="border-t border-border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold">Agent Preview Approval</h2>
+      </div>
+
+      <div className="space-y-3 text-sm">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Agent preview ID
+          </span>
+          <input
+            aria-label="Agent preview ID"
+            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            value={previewIdInput}
+            onChange={(event) => onInputChange(event.currentTarget.value)}
+            placeholder="prev_..."
+          />
+        </label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          aria-label="Review agent preview"
+          onClick={onReview}
+          disabled={!canReview || isReviewing || isPrinting}
+        >
+          <FileSearch className="size-4" aria-hidden="true" />
+          {isReviewing ? "Reviewing" : "Review"}
+        </Button>
+
+        {preview ? (
+          <div className="space-y-2 rounded-md border border-border bg-background p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Status</span>
+              <Badge
+                variant={
+                  workflow.status === "printed"
+                    ? "success"
+                    : preview.safety.allowed === false
+                      ? "warning"
+                      : "success"
+                }
+              >
+                {workflow.status === "printed"
+                  ? "Agent preview printed"
+                  : "Agent preview ready"}
+              </Badge>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Preview</span>
+              <span className="truncate text-right">{preview.previewId}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Profile</span>
+              <span className="truncate text-right">{preview.profileId}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Coverage</span>
+              <span>{formatCoverage(preview)}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Height</span>
+              <span>{preview.heightDots} dots</span>
+            </div>
+            <SafetyMessages preview={preview} />
+            {workflow.status === "ready" ? (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Deny agent preview"
+                  onClick={onDeny}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                  Deny
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  aria-label="Approve agent preview"
+                  onClick={onApprove}
+                  disabled={!canApprove || preview.safety.allowed === false}
+                >
+                  <Printer className="size-4" aria-hidden="true" />
+                  Approve
+                </Button>
+              </div>
+            ) : null}
+            {workflow.status === "printing" ? (
+              <div className="text-muted-foreground">Submitting preview.</div>
+            ) : null}
+            {workflow.status === "printed" ? (
+              <PrintStatus
+                workflow={{ status: "completed", job: workflow.job }}
+                onConfirmOutput={() => undefined}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {workflow.status === "denied" ? (
+          <div className="rounded-md border border-warning/30 bg-warning/10 p-2 text-warning">
+            Agent preview denied
+          </div>
+        ) : workflow.status === "error" ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+            {workflow.message}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -4981,7 +5231,11 @@ function PrintStatus({
   );
 }
 
-function SafetyMessages({ preview }: { preview: DocumentPreviewResponse }) {
+function SafetyMessages({
+  preview,
+}: {
+  preview: Pick<DocumentPreviewResponse, "safety">;
+}) {
   const warnings = safetyEntryMessages(preview.safety.warnings);
   const errors = safetyEntryMessages(preview.safety.errors);
   if (warnings.length === 0 && errors.length === 0) {
@@ -5331,9 +5585,24 @@ function formatHostReadinessStatus(status: string): string {
   return labels[status] ?? "Host Bluetooth readiness unknown";
 }
 
-function formatCoverage(preview: DocumentPreviewResponse): string {
+function formatCoverage(
+  preview: Pick<DocumentPreviewResponse, "safety">,
+): string {
   const value = preview.safety.metrics?.totalBlackCoverage;
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "0%";
+}
+
+function parseAgentPreviewId(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const urlPrefix = "minixprint://approval/";
+  if (trimmed.startsWith(urlPrefix)) {
+    const id = trimmed.slice(urlPrefix.length).trim();
+    return id || null;
+  }
+  return trimmed;
 }
 
 function safetyEntryMessages(entries: unknown[] | undefined): string[] {

@@ -232,6 +232,70 @@ def test_print_endpoint_rejects_bad_approval_token_without_creating_job() -> Non
     assert client.get("/v1/jobs").json() == {"jobs": []}
 
 
+def test_print_stored_preview_endpoint_uses_server_side_approval_without_leaking_token() -> None:
+    client = TestClient(create_app(mock=True))
+    preview = _create_preview(client)
+
+    response = client.post(
+        "/v1/jobs/print-stored-preview",
+        json={
+            "previewId": preview["previewId"],
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "desktop_agent_approval",
+        },
+    )
+
+    assert response.status_code == 200
+    job = response.json()
+    assert job["previewId"] == preview["previewId"]
+    assert job["state"] == "completed_unverified"
+    assert job["source"] == "desktop_agent_approval"
+    assert "approvalToken" not in str(job)
+
+
+def test_print_stored_preview_endpoint_rejects_blocked_preview_without_creating_job() -> None:
+    client = TestClient(create_app(mock=True))
+    row_bytes = 48
+    content_height = 64
+    content_raster = bytes([0xFF]) * row_bytes * content_height
+    preview = client.post(
+        "/v1/render/preview",
+        json={
+            "documentHash": "sha256:dense-document",
+            "renderSettingsHash": "sha256:settings",
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "widthDots": 384,
+            "heightDots": content_height,
+            "rasterBase64": base64.b64encode(content_raster).decode("ascii"),
+            "safety": {
+                "allowed": False,
+                "warnings": [],
+                "errors": [{"code": "band_coverage_blocked"}],
+                "metrics": {"maxBandCoverage64": 1.0},
+            },
+        },
+    ).json()
+
+    response = client.post(
+        "/v1/jobs/print-stored-preview",
+        json={
+            "previewId": preview["previewId"],
+            "profileId": "seznik-minix-s1-lyin48d-gy",
+            "paperMode": "continuous",
+            "density": "medium",
+            "copies": 1,
+            "source": "desktop_agent_approval",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "preview safety blocked printing: band_coverage_blocked"
+    assert client.get("/v1/jobs").json() == {"jobs": []}
+
+
 def test_print_endpoint_rejects_preview_blocked_by_safety_without_creating_job() -> None:
     client = TestClient(create_app(mock=True))
     row_bytes = 48

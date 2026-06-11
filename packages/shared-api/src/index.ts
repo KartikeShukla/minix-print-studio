@@ -61,6 +61,10 @@ export const documentPreviewResponseSchema = z.object({
   expiresAt: z.string()
 });
 
+export const storedPreviewMetadataResponseSchema = documentPreviewResponseSchema.omit({
+  approvalToken: true
+});
+
 export const printPlanBandSchema = z.object({
   index: z.number().int().nonnegative(),
   startRow: z.number().int().nonnegative(),
@@ -285,6 +289,9 @@ export type PrinterProfile = z.infer<typeof printerProfileSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export type RenderSettings = z.infer<typeof renderSettingsSchema>;
 export type DocumentPreviewResponse = z.infer<typeof documentPreviewResponseSchema>;
+export type StoredPreviewMetadataResponse = z.infer<
+  typeof storedPreviewMetadataResponseSchema
+>;
 export type PrintPlanResponse = z.infer<typeof printPlanResponseSchema>;
 export type PrintJobResponse = z.infer<typeof printJobResponseSchema>;
 export type OperatorConfirmationRequest = {
@@ -316,6 +323,16 @@ export type PrintPlanRequest = {
 };
 
 export type PrintPreviewRequest = Omit<PrintPlanRequest, "jobId"> & {
+  copies: number;
+  source: string;
+  deviceId?: string;
+};
+
+export type PrintStoredPreviewRequest = {
+  previewId: string;
+  profileId: string;
+  paperMode: "continuous" | "gap_label" | "black_mark";
+  density: "light" | "medium" | "dark";
   copies: number;
   source: string;
   deviceId?: string;

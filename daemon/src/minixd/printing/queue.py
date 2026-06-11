@@ -120,6 +120,33 @@ class PrintQueue:
         self._persist_jobs()
         return job
 
+    def print_stored_preview(
+        self,
+        *,
+        preview_id: str,
+        profile_id: str,
+        paper_mode: str,
+        density: str,
+        copies: int,
+        source: str,
+        device_id: str | None = None,
+    ) -> PrintJob:
+        preview = self._preview_store.get(preview_id)
+        if preview is None:
+            raise PrintRejectedError("preview not found")
+        return self.print_preview(
+            preview_id=preview.preview_id,
+            approval_token=preview.approval_token,
+            document_hash=preview.document_hash,
+            render_settings_hash=preview.render_settings_hash,
+            profile_id=profile_id,
+            paper_mode=paper_mode,
+            density=density,
+            copies=copies,
+            source=source,
+            device_id=device_id,
+        )
+
     def list_jobs(self) -> list[PrintJob]:
         return list(self._jobs.values())
 

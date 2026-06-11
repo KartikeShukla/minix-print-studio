@@ -40,6 +40,18 @@ class PrintJobRequest(BaseModel):
     device_id: Annotated[str | None, Field(alias="deviceId", min_length=1)] = None
 
 
+class PrintStoredPreviewRequest(BaseModel):
+    preview_id: Annotated[str, Field(alias="previewId", min_length=1)]
+    profile_id: Annotated[str, Field(alias="profileId", min_length=1)]
+    paper_mode: Annotated[
+        str, Field(alias="paperMode", pattern="^(continuous|gap_label|black_mark)$")
+    ]
+    density: Annotated[str, Field(pattern="^(light|medium|dark)$")]
+    copies: Annotated[int, Field(gt=0, le=5)]
+    source: Annotated[str, Field(min_length=1)]
+    device_id: Annotated[str | None, Field(alias="deviceId", min_length=1)] = None
+
+
 class OperatorConfirmationRequest(BaseModel):
     printed_text_readable: bool = Field(alias="printedTextReadable")
     end_marker_visible: bool = Field(alias="endMarkerVisible")
@@ -92,6 +104,22 @@ def create_jobs_router(
                 approval_token=request.approval_token,
                 document_hash=request.document_hash,
                 render_settings_hash=request.render_settings_hash,
+                profile_id=request.profile_id,
+                paper_mode=request.paper_mode,
+                density=request.density,
+                copies=request.copies,
+                source=request.source,
+                device_id=request.device_id,
+            )
+        except PrintRejectedError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return _serialize_print_job(job)
+
+    @router.post("/print-stored-preview")
+    def print_stored_preview(request: PrintStoredPreviewRequest) -> dict[str, object]:
+        try:
+            job = print_queue.print_stored_preview(
+                preview_id=request.preview_id,
                 profile_id=request.profile_id,
                 paper_mode=request.paper_mode,
                 density=request.density,

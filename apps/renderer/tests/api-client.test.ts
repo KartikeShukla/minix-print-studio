@@ -174,6 +174,90 @@ describe("daemon API client", () => {
     });
   });
 
+  it("loads and prints a stored agent preview by preview id without sending an approval token", async () => {
+    const previewResponse = {
+      previewId: "prev_agent",
+      documentHash: "sha256:document",
+      renderSettingsHash: "sha256:settings",
+      rasterHash: "sha256:raster",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      widthDots: 384,
+      heightDots: 300,
+      safety: { allowed: true, warnings: [], metrics: { totalBlackCoverage: 0.08 } },
+      createdAt: "2026-06-04T00:00:00.000Z",
+      expiresAt: "2026-06-04T00:10:00.000Z"
+    };
+    const printResponse = {
+      jobId: "job_agent",
+      previewId: "prev_agent",
+      planId: "plan_job_agent",
+      deviceId: null,
+      state: "completed_unverified",
+      phase: "waiting_for_final_status",
+      completionLevel: "unverified",
+      completionConfidence: "mock_data_sent_final_ack_missing",
+      requiresUserCheck: true,
+      source: "desktop_agent_approval",
+      copies: 1,
+      bandsSent: 1,
+      totalBands: 1,
+      rowsSent: 460,
+      totalRows: 460,
+      bytesSent: 22080,
+      totalBytes: 22080,
+      tailBlankRowsDots: 160,
+      safeActions: ["confirm_complete", "feed_paper", "reprint_from_start"]
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => previewResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => printResponse });
+    vi.stubGlobal("fetch", fetchMock);
+    window.minix = {
+      getDaemonRuntime: async () => ({
+        baseUrl: "http://127.0.0.1:39281",
+        token: "secret-token"
+      }),
+      getAppVersion: async () => "0.1.0"
+    };
+    const client = createDaemonClient();
+
+    await expect(client.getStoredPreview("prev_agent")).resolves.toEqual(previewResponse);
+    await expect(
+      client.printStoredPreview({
+        previewId: "prev_agent",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        copies: 1,
+        source: "desktop_agent_approval"
+      })
+    ).resolves.toEqual(printResponse);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:39281/v1/render/previews/prev_agent", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer secret-token"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://127.0.0.1:39281/v1/jobs/print-stored-preview", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        previewId: "prev_agent",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        copies: 1,
+        source: "desktop_agent_approval"
+      })
+    });
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("approvalToken");
+  });
+
   it("scans and read-only verifies printers through the daemon with auth", async () => {
     const scanResponse = {
       printers: [
