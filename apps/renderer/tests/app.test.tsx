@@ -9,6 +9,7 @@ import { createDefaultDocument } from "@minix/design-model";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app/App";
 import type { ProjectMutationRequest } from "../src/lib/api-client";
+import { VERIFIED_PRINTER_STORAGE_KEY } from "../src/lib/printer-selection";
 import type { UpdateChannelProvider } from "../src/lib/update-channel";
 
 describe("MiniX Print Studio shell", () => {
@@ -1052,6 +1053,123 @@ describe("MiniX Print Studio shell", () => {
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(clickDownload).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:hardware-test");
+  });
+
+  it("restores a verified printer selection and uses it for the next physical print", async () => {
+    localStorage.setItem(
+      VERIFIED_PRINTER_STORAGE_KEY,
+      JSON.stringify({
+        deviceId: "mock-minix-0194",
+        name: "Seznik MiniX_0194_LE",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        modelResponse: "S1_LYiN48D_GY",
+        firmware: "V1.9.11",
+        verifiedAt: "2026-06-11T10:00:00.000Z",
+      }),
+    );
+    const createDocumentPreview = vi.fn().mockResolvedValue({
+      previewId: "prev_restored",
+      approvalToken: "appr_restored",
+      documentHash: "sha256:document",
+      renderSettingsHash: "sha256:settings",
+      rasterHash: "sha256:raster",
+      profileId: "seznik-minix-s1-lyin48d-gy",
+      widthDots: 384,
+      heightDots: 900,
+      safety: {
+        allowed: true,
+        warnings: [],
+        metrics: { totalBlackCoverage: 0.08, maxBandCoverage64: 0.12 },
+      },
+      createdAt: "2026-06-11T10:00:00.000Z",
+      expiresAt: "2026-06-11T10:05:00.000Z",
+    });
+    const planApprovedPreview = vi.fn().mockResolvedValue({
+      plan: {
+        planId: "plan_restored",
+        jobId: "job_preview",
+        previewId: "prev_restored",
+        documentHash: "sha256:document",
+        rasterHash: "sha256:raster",
+        profileId: "seznik-minix-s1-lyin48d-gy",
+        paperMode: "continuous",
+        density: "medium",
+        widthDots: 384,
+        contentHeightDots: 900,
+        tailBlankRowsDots: 160,
+        transferHeightDots: 1060,
+        rowBytes: 48,
+        totalRasterBytes: 50880,
+        requiresLongPrintMode: false,
+      },
+      totalBands: 1,
+      bands: [
+        {
+          index: 0,
+          startRow: 0,
+          heightDots: 1060,
+          rasterByteOffset: 0,
+          rasterByteLength: 50880,
+          payloadBytes: 50888,
+          blackDotCount: 120,
+          blackCoverage: 0.01,
+          cooldownAfterMs: 0,
+          sha256: "sha256:band0",
+        },
+      ],
+    });
+    const printApprovedPreview = vi.fn().mockResolvedValue({
+      jobId: "job_restored",
+      previewId: "prev_restored",
+      planId: "plan_job_restored",
+      deviceId: "mock-minix-0194",
+      state: "completed_unverified",
+      phase: "awaiting_user_check",
+      completionLevel: "unverified",
+      completionConfidence: "ble_transfer_completed",
+      requiresUserCheck: true,
+      source: "ui",
+      copies: 1,
+      operatorConfirmation: null,
+      bandsSent: 1,
+      totalBands: 1,
+      rowsSent: 1060,
+      totalRows: 1060,
+      bytesSent: 50888,
+      totalBytes: 50888,
+      tailBlankRowsDots: 160,
+      safeActions: ["confirm_complete"],
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview,
+          planApprovedPreview,
+          printApprovedPreview,
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("Remembered verified printer")).toBeInTheDocument();
+    expect(screen.getByText("Seznik MiniX_0194_LE")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByText("Preview ready");
+    fireEvent.click(screen.getByRole("button", { name: "Print" }));
+
+    await screen.findByText("job_restored");
+    expect(printApprovedPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId: "mock-minix-0194" }),
+    );
   });
 
   it("checks host Bluetooth readiness before Stage A scan", async () => {
