@@ -131,7 +131,7 @@ function buildManifest({
       {
         name: "print_note",
         description:
-          "Create a print preview for a short note without directly printing.",
+          "Create an approval-gated print preview for a short note without directly printing.",
       },
       {
         name: "render_preview",

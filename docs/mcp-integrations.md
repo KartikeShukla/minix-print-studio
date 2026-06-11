@@ -36,7 +36,10 @@ MiniX entry.
 - `list_supported_profiles` returns safe profile summaries without BLE UUIDs,
   read-only probe commands, or printer protocol payload details.
 - Print-related MCP responses include daemon preview safety data when available.
-- `print_note` returns an explicit policy decision when direct printing is
-  blocked by the default agent policy.
+- `print_note` returns an explicit policy decision. Without a reviewed opt-in
+  gate, direct printing remains blocked by the default agent policy. With a
+  reviewed `agent_direct_user_opt_in` gate, the tool may enter the
+  approval-required runtime path, but it still does not dispatch printer bytes or
+  allow unattended printing.
 - MCP tools do not accept raw BLE commands.
 - The daemon remains the only production owner of printer transport.

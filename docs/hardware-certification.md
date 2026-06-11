@@ -370,8 +370,10 @@ The CLI inspection rejects records that expose raw device ids, omit local
 policy-review validation, weaken approval-required defaults, change the
 conservative agent limits, allow unattended printing, allow raw BLE writes, or
 allow unsafe resume. In the desktop app, use `Inspect agent-direct user opt-in`
-in the Printer panel to show the opt-in gate while keeping runtime approval
-enforcement as the next required stage.
+in the Printer panel to show the opt-in gate. MCP `print_note` can enforce a
+reviewed opt-in gate at runtime and still returns approval-required preview
+metadata only; the desktop-managed MCP runtime handoff does not yet persist or
+select that gate automatically for agents.
 
 ## Shareable Evidence Summary
 

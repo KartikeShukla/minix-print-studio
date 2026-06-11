@@ -257,6 +257,11 @@ package:win-installer`, the Release Package workflow, and the release
   flow, validates the selected JSON through the same CLI path, and shows the
   explicit opt-in, approval-required default, unattended-print block, and runtime
   approval enforcement as the next stage.
+- MCP `print_note` accepts a reviewed `agent_direct_user_opt_in` gate and
+  enforces runtime approval policy against daemon preview output: the default
+  path remains blocked without the gate, valid opt-in gates still return
+  approval-required preview metadata instead of printing, and over-height or
+  safety-blocked previews keep direct print disallowed.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -372,6 +377,10 @@ package:win-installer`, the Release Package workflow, and the release
   through the hardware-test CLI, Electron bridge, renderer setup checklist, and
   renderer Printer panel while preserving the approval-required default and
   blocking unattended agent printing.
+- TDD red/green checks for MCP runtime approval enforcement on `print_note`
+  through both the core tool handler and FastMCP server wrapper, covering valid
+  opt-in gates, height-limit rejection, safety rejection, token redaction, and
+  no unattended printing.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -456,5 +465,6 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Implement runtime approval enforcement for agent direct-print requests using
-   the reviewed user opt-in gate, without allowing unattended printing.
+1. Persist or select the reviewed agent-direct user opt-in gate from the
+   desktop-managed MCP runtime handoff so agents do not need to pass the JSON
+   gate manually.

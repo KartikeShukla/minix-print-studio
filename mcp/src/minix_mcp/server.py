@@ -75,9 +75,17 @@ def build_mcp_server(
     def print_note(
         text: str,
         title: str = "Agent note",
+        agent_direct_user_opt_in: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a preview for a short text note and require user approval before printing."""
-        return print_note_tool(factory(), text=text, title=title)
+        return print_note_tool(
+            factory(),
+            text=text,
+            title=title,
+            agent_direct_user_opt_in=cast(JsonObject, agent_direct_user_opt_in)
+            if agent_direct_user_opt_in is not None
+            else None,
+        )
 
     return server
 
