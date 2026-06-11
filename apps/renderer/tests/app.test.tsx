@@ -1610,6 +1610,100 @@ describe("MiniX Print Studio shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("inspects a local agent-direct user opt-in while preserving approval required", async () => {
+    const inspect = vi.fn().mockResolvedValue({
+      recordPath: "/tmp/agent-direct-user-opt-in.json",
+      summary: {
+        status: "agent_direct_user_opt_in_recorded",
+        sourcePolicyReview: {
+          stage: "agent_direct_policy_review",
+          status: "agent_direct_policy_reviewed",
+          localRecordValidated: true,
+        },
+        optIn: {
+          explicitUserOptIn: true,
+          recordedVia: "local_cli_confirmation",
+          directPrintDefault: "approval_required",
+          unattendedPrintingAllowed: false,
+        },
+        agentRules: {
+          directPrintEnabled: true,
+          directPrintDefault: "approval_required",
+          approvalRequiredByDefault: true,
+          longDirectPrintRequiresApproval: true,
+          overLimitBehavior: "preview_and_ask",
+          noAutomaticRetryAfterPrintableBytes: true,
+          rawBleWritesAllowed: false,
+          unsafeResumeAllowed: false,
+          requiresTrustedPrinter: true,
+          requiresStableSupportGate: true,
+        },
+        limits: {
+          maxHeightDots: 1000,
+          warnTotalBlackCoverage: 0.3,
+          blockTotalBlackCoverage: 0.45,
+          blockBandCoverage: 0.7,
+          maxCopies: 1,
+          jobsPerMinute: 3,
+        },
+        safety: {
+          stableSupportClaimEnabled: true,
+          longPrintPrintingEnabled: true,
+          agentDirectPrintingEnabled: true,
+          agentDirectPrintingDefault: "approval_required",
+          unattendedAgentPrintingEnabled: false,
+        },
+        nextRequiredStage: "runtime_approval_enforcement",
+      },
+    });
+
+    render(
+      <App
+        daemonClient={{
+          getHealth: async () => ({
+            ok: true,
+            version: "0.1.0",
+            profileRegistryVersion: "2026.06.04",
+            mock: true,
+          }),
+          createDocumentPreview: vi.fn(),
+          planApprovedPreview: vi.fn(),
+          printApprovedPreview: vi.fn(),
+          scanPrinters: vi.fn(),
+          readOnlyVerify: vi.fn(),
+        }}
+        agentDirectUserOptInInspector={{ inspect }}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Inspect agent-direct user opt-in",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(inspect).toHaveBeenCalledOnce();
+    });
+    expect(
+      await screen.findByText("Agent-direct user opt-in recorded"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Policy review validated")).toBeInTheDocument();
+    expect(screen.getByText("Explicit user opt-in")).toBeInTheDocument();
+    expect(
+      screen.getByText("Approval remains required by default"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Unattended agent printing blocked"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Direct print default: approval required"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Runtime enforcement required"),
+    ).toBeInTheDocument();
+  });
+
   it("adds a text layer from the canvas tool and persists the document", async () => {
     render(
       <App

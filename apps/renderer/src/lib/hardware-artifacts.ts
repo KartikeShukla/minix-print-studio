@@ -238,6 +238,47 @@ export type AgentDirectPolicyReviewInspectionResult = {
   summary: AgentDirectPolicyReviewSummary;
 };
 
+export type AgentDirectUserOptInSummary = {
+  status: string;
+  sourcePolicyReview: {
+    stage: string;
+    status: string;
+    localRecordValidated: boolean;
+  };
+  optIn: {
+    explicitUserOptIn: boolean;
+    recordedVia: string;
+    directPrintDefault: string;
+    unattendedPrintingAllowed: boolean;
+  };
+  agentRules: {
+    directPrintEnabled: boolean;
+    directPrintDefault: string;
+    approvalRequiredByDefault: boolean;
+    longDirectPrintRequiresApproval: boolean;
+    overLimitBehavior: string;
+    noAutomaticRetryAfterPrintableBytes: boolean;
+    rawBleWritesAllowed: boolean;
+    unsafeResumeAllowed: boolean;
+    requiresTrustedPrinter: boolean;
+    requiresStableSupportGate: boolean;
+  };
+  limits: AgentDirectPolicyReviewSummary["limits"];
+  safety: {
+    stableSupportClaimEnabled: boolean;
+    longPrintPrintingEnabled: boolean;
+    agentDirectPrintingEnabled: boolean;
+    agentDirectPrintingDefault: string;
+    unattendedAgentPrintingEnabled: boolean;
+  };
+  nextRequiredStage: string;
+};
+
+export type AgentDirectUserOptInInspectionResult = {
+  recordPath: string;
+  summary: AgentDirectUserOptInSummary;
+};
+
 export type HardwareHostReadiness = {
   status: string;
   platform: string;
@@ -266,6 +307,10 @@ export type StableSupportGateInspector = {
 
 export type AgentDirectPolicyReviewInspector = {
   inspect: () => Promise<AgentDirectPolicyReviewInspectionResult | null>;
+};
+
+export type AgentDirectUserOptInInspector = {
+  inspect: () => Promise<AgentDirectUserOptInInspectionResult | null>;
 };
 
 export type HardwareReadinessProvider = {
@@ -313,6 +358,18 @@ export const desktopAgentDirectPolicyReviewInspector: AgentDirectPolicyReviewIns
         throw new Error("Agent-direct policy review inspection is unavailable");
       }
       return inspectAgentDirectPolicyReview();
+    },
+  };
+
+export const desktopAgentDirectUserOptInInspector: AgentDirectUserOptInInspector =
+  {
+    async inspect() {
+      const inspectAgentDirectUserOptIn =
+        window.minix?.inspectAgentDirectUserOptIn;
+      if (!inspectAgentDirectUserOptIn) {
+        throw new Error("Agent-direct user opt-in inspection is unavailable");
+      }
+      return inspectAgentDirectUserOptIn();
     },
   };
 

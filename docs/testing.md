@@ -75,6 +75,11 @@ pnpm release-package-check
   approval-required defaults, raw BLE write and unsafe-resume blocks, Electron
   bridge command wiring, renderer setup checklist item, and renderer Printer
   panel display while keeping direct printing disabled.
+- Agent-direct user opt-in tests cover offline gate recording from the reviewed
+  policy-review record, required explicit confirmation, status-only inspection,
+  conservative agent limits, approval-required direct default, unattended-print
+  block, raw BLE write and unsafe-resume blocks, Electron bridge command wiring,
+  renderer setup checklist item, and renderer Printer panel display.
 - Long-print reliability print-execution tests cover trusted-record chain
   validation, deterministic marker fixture submission through daemon preview and
   print APIs, status-only stdout, omission of raster payloads from stdout, and

@@ -114,12 +114,15 @@ import {
 } from "@/lib/setup-checklist";
 import {
   desktopAgentDirectPolicyReviewInspector,
+  desktopAgentDirectUserOptInInspector,
   desktopHardwareArtifactInspector,
   desktopHardwareReadinessProvider,
   desktopStableSupportGateInspector,
   desktopTrustedPrinterRecordInspector,
   type AgentDirectPolicyReviewInspectionResult,
   type AgentDirectPolicyReviewInspector,
+  type AgentDirectUserOptInInspectionResult,
+  type AgentDirectUserOptInInspector,
   type HardwareArtifactInspectionResult,
   type HardwareArtifactInspector,
   type HardwareHostReadiness,
@@ -181,6 +184,7 @@ export type AppProps = {
   trustedPrinterRecordInspector?: TrustedPrinterRecordInspector;
   stableSupportGateInspector?: StableSupportGateInspector;
   agentDirectPolicyReviewInspector?: AgentDirectPolicyReviewInspector;
+  agentDirectUserOptInInspector?: AgentDirectUserOptInInspector;
   hardwareReadinessProvider?: HardwareReadinessProvider;
   supportBundleExporter?: SupportBundleExporter;
   updateChannelProvider?: UpdateChannelProvider;
@@ -274,6 +278,12 @@ type AgentDirectPolicyReviewWorkflow =
   | { status: "idle" }
   | { status: "running" }
   | { status: "ready"; result: AgentDirectPolicyReviewInspectionResult }
+  | { status: "error"; message: string };
+
+type AgentDirectUserOptInWorkflow =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; result: AgentDirectUserOptInInspectionResult }
   | { status: "error"; message: string };
 
 type HardwareReadinessWorkflow =
@@ -381,6 +391,7 @@ export function App({
   trustedPrinterRecordInspector,
   stableSupportGateInspector,
   agentDirectPolicyReviewInspector,
+  agentDirectUserOptInInspector,
   hardwareReadinessProvider,
   supportBundleExporter,
   updateChannelProvider,
@@ -414,6 +425,10 @@ export function App({
       agentDirectPolicyReviewInspector ??
       desktopAgentDirectPolicyReviewInspector,
     [agentDirectPolicyReviewInspector],
+  );
+  const userOptInInspector = useMemo(
+    () => agentDirectUserOptInInspector ?? desktopAgentDirectUserOptInInspector,
+    [agentDirectUserOptInInspector],
   );
   const readinessProvider = useMemo(
     () => hardwareReadinessProvider ?? desktopHardwareReadinessProvider,
@@ -483,6 +498,8 @@ export function App({
     useState<StableSupportGateWorkflow>({ status: "idle" });
   const [agentDirectPolicyReviewWorkflow, setAgentDirectPolicyReviewWorkflow] =
     useState<AgentDirectPolicyReviewWorkflow>({ status: "idle" });
+  const [agentDirectUserOptInWorkflow, setAgentDirectUserOptInWorkflow] =
+    useState<AgentDirectUserOptInWorkflow>({ status: "idle" });
   const [hardwareReadinessWorkflow, setHardwareReadinessWorkflow] =
     useState<HardwareReadinessWorkflow>({ status: "idle" });
   const [agentIntegrationWorkflow, setAgentIntegrationWorkflow] =
@@ -1715,6 +1732,24 @@ export function App({
     }
   }, [policyReviewInspector]);
 
+  const inspectAgentDirectUserOptIn = useCallback(async () => {
+    setAgentDirectUserOptInWorkflow({ status: "running" });
+    try {
+      const result = await userOptInInspector.inspect();
+      setAgentDirectUserOptInWorkflow(
+        result ? { status: "ready", result } : { status: "idle" },
+      );
+    } catch (error: unknown) {
+      setAgentDirectUserOptInWorkflow({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Agent-direct user opt-in inspection failed",
+      });
+    }
+  }, [userOptInInspector]);
+
   const copyAgentIntegrationConfig = useCallback(
     async (target: AgentIntegrationPreviewTarget) => {
       try {
@@ -2069,6 +2104,7 @@ export function App({
                 agentDirectPolicyReviewWorkflow={
                   agentDirectPolicyReviewWorkflow
                 }
+                agentDirectUserOptInWorkflow={agentDirectUserOptInWorkflow}
                 agentIntegrationWorkflow={agentIntegrationWorkflow}
                 onDismiss={dismissSetupChecklist}
               />
@@ -2102,6 +2138,7 @@ export function App({
               trustedPrinterRecordWorkflow={trustedPrinterRecordWorkflow}
               stableSupportGateWorkflow={stableSupportGateWorkflow}
               agentDirectPolicyReviewWorkflow={agentDirectPolicyReviewWorkflow}
+              agentDirectUserOptInWorkflow={agentDirectUserOptInWorkflow}
               onCheckHostBluetooth={checkHostBluetoothReadiness}
               onVerify={runReadOnlyVerify}
               onExportHardwareArtifact={runHardwareArtifactExport}
@@ -2109,6 +2146,7 @@ export function App({
               onInspectTrustedPrinterRecord={inspectTrustedPrinterRecord}
               onInspectStableSupportGate={inspectStableSupportGate}
               onInspectAgentDirectPolicyReview={inspectAgentDirectPolicyReview}
+              onInspectAgentDirectUserOptIn={inspectAgentDirectUserOptIn}
             />
 
             <section className="border-b border-border p-4">
@@ -2538,6 +2576,7 @@ function SetupChecklistPanel({
   trustedPrinterRecordWorkflow,
   stableSupportGateWorkflow,
   agentDirectPolicyReviewWorkflow,
+  agentDirectUserOptInWorkflow,
   agentIntegrationWorkflow,
   onDismiss,
 }: {
@@ -2548,6 +2587,7 @@ function SetupChecklistPanel({
   trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
   stableSupportGateWorkflow: StableSupportGateWorkflow;
   agentDirectPolicyReviewWorkflow: AgentDirectPolicyReviewWorkflow;
+  agentDirectUserOptInWorkflow: AgentDirectUserOptInWorkflow;
   agentIntegrationWorkflow: AgentIntegrationWorkflow;
   onDismiss: () => void;
 }) {
@@ -2577,6 +2617,10 @@ function SetupChecklistPanel({
     {
       label: "Agent-direct policy gate",
       ready: agentDirectPolicyReviewWorkflow.status === "ready",
+    },
+    {
+      label: "Agent-direct user opt-in",
+      ready: agentDirectUserOptInWorkflow.status === "ready",
     },
     {
       label: "Agent integrations",
@@ -4059,6 +4103,7 @@ function PrinterPanel({
   trustedPrinterRecordWorkflow,
   stableSupportGateWorkflow,
   agentDirectPolicyReviewWorkflow,
+  agentDirectUserOptInWorkflow,
   onCheckHostBluetooth,
   onVerify,
   onExportHardwareArtifact,
@@ -4066,6 +4111,7 @@ function PrinterPanel({
   onInspectTrustedPrinterRecord,
   onInspectStableSupportGate,
   onInspectAgentDirectPolicyReview,
+  onInspectAgentDirectUserOptIn,
 }: {
   workflow: PrinterWorkflow;
   hardwareReadinessWorkflow: HardwareReadinessWorkflow;
@@ -4074,6 +4120,7 @@ function PrinterPanel({
   trustedPrinterRecordWorkflow: TrustedPrinterRecordWorkflow;
   stableSupportGateWorkflow: StableSupportGateWorkflow;
   agentDirectPolicyReviewWorkflow: AgentDirectPolicyReviewWorkflow;
+  agentDirectUserOptInWorkflow: AgentDirectUserOptInWorkflow;
   onCheckHostBluetooth: () => void;
   onVerify: (deviceId: string, candidates: PrinterCandidate[]) => void;
   onExportHardwareArtifact: (deviceId: string) => void;
@@ -4081,6 +4128,7 @@ function PrinterPanel({
   onInspectTrustedPrinterRecord: () => void;
   onInspectStableSupportGate: () => void;
   onInspectAgentDirectPolicyReview: () => void;
+  onInspectAgentDirectUserOptIn: () => void;
 }) {
   const candidates = "candidates" in workflow ? workflow.candidates : [];
   const primaryCandidate = candidates[0];
@@ -4146,6 +4194,10 @@ function PrinterPanel({
       <AgentDirectPolicyReviewStatus
         workflow={agentDirectPolicyReviewWorkflow}
         onInspect={onInspectAgentDirectPolicyReview}
+      />
+      <AgentDirectUserOptInStatus
+        workflow={agentDirectUserOptInWorkflow}
+        onInspect={onInspectAgentDirectUserOptIn}
       />
     </section>
   );
@@ -4422,6 +4474,80 @@ function AgentDirectPolicyReviewStatus({
               <Badge variant="warning">
                 Next: explicit user opt-in required
               </Badge>
+            ) : null}
+          </div>
+        </div>
+      ) : workflow.status === "error" ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
+          {workflow.message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AgentDirectUserOptInStatus({
+  workflow,
+  onInspect,
+}: {
+  workflow: AgentDirectUserOptInWorkflow;
+  onInspect: () => void;
+}) {
+  const summary = workflow.status === "ready" ? workflow.result.summary : null;
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onInspect}
+        disabled={workflow.status === "running"}
+      >
+        <ShieldCheck className="size-4" aria-hidden="true" />
+        {workflow.status === "running"
+          ? "Inspecting agent-direct user opt-in"
+          : "Inspect agent-direct user opt-in"}
+      </Button>
+      {summary ? (
+        <div className="space-y-3 rounded-md border border-warning/30 bg-warning/10 p-3">
+          <div>
+            <div className="font-medium text-warning">
+              Agent-direct user opt-in recorded
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <span className="text-muted-foreground">Source policy</span>
+              <span className="text-right">Policy review validated</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <TrustedEvidenceRow
+              label="Explicit user opt-in"
+              ready={summary.optIn.explicitUserOptIn}
+            />
+            <TrustedEvidenceRow
+              label="Approval remains required by default"
+              ready={summary.agentRules.approvalRequiredByDefault}
+            />
+            <TrustedEvidenceRow
+              label="Unattended agent printing blocked"
+              ready={!summary.safety.unattendedAgentPrintingEnabled}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {summary.agentRules.directPrintDefault === "approval_required" ? (
+              <Badge variant="warning">
+                Direct print default: approval required
+              </Badge>
+            ) : null}
+            {!summary.agentRules.rawBleWritesAllowed ? (
+              <Badge variant="warning">Raw BLE writes blocked</Badge>
+            ) : null}
+            {!summary.agentRules.unsafeResumeAllowed ? (
+              <Badge variant="warning">Unsafe resume blocked</Badge>
+            ) : null}
+            {summary.nextRequiredStage === "runtime_approval_enforcement" ? (
+              <Badge variant="warning">Runtime enforcement required</Badge>
             ) : null}
           </div>
         </div>

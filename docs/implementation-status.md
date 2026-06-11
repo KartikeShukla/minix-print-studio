@@ -243,6 +243,20 @@ package:win-installer`, the Release Package workflow, and the release
   flow, validates the selected JSON through the same CLI path, and shows the
   approval-required default, preview-and-ask over-limit behavior, agent limits,
   raw-write/resume blocks, and explicit user opt-in as the next stage.
+- `minix-hardware-test record-agent-direct-user-opt-in` records an offline
+  local JSON gate from the reviewed agent-direct policy review, requires the
+  explicit confirmation flag, keeps stdout status-only, switches the direct
+  default to approval-required, and continues blocking unattended agent printing,
+  raw BLE writes, and unsafe resume.
+- `minix-hardware-test inspect-agent-direct-user-opt-in` validates a local
+  agent-direct user opt-in JSON record offline, rejects raw device IDs, missing
+  local policy-review validation, weakened approval defaults, changed
+  conservative limits, unattended printing, raw BLE writes, or unsafe resume,
+  and does not contact the daemon.
+- Electron exposes agent-direct user opt-in inspection from the Printer setup
+  flow, validates the selected JSON through the same CLI path, and shows the
+  explicit opt-in, approval-required default, unattended-print block, and runtime
+  approval enforcement as the next stage.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -354,6 +368,10 @@ package:win-installer`, the Release Package workflow, and the release
   through the hardware-test CLI, Electron bridge, renderer setup checklist, and
   renderer Printer panel while keeping direct printing disabled pending explicit
   user opt-in.
+- TDD red/green checks for agent-direct user opt-in recording and inspection
+  through the hardware-test CLI, Electron bridge, renderer setup checklist, and
+  renderer Printer panel while preserving the approval-required default and
+  blocking unattended agent printing.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -438,5 +456,5 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Design the explicit user opt-in workflow for agent direct printing without
-   changing the approval-required default.
+1. Implement runtime approval enforcement for agent direct-print requests using
+   the reviewed user opt-in gate, without allowing unattended printing.
