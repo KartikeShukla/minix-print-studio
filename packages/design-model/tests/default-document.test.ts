@@ -11,6 +11,7 @@ import {
   printDocumentSchema,
   qrElementSchema,
   rectElementSchema,
+  removeElement,
   textElementSchema,
   updateElement
 } from "../src/index";
@@ -139,6 +140,48 @@ describe("default print document", () => {
     expect(moved.elements[0].x).toBe(48);
     expect(moved.elements[0].y).toBe(96);
     expect(moved.updatedAt).toBe("2026-06-04T00:05:00.000Z");
+  });
+
+  it("removes an element immutably and bumps updatedAt", () => {
+    const document = createDefaultDocument({
+      title: "Remove fixture",
+      now: new Date("2026-06-04T00:00:00.000Z")
+    });
+    const text = createTextElement({
+      id: "el_remove",
+      name: "Remove me",
+      text: "Remove me",
+      x: 24,
+      y: 56,
+      width: 160,
+      height: 48
+    });
+    const keep = createRectElement({
+      id: "el_keep",
+      name: "Keep me",
+      x: 24,
+      y: 144,
+      width: 336,
+      height: 64
+    });
+    const withElements = {
+      ...document,
+      elements: [text, keep]
+    };
+
+    const removed = removeElement(withElements, "el_remove", {
+      now: new Date("2026-06-04T00:05:00.000Z")
+    });
+
+    expect(withElements.elements).toHaveLength(2);
+    expect(removed.elements.map((element) => element.id)).toEqual(["el_keep"]);
+    expect(removed.updatedAt).toBe("2026-06-04T00:05:00.000Z");
+
+    const unchanged = removeElement(withElements, "el_missing", {
+      now: new Date("2026-06-04T00:06:00.000Z")
+    });
+    expect(unchanged.elements).toHaveLength(2);
+    expect(unchanged.updatedAt).toBe(withElements.updatedAt);
   });
 
   it("updates an element immutably and bumps updatedAt", () => {

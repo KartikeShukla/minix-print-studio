@@ -295,6 +295,21 @@ export function moveElement(
   };
 }
 
+export function removeElement(
+  document: PrintDocument,
+  elementId: string,
+  options: { now?: Date } = {}
+): PrintDocument {
+  if (!document.elements.some((element) => element.id === elementId)) {
+    return document;
+  }
+  return {
+    ...document,
+    updatedAt: (options.now ?? new Date()).toISOString(),
+    elements: document.elements.filter((element) => element.id !== elementId)
+  };
+}
+
 export function updateElement(
   document: PrintDocument,
   elementId: string,

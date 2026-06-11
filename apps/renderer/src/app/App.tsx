@@ -53,6 +53,7 @@ import {
   printDocumentSchema,
   qrElementSchema,
   rectElementSchema,
+  removeElement,
   textElementSchema,
   updateElement,
   type ImageElement,
@@ -427,6 +428,7 @@ export function App({
     [updateChannelProvider],
   );
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const [editorState, setEditorState] = useState<EditorState>(() => {
     const document =
       loadStoredDocument() ?? createDefaultDocument({ heightDots: 900 });
@@ -922,6 +924,38 @@ export function App({
     [commitDocument],
   );
 
+  const deleteDocumentElement = useCallback(
+    (elementId: string) => {
+      setEditingTextElementId(null);
+      commitDocument((currentDocument) => ({
+        document: removeElement(currentDocument, elementId),
+        selectedElementId: null,
+      }));
+    },
+    [commitDocument],
+  );
+
+  const nudgeDocumentElement = useCallback(
+    (elementId: string, deltaX: number, deltaY: number) => {
+      commitDocument((currentDocument) => {
+        const element = currentDocument.elements.find(
+          (candidate) => candidate.id === elementId,
+        );
+        if (!element || element.locked) {
+          return { document: currentDocument };
+        }
+        return {
+          document: moveElement(currentDocument, elementId, {
+            x: Math.max(0, element.x + deltaX),
+            y: Math.max(0, element.y + deltaY),
+          }),
+          selectedElementId: elementId,
+        };
+      });
+    },
+    [commitDocument],
+  );
+
   const transformDocumentElement = useCallback(
     (elementId: string, transform: ElementTransform) => {
       updateDocumentElement(elementId, (currentElement) => ({
@@ -1011,6 +1045,110 @@ export function App({
     });
     invalidatePreview();
   }, [invalidatePreview]);
+
+  useEffect(() => {
+    const handleEditorKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redoDocumentChange();
+        } else {
+          undoDocumentChange();
+        }
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redoDocumentChange();
+        return;
+      }
+
+      if (!selectedElementId) {
+        return;
+      }
+      if (event.key === "Escape") {
+        selectElement(null);
+        return;
+      }
+      const selected = document.elements.find(
+        (element) => element.id === selectedElementId,
+      );
+      if (!selected) {
+        return;
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (!selected.locked) {
+          event.preventDefault();
+          deleteDocumentElement(selectedElementId);
+        }
+        return;
+      }
+      const nudgeDirections: Record<string, [number, number]> = {
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+      };
+      const direction = nudgeDirections[event.key];
+      if (direction && !selected.locked) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        nudgeDocumentElement(
+          selectedElementId,
+          direction[0] * step,
+          direction[1] * step,
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleEditorKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleEditorKeyDown);
+    };
+  }, [
+    document.elements,
+    selectedElementId,
+    deleteDocumentElement,
+    nudgeDocumentElement,
+    redoDocumentChange,
+    selectElement,
+    undoDocumentChange,
+  ]);
+
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) {
+      return;
+    }
+    const handleWorkspaceWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+      event.preventDefault();
+      if (event.deltaY < 0) {
+        zoomCanvasIn();
+      } else if (event.deltaY > 0) {
+        zoomCanvasOut();
+      }
+    };
+    workspace.addEventListener("wheel", handleWorkspaceWheel, {
+      passive: false,
+    });
+    return () => {
+      workspace.removeEventListener("wheel", handleWorkspaceWheel);
+    };
+  }, [zoomCanvasIn, zoomCanvasOut]);
 
   const runPreview = useCallback(async () => {
     setPreviewWorkflow({ status: "running" });
@@ -1787,7 +1925,7 @@ export function App({
             <Button
               variant="outline"
               size="icon"
-              title="Undo"
+              title="Undo (Ctrl/Cmd+Z)"
               aria-label="Undo"
               onClick={undoDocumentChange}
               disabled={!canUndo}
@@ -1797,7 +1935,7 @@ export function App({
             <Button
               variant="outline"
               size="icon"
-              title="Redo"
+              title="Redo (Ctrl/Cmd+Shift+Z)"
               aria-label="Redo"
               onClick={redoDocumentChange}
               disabled={!canRedo}
@@ -1827,6 +1965,11 @@ export function App({
             <Button
               size="sm"
               disabled={!previewReady || printWorkflow.status === "running"}
+              title={
+                previewReady
+                  ? undefined
+                  : "Run Preview first - printing requires an approved daemon preview"
+              }
               onClick={runPrint}
             >
               <Printer className="size-4" aria-hidden="true" />
@@ -1888,7 +2031,11 @@ export function App({
             </section>
           </aside>
 
-          <section className="min-h-0 overflow-auto bg-workspace p-6">
+          <section
+            ref={workspaceRef}
+            aria-label="Canvas workspace"
+            className="min-h-0 overflow-auto bg-workspace p-6"
+          >
             <div className="mx-auto flex min-h-full w-full max-w-4xl items-start justify-center">
               <DocumentCanvas
                 document={document}
@@ -1942,6 +2089,11 @@ export function App({
               onOpen={openProject}
               onDelete={deleteProject}
             />
+            <ElementInspector
+              element={selectedElement}
+              onUpdate={updateDocumentElement}
+              onDelete={deleteDocumentElement}
+            />
             <PrinterPanel
               workflow={printerWorkflow}
               hardwareReadinessWorkflow={hardwareReadinessWorkflow}
@@ -1957,10 +2109,6 @@ export function App({
               onInspectTrustedPrinterRecord={inspectTrustedPrinterRecord}
               onInspectStableSupportGate={inspectStableSupportGate}
               onInspectAgentDirectPolicyReview={inspectAgentDirectPolicyReview}
-            />
-            <ElementInspector
-              element={selectedElement}
-              onUpdate={updateDocumentElement}
             />
 
             <section className="border-b border-border p-4">
@@ -2815,9 +2963,11 @@ function AgentIntegrationsPanel({
 function ElementInspector({
   element,
   onUpdate,
+  onDelete,
 }: {
   element: DocumentElement | null;
   onUpdate: (elementId: string, updater: ElementUpdater) => void;
+  onDelete: (elementId: string) => void;
 }) {
   const textElement = element ? textElementSchema.safeParse(element) : null;
   const rectElement = element ? rectElementSchema.safeParse(element) : null;
@@ -3146,6 +3296,17 @@ function ElementInspector({
               </label>
             </div>
           ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+            title="Delete layer (Delete)"
+            onClick={() => onDelete(element.id)}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            Delete layer
+          </Button>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">No layer selected</p>
