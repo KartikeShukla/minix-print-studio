@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import plistlib
+import struct
 import sys
 from pathlib import Path
 
@@ -15,8 +16,28 @@ REQUIRED_ARTIFACTS = {
 }
 WINDOWS_REQUIRED_PATHS = (
     Path("win-unpacked/MiniX Print Studio.exe"),
+    Path("win-unpacked/resources/app.asar"),
     Path("win-unpacked/resources/sidecars/minixd.exe"),
     Path("win-unpacked/resources/sidecars/minix-mcp.exe"),
+)
+PACKAGED_APP_SMOKE_SNIPPETS = (
+    (
+        "out/main/index.js",
+        'app.setAsDefaultProtocolClient("minixprint")',
+        'app.setAsDefaultProtocolClient("minixprint")',
+    ),
+    ("out/main/index.js", 'app.on("open-url"', 'app.on("open-url")'),
+    ("out/main/index.js", 'app.on("second-instance"', 'app.on("second-instance")'),
+    (
+        "out/preload/index.mjs",
+        "agent-preview-approvals:list",
+        "agent-preview-approvals:list",
+    ),
+    (
+        "out/preload/index.mjs",
+        "agent-preview-approvals:changed",
+        "agent-preview-approvals:changed",
+    ),
 )
 WINDOWS_INSTALLER_GLOB = "MiniX Print Studio-*-win-x64.exe"
 FORBIDDEN_PREFIXES = (
@@ -27,9 +48,7 @@ FORBIDDEN_PREFIXES = (
     "jobs/",
     "hardware-artifacts/",
 )
-MAC_BLUETOOTH_USAGE_DESCRIPTION = (
-    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
-)
+MAC_BLUETOOTH_USAGE_DESCRIPTION = "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
 MAC_BLUETOOTH_USAGE_KEYS = (
     "NSBluetoothAlwaysUsageDescription",
     "NSBluetoothPeripheralUsageDescription",
@@ -79,7 +98,9 @@ def validate_release_evidence(
 
     issues.extend(validate_workflow_run_json(workflow_run_json))
     issues.extend(validate_macos_artifact(evidence_dir / REQUIRED_ARTIFACTS["macOS"]))
-    issues.extend(validate_windows_artifact(evidence_dir / REQUIRED_ARTIFACTS["Windows"]))
+    issues.extend(
+        validate_windows_artifact(evidence_dir / REQUIRED_ARTIFACTS["Windows"])
+    )
     issues.extend(
         validate_windows_installer_artifact(
             evidence_dir / REQUIRED_ARTIFACTS["Windows installer"]
@@ -123,12 +144,19 @@ def validate_macos_artifact(artifact_dir: Path) -> list[str]:
 
     required_paths = (
         app_contents / "Info.plist",
+        app_contents / "Resources/app.asar",
         app_contents / "Resources/sidecars/minixd",
         app_contents / "Resources/sidecars/minix-mcp",
     )
     issues.extend(validate_required_paths(artifact_dir, "macOS", required_paths))
     issues.extend(validate_macos_info_plist(artifact_dir, app_contents / "Info.plist"))
     issues.extend(validate_checksum_manifest(artifact_dir, "macOS", required_paths))
+    issues.extend(
+        validate_packaged_app_smoke(
+            artifact_dir / app_contents / "Resources/app.asar",
+            label="macOS",
+        )
+    )
     return issues
 
 
@@ -137,8 +165,18 @@ def validate_windows_artifact(artifact_dir: Path) -> list[str]:
     if issues and not artifact_dir.is_dir():
         return issues
 
-    issues.extend(validate_required_paths(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS))
-    issues.extend(validate_checksum_manifest(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS))
+    issues.extend(
+        validate_required_paths(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS)
+    )
+    issues.extend(
+        validate_checksum_manifest(artifact_dir, "Windows", WINDOWS_REQUIRED_PATHS)
+    )
+    issues.extend(
+        validate_packaged_app_smoke(
+            artifact_dir / "win-unpacked/resources/app.asar",
+            label="Windows",
+        )
+    )
     return issues
 
 
@@ -173,12 +211,20 @@ def validate_artifact_common(artifact_dir: Path, *, label: str) -> list[str]:
         for path in artifact_dir.rglob("*")
         if path.is_file() or path.is_dir()
     ]
-    if any(relative_path.name == "builder-debug.yml" for relative_path in relative_paths):
+    if any(
+        relative_path.name == "builder-debug.yml" for relative_path in relative_paths
+    ):
         issues.append(f"{label} artifact must not include builder-debug.yml")
-    if any(part.startswith(".icon-") for relative_path in relative_paths for part in relative_path.parts):
+    if any(
+        part.startswith(".icon-")
+        for relative_path in relative_paths
+        for part in relative_path.parts
+    ):
         issues.append(f"{label} artifact must not include .icon-* scratch directories")
     for prefix in FORBIDDEN_PREFIXES:
-        if any(_matches_prefix(relative_path, prefix) for relative_path in relative_paths):
+        if any(
+            _matches_prefix(relative_path, prefix) for relative_path in relative_paths
+        ):
             issues.append(f"{label} artifact must not include {prefix}")
     return issues
 
@@ -213,7 +259,9 @@ def validate_checksum_manifest(
     for relative_path, expected_digest in entries.items():
         target = artifact_dir / relative_path
         if not target.is_file():
-            issues.append(f"{label} checksum manifest lists missing file {relative_path}")
+            issues.append(
+                f"{label} checksum manifest lists missing file {relative_path}"
+            )
             continue
         actual_digest = hashlib.sha256(target.read_bytes()).hexdigest()
         if actual_digest != expected_digest:
@@ -234,9 +282,83 @@ def validate_macos_info_plist(artifact_dir: Path, info_plist_path: Path) -> list
     if not isinstance(payload, dict):
         return ["macOS artifact Info.plist is not a dictionary"]
 
-    if any(payload.get(key) != MAC_BLUETOOTH_USAGE_DESCRIPTION for key in MAC_BLUETOOTH_USAGE_KEYS):
+    if any(
+        payload.get(key) != MAC_BLUETOOTH_USAGE_DESCRIPTION
+        for key in MAC_BLUETOOTH_USAGE_KEYS
+    ):
         return ["macOS artifact Info.plist missing Bluetooth usage descriptions"]
     return []
+
+
+def validate_packaged_app_smoke(asar_path: Path, *, label: str) -> list[str]:
+    if not asar_path.is_file():
+        return []
+
+    try:
+        files = read_asar_files(
+            asar_path, ("out/main/index.js", "out/preload/index.mjs")
+        )
+    except (AsarReadError, OSError, UnicodeDecodeError) as exc:
+        return [f"{label} packaged app.asar could not be inspected: {exc}"]
+
+    issues: list[str] = []
+    for relative_path, snippet, display_snippet in PACKAGED_APP_SMOKE_SNIPPETS:
+        content = files.get(relative_path, "")
+        if snippet not in content:
+            issues.append(
+                f"{label} packaged app.asar missing deep-link smoke evidence: "
+                f"{display_snippet}"
+            )
+    return issues
+
+
+class AsarReadError(ValueError):
+    pass
+
+
+def read_asar_files(asar_path: Path, relative_paths: tuple[str, ...]) -> dict[str, str]:
+    payload = asar_path.read_bytes()
+    if len(payload) < 16:
+        raise AsarReadError("archive header is truncated")
+
+    header_size = struct.unpack_from("<I", payload, 4)[0]
+    json_size = struct.unpack_from("<I", payload, 12)[0]
+    header_start = 16
+    header_end = header_start + json_size
+    content_base = 8 + header_size
+    if header_end > len(payload) or content_base > len(payload):
+        raise AsarReadError("archive header extends past file size")
+
+    header = json.loads(payload[header_start:header_end].decode("utf-8"))
+    files: dict[str, str] = {}
+    for relative_path in relative_paths:
+        entry = _find_asar_entry(header, relative_path)
+        if entry is None:
+            raise AsarReadError(f"missing {relative_path}")
+        offset = int(entry["offset"])
+        size = int(entry["size"])
+        start = content_base + offset
+        end = start + size
+        if start < content_base or end > len(payload):
+            raise AsarReadError(f"{relative_path} extends past file size")
+        files[relative_path] = payload[start:end].decode("utf-8")
+    return files
+
+
+def _find_asar_entry(header: object, relative_path: str) -> dict[str, object] | None:
+    node = header
+    for part in relative_path.split("/"):
+        if not isinstance(node, dict):
+            return None
+        files = node.get("files")
+        if not isinstance(files, dict):
+            return None
+        node = files.get(part)
+        if node is None:
+            return None
+    return (
+        node if isinstance(node, dict) and "offset" in node and "size" in node else None
+    )
 
 
 def parse_checksum_manifest(path: Path) -> dict[str, str]:
@@ -254,7 +376,9 @@ def parse_checksum_manifest(path: Path) -> dict[str, str]:
 
 
 def find_macos_app_contents(artifact_dir: Path) -> Path | None:
-    for info_plist in sorted(artifact_dir.glob("mac*/MiniX Print Studio.app/Contents/Info.plist")):
+    for info_plist in sorted(
+        artifact_dir.glob("mac*/MiniX Print Studio.app/Contents/Info.plist")
+    ):
         return info_plist.parent.relative_to(artifact_dir)
     return None
 

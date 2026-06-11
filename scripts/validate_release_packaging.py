@@ -40,9 +40,7 @@ BUILDER_REQUIRED_SNIPPETS = (
     "signAndEditExecutable: false",
     "publish: null",
 )
-MAC_BLUETOOTH_USAGE_DESCRIPTION = (
-    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
-)
+MAC_BLUETOOTH_USAGE_DESCRIPTION = "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
 MAC_BLUETOOTH_USAGE_KEYS = (
     "NSBluetoothAlwaysUsageDescription",
     "NSBluetoothPeripheralUsageDescription",
@@ -106,6 +104,11 @@ RELEASE_WORKFLOW_REQUIRED_SNIPPETS = (
         "release package workflow missing command: "
         "node scripts/run_python.mjs scripts/write_release_checksums.py dist/release",
     ),
+    (
+        "node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release",
+        "release package workflow missing command: "
+        "node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release",
+    ),
 )
 
 
@@ -145,20 +148,28 @@ def validate_repository(root: Path) -> list[str]:
     issues.extend(validate_builder_config_text(text))
     for snippet in BUILDER_REQUIRED_SNIPPETS:
         if snippet not in text:
-            issues.append(f"electron-builder config missing required setting: {snippet}")
+            issues.append(
+                f"electron-builder config missing required setting: {snippet}"
+            )
     for icon_path in REQUIRED_PACKAGE_ICON_PATHS:
         if not (root / icon_path).is_file():
-            issues.append(f"missing required package icon asset: {icon_path.as_posix()}")
+            issues.append(
+                f"missing required package icon asset: {icon_path.as_posix()}"
+            )
 
     desktop_tsconfig = root / DESKTOP_TSCONFIG_PATH
     if not desktop_tsconfig.is_file():
         issues.append(f"missing required file: {DESKTOP_TSCONFIG_PATH.as_posix()}")
     else:
-        issues.extend(validate_desktop_tsconfig_text(desktop_tsconfig.read_text(encoding="utf-8")))
+        issues.extend(
+            validate_desktop_tsconfig_text(desktop_tsconfig.read_text(encoding="utf-8"))
+        )
 
     release_workflow = root / RELEASE_PACKAGE_WORKFLOW_PATH
     if not release_workflow.is_file():
-        issues.append(f"missing required file: {RELEASE_PACKAGE_WORKFLOW_PATH.as_posix()}")
+        issues.append(
+            f"missing required file: {RELEASE_PACKAGE_WORKFLOW_PATH.as_posix()}"
+        )
     else:
         issues.extend(
             validate_release_package_workflow_text(
@@ -195,16 +206,22 @@ def validate_builder_config_text(text: str) -> list[str]:
     if not _sidecar_resources_included(text):
         issues.append("electron-builder config must include sidecar binaries")
     if not _windows_resource_editing_disabled(text):
-        issues.append("electron-builder config must disable Windows executable resource editing")
+        issues.append(
+            "electron-builder config must disable Windows executable resource editing"
+        )
     if not _mac_icon_configured(text):
         issues.append("electron-builder config must set mac icon: build/icon.png")
     if not _windows_icon_configured(text):
         issues.append("electron-builder config must set Windows icon: build/icon.ico")
     if not _mac_bluetooth_usage_descriptions_configured(text):
-        issues.append("electron-builder config must set macOS Bluetooth usage descriptions")
+        issues.append(
+            "electron-builder config must set macOS Bluetooth usage descriptions"
+        )
     for marker in PRIVATE_PATH_MARKERS:
         if marker in text:
-            issues.append(f"electron-builder config contains private path marker: {marker}")
+            issues.append(
+                f"electron-builder config contains private path marker: {marker}"
+            )
             break
     return issues
 
@@ -217,9 +234,14 @@ def validate_desktop_tsconfig_text(text: str) -> list[str]:
         return ["apps/desktop/tsconfig.json is not valid JSON"]
 
     compiler_options = payload.get("compilerOptions")
-    paths = compiler_options.get("paths") if isinstance(compiler_options, dict) else None
+    paths = (
+        compiler_options.get("paths") if isinstance(compiler_options, dict) else None
+    )
     expected_alias = ["../../packages/integration-configs/src/index.ts"]
-    if not isinstance(paths, dict) or paths.get("@minix/integration-configs") != expected_alias:
+    if (
+        not isinstance(paths, dict)
+        or paths.get("@minix/integration-configs") != expected_alias
+    ):
         issues.append(
             "apps/desktop/tsconfig.json must map @minix/integration-configs to source"
         )
@@ -250,8 +272,12 @@ def validate_release_package_workflow_text(text: str) -> list[str]:
         for artifact_name, issue in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_NAMES.items()
         if artifact_name not in text
     )
-    if any(snippet not in text for snippet in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS):
-        issues.append("release package workflow must exclude electron-builder scratch artifacts")
+    if any(
+        snippet not in text for snippet in RELEASE_WORKFLOW_REQUIRED_ARTIFACT_EXCLUSIONS
+    ):
+        issues.append(
+            "release package workflow must exclude electron-builder scratch artifacts"
+        )
     return issues
 
 
@@ -288,7 +314,10 @@ def _contains_signing_identity(text: str) -> bool:
 def _publishing_enabled(text: str) -> bool:
     for line in text.splitlines():
         stripped = line.strip()
-        if stripped.startswith("publish:") and stripped not in {"publish: null", "publish: never"}:
+        if stripped.startswith("publish:") and stripped not in {
+            "publish: null",
+            "publish: never",
+        }:
             return True
     return False
 

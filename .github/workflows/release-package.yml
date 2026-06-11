@@ -70,6 +70,7 @@ jobs:
       - run: python -m pip install -e daemon[dev] -e mcp[dev]
       - run: pnpm release-package-check
       - run: ${{ matrix.package_command }}
+      - run: node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release
       - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
       - uses: actions/upload-artifact@v4
         with:
