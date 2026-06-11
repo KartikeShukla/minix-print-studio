@@ -67,9 +67,12 @@ The evidence validator requires a successful manual `Release Package` run,
 platform-named macOS and Windows unsigned artifact directories, the unsigned
 Windows installer artifact, matching `SHA256SUMS.txt` manifests, bundled
 daemon/MCP sidecars, and no runtime state, diagnostics, hardware artifacts, or
-electron-builder scratch files. The macOS artifact must also include Bluetooth
-usage descriptions in `Info.plist` explaining that Bluetooth is used only to
-connect to the local MiniX thermal printer.
+electron-builder scratch files. It also inspects packaged `app.asar` files for
+the custom `minixprint://` approval-link registration and pending-preview IPC
+handoff so release artifacts keep the agent approval review path intact. The
+macOS artifact must also include Bluetooth usage descriptions in `Info.plist`
+explaining that Bluetooth is used only to connect to the local MiniX thermal
+printer.
 
 ## Public History Gate
 

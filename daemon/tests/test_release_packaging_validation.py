@@ -8,8 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_PACKAGING_SCRIPT = PROJECT_ROOT / "scripts" / "validate_release_packaging.py"
 BLUETOOTH_USAGE_DESCRIPTION = (
-    "MiniX Print Studio uses Bluetooth only to connect to your local "
-    "MiniX thermal printer."
+    "MiniX Print Studio uses Bluetooth only to connect to your local MiniX thermal printer."
 )
 BLUETOOTH_EXTEND_INFO = (
     "  extendInfo:\n"
@@ -91,9 +90,7 @@ def test_release_packaging_check_requires_windows_installer_package_command() ->
         },
         desktop_scripts={
             **validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS,
-            "package:win-installer": validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS[
-                "package:win"
-            ],
+            "package:win-installer": validator.DESKTOP_REQUIRED_PACKAGE_SCRIPTS["package:win"],
         },
     )
 
@@ -165,6 +162,23 @@ def test_release_packaging_check_requires_artifact_upload_step() -> None:
     )
 
     assert issues == ["release package workflow missing artifact upload step"]
+
+
+def test_release_packaging_check_requires_packaged_app_smoke_step() -> None:
+    validator = _load_validator()
+    smoke_command = (
+        "      - run: node scripts/run_python.mjs "
+        "scripts/validate_packaged_app_smoke.py dist/release\n"
+    )
+
+    issues = validator.validate_release_package_workflow_text(
+        _complete_release_workflow_text().replace(smoke_command, "")
+    )
+
+    assert issues == [
+        "release package workflow missing command: "
+        "node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release",
+    ]
 
 
 def test_release_packaging_check_requires_platform_named_artifacts() -> None:
@@ -432,6 +446,7 @@ jobs:
       - run: pnpm package:mac
       - run: pnpm package:win
       - run: pnpm package:win-installer
+      - run: node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release
       - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
       - uses: actions/upload-artifact@v4
         with:

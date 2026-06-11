@@ -38,6 +38,7 @@ REQUIRED_SOURCE_PATHS = (
     Path("scripts/generate_desktop_icons.py"),
     Path("scripts/write_release_checksums.py"),
     Path("scripts/validate_release_evidence.py"),
+    Path("scripts/validate_packaged_app_smoke.py"),
     Path("scripts/validate_public_history.py"),
 )
 
@@ -63,9 +64,7 @@ FORBIDDEN_SOURCE_PREFIXES = (
     "test-results/",
 )
 
-FORBIDDEN_SOURCE_NAMES = (
-    ".DS_Store",
-)
+FORBIDDEN_SOURCE_NAMES = (".DS_Store",)
 
 
 def main() -> int:

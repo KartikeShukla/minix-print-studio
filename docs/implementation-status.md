@@ -43,6 +43,10 @@ Public development is on `main`; implementation slices use short-lived
 - Windows unsigned installer packaging is wired through `pnpm
 package:win-installer`, the Release Package workflow, and the release
   packaging/evidence validators as `minix-print-studio-windows-installer-unsigned`.
+- Release Package workflow runs a packaged app smoke after each Electron package
+  build, and release evidence validation inspects packaged `app.asar` files for
+  the `minixprint://` approval-link registration plus pending-preview IPC
+  handoff before artifacts are accepted.
 - Public GitHub repository `KartikeShukla/minix-print-studio` is live with the implementation work merged into `main`.
 - Manual Release Package workflow run `27053365446` on public `main` commit `028ca71` completed successfully on macOS and Windows runners, and downloaded evidence passed `scripts/validate_release_evidence.py` with the Bluetooth usage-description gate enabled.
 - Dependabot is configured for weekly npm workspace, GitHub Actions, daemon Python, and MCP Python dependency updates, with open-source/source package validators requiring the config.
@@ -306,6 +310,9 @@ package:win-installer`, the Release Package workflow, and the release
 - TDD red/green checks for release workflow evidence validation across successful run metadata, Windows package/sidecar presence, checksum manifests, and forbidden artifact paths.
 - TDD red/green checks for unsigned Windows installer packaging scripts,
   workflow artifact upload, and downloaded installer evidence validation.
+- TDD red/green checks for packaged app smoke validation of `app.asar` custom
+  protocol registration, `open-url`/`second-instance` handling, and
+  pending-preview IPC bridge coverage in release evidence and workflow gates.
 - TDD red/green checks for Dependabot config coverage across npm, GitHub Actions, daemon Python, and MCP Python dependency manifests.
 - TDD red/green checks for CodeQL workflow coverage across JavaScript/TypeScript and Python plus its least-privilege scan upload permissions.
 - TDD red/green checks for least-privilege GitHub Actions permissions and Node 24 JavaScript action runtime opt-in on required workflows.
@@ -491,6 +498,5 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Add a packaged-app smoke for custom protocol registration and second-instance
-   approval URL handoff once unsigned package validation has a stable GUI smoke
-   lane.
+1. Add a packaged-app smoke for the renderer approval queue using an Electron
+   test harness once CI has a stable signed-or-dev launch path for GUI flows.
