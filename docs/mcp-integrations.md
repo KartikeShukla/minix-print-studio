@@ -27,10 +27,11 @@ The renderer's Agent Integrations panel previews config snippets, installs suppo
 targets with backup manifests, tests prerequisites, and can uninstall only the managed
 MiniX entry.
 
-The renderer's Agent Preview Approval panel can review an MCP-created preview by
-preview ID or `minixprint://approval/<previewId>` URL, display the daemon's
-redacted preview metadata and safety summary, deny locally, or approve the
-stored preview through the daemon without receiving the hidden approval token.
+The desktop app registers `minixprint://approval/<previewId>` links. Incoming
+approval links are queued in the renderer's Agent Preview Approval panel, which
+auto-opens the newest pending preview, displays the daemon's redacted metadata
+and safety summary, lets the user deny locally, or approves the stored preview
+through the daemon without receiving the hidden approval token.
 
 ## Security Boundary
 
@@ -48,6 +49,9 @@ stored preview through the daemon without receiving the hidden approval token.
   for redacted metadata and `/v1/jobs/print-stored-preview` for user-approved
   submission. Neither response exposes approval tokens, raw raster data, BLE
   commands, or segment payloads.
+- Desktop deep-link handling stores only preview IDs, approval URLs, and receipt
+  timestamps in the in-app pending queue; bearer tokens and approval tokens stay
+  out of the renderer and MCP client.
 - `print_note` returns an explicit policy decision. Without a reviewed opt-in
   gate, direct printing remains blocked by the default agent policy. With a
   reviewed `agent_direct_user_opt_in` gate supplied by the caller or selected in

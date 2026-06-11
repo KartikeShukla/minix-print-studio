@@ -6,6 +6,7 @@ import type {
   AgentIntegrationPreview,
   AgentIntegrationTargetId,
 } from "@/lib/agent-integrations";
+import type { PendingAgentPreviewApproval } from "@/lib/agent-preview-approvals";
 import type {
   AgentDirectPolicyReviewInspectionResult,
   AgentDirectUserOptInInspectionResult,
@@ -111,6 +112,11 @@ declare global {
       getDaemonRuntime: () => Promise<DaemonRuntime>;
       getAppVersion: () => Promise<string>;
       getAgentIntegrationPreview?: () => Promise<AgentIntegrationPreview>;
+      listAgentPreviewApprovals?: () => Promise<PendingAgentPreviewApproval[]>;
+      removeAgentPreviewApproval?: (previewId: string) => Promise<void>;
+      onAgentPreviewApprovalsChanged?: (
+        callback: (approvals: PendingAgentPreviewApproval[]) => void,
+      ) => (() => void) | undefined;
       installAgentIntegrationConfig?: (
         targetId: AgentIntegrationTargetId,
       ) => Promise<AgentIntegrationInstallResult>;

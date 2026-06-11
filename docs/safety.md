@@ -35,6 +35,9 @@ explicit certification stages pass.
 - Desktop approval of an MCP-created preview may submit a stored preview by
   preview ID after user review. The approval token stays inside the daemon
   preview store; renderer and MCP responses must not expose it.
+- Desktop `minixprint://approval/<previewId>` handling queues only token-free
+  approval links and preview IDs before opening the review surface; it must not
+  persist daemon bearer tokens, approval tokens, raw raster data, or BLE payloads.
 - A daemon result of `completed_unverified` means the BLE transfer finished from
   the daemon's perspective; it does not certify that the paper output is correct.
 - Agent direct printing is disabled by default, and MCP print tools return
