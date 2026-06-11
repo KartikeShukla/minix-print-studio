@@ -72,7 +72,7 @@ jobs:
       - run: ${{ matrix.package_command }}
       - run: node scripts/run_python.mjs scripts/validate_packaged_app_smoke.py dist/release
       - run: node scripts/run_python.mjs scripts/write_release_checksums.py dist/release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: |
