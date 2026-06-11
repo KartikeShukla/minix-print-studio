@@ -24,13 +24,14 @@ explicit certification stages pass.
   user opt-in record exists.
 - An agent-direct user opt-in record may change the direct-print default to
   approval-required only after local confirmation. It still blocks unattended
-  agent printing, raw BLE writes, and unsafe resume until runtime approval
-  enforcement is implemented.
+  agent printing, raw BLE writes, and unsafe resume. The desktop runtime handoff
+  can select this reviewed gate for MCP agents without embedding the JSON in
+  committed config.
 - Runtime approval enforcement may allow an MCP tool such as `print_note` to
   enter the approval-required preview flow when a reviewed opt-in gate is
-  supplied. It must still return preview/approval metadata only, reject unsafe or
-  over-limit previews, and never dispatch printer bytes without a user-approved
-  preview token.
+  supplied by the caller or selected through the desktop handoff. It must still
+  return preview/approval metadata only, reject unsafe or over-limit previews,
+  and never dispatch printer bytes without a user-approved preview token.
 - A daemon result of `completed_unverified` means the BLE transfer finished from
   the daemon's perspective; it does not certify that the paper output is correct.
 - Agent direct printing is disabled by default, and MCP print tools return

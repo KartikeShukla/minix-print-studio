@@ -266,6 +266,10 @@ package:win-installer`, the Release Package workflow, and the release
   path remains blocked without the gate, valid opt-in gates still return
   approval-required preview metadata instead of printing, and over-height or
   safety-blocked previews keep direct print disallowed.
+- Desktop runtime handoff can persist a validated agent-direct user opt-in gate
+  as `runtime/agent-direct-user-opt-in.json`, reference it from `runtime.json`,
+  and the MCP server auto-applies that gate to `print_note` when the caller does
+  not pass `agent_direct_user_opt_in` manually.
 - `minix-hardware-test print-long-print-reliability` validates the same
   Stage A/B/C/trusted-record chain, generates the deterministic 8000-dot
   low-coverage marker fixture, submits it through `/v1/render/preview` and
@@ -385,6 +389,10 @@ package:win-installer`, the Release Package workflow, and the release
   through both the core tool handler and FastMCP server wrapper, covering valid
   opt-in gates, height-limit rejection, safety rejection, token redaction, and
   no unattended printing.
+- TDD red/green checks for desktop-selected MCP opt-in handoff cover runtime
+  JSON file references, token/gate JSON separation, handoff rewrites preserving
+  the selected gate, MCP runtime resolution, inline-gate rejection, and FastMCP
+  `print_note` auto-selection when callers omit the gate.
 - TDD red/green checks for Stage D long-print reliability print execution
   through the daemon preview and print APIs while keeping stdout status-only and
   using a dedicated long-print HTTP timeout for `/v1/jobs/print`.
@@ -469,6 +477,6 @@ export-read-only --help` show `--require-host-ready` as a guarded Stage A
 
 ## Next Implementation Slices
 
-1. Persist or select the reviewed agent-direct user opt-in gate from the
-   desktop-managed MCP runtime handoff so agents do not need to pass the JSON
-   gate manually.
+1. Add a desktop approval surface for MCP-originated print previews so a user can
+   review an agent-created preview, approve or deny it, and submit the existing
+   preview-bound print job without exposing approval tokens to the agent.

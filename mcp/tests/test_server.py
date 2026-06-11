@@ -163,6 +163,34 @@ async def test_mcp_server_calls_print_note_with_agent_direct_opt_in(
 
 
 @pytest.mark.anyio
+async def test_mcp_server_uses_runtime_selected_agent_direct_opt_in() -> None:
+    server = build_mcp_server(
+        client_factory=StubDaemonClient,
+        agent_direct_user_opt_in_provider=_agent_direct_user_opt_in_record,
+    )
+    async with create_connected_server_and_client_session(
+        server,
+        raise_exceptions=True,
+    ) as session:
+        result = await session.call_tool(
+            "print_note",
+            {
+                "text": "Restock labels",
+                "title": "Agent note",
+            },
+        )
+
+    assert result.structuredContent is not None
+    assert result.structuredContent["status"] == "approval_required"
+    assert result.structuredContent["policyDecision"]["directPrintAllowed"] is True
+    assert (
+        result.structuredContent["policyDecision"]["sourceGate"]
+        == "agent_direct_user_opt_in"
+    )
+    assert "approvalToken" not in str(result.structuredContent)
+
+
+@pytest.mark.anyio
 async def test_mcp_server_calls_get_job_status_tool(
     client_session: ClientSession,
 ) -> None:

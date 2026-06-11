@@ -17,13 +17,18 @@ from minix_mcp.tools import (
 )
 
 ClientFactory = Callable[[], DaemonClient]
+AgentDirectUserOptInProvider = Callable[[], JsonObject | None]
 
 
 def build_mcp_server(
     *,
     client_factory: ClientFactory | None = None,
+    agent_direct_user_opt_in_provider: AgentDirectUserOptInProvider | None = None,
 ) -> FastMCP:
     factory = client_factory or build_default_client
+    runtime_opt_in_provider = (
+        agent_direct_user_opt_in_provider or build_default_agent_direct_user_opt_in
+    )
     server = FastMCP(
         "MiniX Print Studio",
         instructions=(
@@ -78,13 +83,16 @@ def build_mcp_server(
         agent_direct_user_opt_in: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create a preview for a short text note and require user approval before printing."""
+        selected_agent_direct_user_opt_in = (
+            cast(JsonObject, agent_direct_user_opt_in)
+            if agent_direct_user_opt_in is not None
+            else runtime_opt_in_provider()
+        )
         return print_note_tool(
             factory(),
             text=text,
             title=title,
-            agent_direct_user_opt_in=cast(JsonObject, agent_direct_user_opt_in)
-            if agent_direct_user_opt_in is not None
-            else None,
+            agent_direct_user_opt_in=selected_agent_direct_user_opt_in,
         )
 
     return server
@@ -96,6 +104,10 @@ def build_default_client() -> DaemonHttpClient:
         base_url=runtime.base_url,
         token=runtime.token,
     )
+
+
+def build_default_agent_direct_user_opt_in() -> JsonObject | None:
+    return resolve_daemon_runtime().agent_direct_user_opt_in
 
 
 def run_stdio_server() -> None:
